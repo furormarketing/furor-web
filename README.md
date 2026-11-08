@@ -1,26 +1,15 @@
 # Furor Marketing — sitio web
 
-Home de furormarketing.com: un solo `index.html` (Three.js + GSAP + Lenis por CDN).
+Home de furormarketing.com: un solo `index.html` con CSS y JS embebidos, sin frameworks.
+El logo, las fotos y los íconos de WhatsApp/Instagram van dentro del mismo archivo, así que no hace falta subir imágenes aparte.
 
-## Imágenes
-Subilas a esta misma carpeta, con estos nombres exactos:
+## Secciones
+Hero (FUROR MARKETING + grilla de herramientas) · Cuenta regresiva de cupos · Servicios · Proceso · Sedes (mapa 3D del NOA) · Preguntas frecuentes · Pie de página con CTA. Botón flotante de WhatsApp en toda la página.
 
-| Archivo | Qué es |
-|---|---|
-| `hero.jpg` | Imagen principal del hero (16:9) |
-| `depth.png` | Mapa de profundidad del hero (Depth Anything V2 / MiDaS) |
-| `water-mask.png` | (Opcional) máscara del estanque |
-| `project-1.jpg` … `project-4.jpg` | Imágenes de los proyectos |
-
-Mientras falten, el sitio usa ilustraciones de respaldo.
-
-## Editar textos y datos
-Todo está en el objeto `CONFIG`, al principio del `<script>` en `index.html`:
-proyectos, mail, WhatsApp, redes, textos y tiempos de animación.
-
-## Probar en tu compu
-Abrí la carpeta en VS Code → extensión "Live Server" → click derecho en `index.html` → "Open with Live Server".
-(No lo abras con doble click: Chrome bloquea las texturas WebGL desde archivos locales.)
+## Datos que se editan seguido
+- **WhatsApp:** buscá `wa.me/549` (Tucumán 3814953316, Salta 3872260178, Santiago del Estero 3858523537).
+- **Cuenta regresiva:** en el `<script>`, `CICLO_DIAS` (duración del ciclo) y `CUPOS` (`null` = no se muestra).
+- **Preguntas frecuentes:** buscá `faq__pregunta`.
 
 ## Publicación
 Cada cambio que se sube a la rama `main` se publica solo en GitHub Pages en 1–2 minutos.
