@@ -111,7 +111,7 @@ label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:60
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;min-width:0;box-shadow:var(--shadow)}
 .card-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-2px 0 12px}
 .card-h h2{display:flex;align-items:center;gap:8px}
-.card-h a{font-size:13px;font-weight:600;text-decoration:none}
+.card-h > a{font-size:13px;font-weight:600;text-decoration:none}
 .count{font-size:12px;font-weight:700;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
 .list{display:flex;flex-direction:column}
 .row{display:flex;gap:12px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
@@ -338,3 +338,5 @@ tbody tr.click:hover{background:var(--brand-soft)}
 .card > h2{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
 .card > h2 a{font-size:13px;font-family:var(--font-body);font-weight:600;text-decoration:none}
 a.btn[aria-disabled]{pointer-events:auto}
+
+label.f input,label.f select,label.f textarea{font-weight:400;color:var(--ink)}

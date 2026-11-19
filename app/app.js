@@ -11,7 +11,7 @@ const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY,
 });
 const NAV = [
   ["inicio","Inicio","home","Operación"],["agenda","Agenda","cal","Operación"],["tareas","Tareas","check","Operación"],["chat","Chat","chat","Operación"],
-  ["clientes","Clientes","briefcase","Cuentas"],["contenido","Contenido","grid","Cuentas"],
+  ["clientes","Clientes","briefcase","Cuentas"],["contenido","Contenido","grid","Cuentas"],["publicados","Publicados","link","Cuentas"],
   ["prospectos","Prospectos","target","Ventas"],["plantillas","Plantillas","message","Ventas"],["material","Material","file","Ventas"],
   ["novedades","Novedades","bell","Equipo"],["equipo","Equipo","users","Equipo"]
 ];
@@ -37,7 +37,9 @@ const ICONS = {
   ok:'<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
   download:'<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
   copy:'<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
-  plus:'<path d="M12 5v14M5 12h14"/>'
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  link:'<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/>',
+  send:'<path d="M21 3 3 10.5l7 3 3 7z"/><path d="m10 13.5 4.5-4.5"/>'
 };
 const icon = n => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]||""}</svg>`;
 const ETAPAS = ["Nuevo","Contactado","Reunión agendada","Propuesta enviada","Ganado","Perdido"];
@@ -58,16 +60,16 @@ const DKEYS = ["lun","mar","mie","jue","vie","sab","dom"];
 const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const MES_C = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-const TABLES = ["miembros","clientes","tareas","eventos","entregas","publicaciones","mensajes","novedades","config","material","plantillas","prospectos"];
+const TABLES = ["miembros","clientes","tareas","eventos","entregas","publicaciones","mensajes","novedades","config","material","plantillas","prospectos","publicados"];
 const MAX_MB = 50;
 
 /* ---------- Estado ---------- */
 const S = {
   session:null, me:null, loading:true, authMode:"entrar", authErr:"", authBusy:false,
-  miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[], material:[], plantillas:[], prospectos:[],
+  miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[], material:[], plantillas:[], prospectos:[], publicados:[], selPub:{},
   more:false,
   view:"inicio", cliId:null, cliTab:"resumen",
-  f:{ cliQ:"", cliSede:"", cliEstado:"Activo", tScope:"todas", tArea:"", agSede:"", calSel:null, ctScope:"todas", chatQ:"", pScope:"todos", pSede:"", pQ:"", matCat:"", tplEt:"" },
+  f:{ cliQ:"", cliSede:"", cliEstado:"Activo", tScope:"todas", tArea:"", agSede:"", calSel:null, ctScope:"todas", chatQ:"", pScope:"todos", pSede:"", pQ:"", matCat:"", tplEt:"", pubEst:"pendientes", pubCli:"", pubQ:"" },
   cal:(()=>{const d=new Date();return {y:d.getFullYear(),m:d.getMonth()};})(),
   weekOff:0, chatCh:"general", drafts:{}, pedido:false
 };
@@ -100,12 +102,13 @@ function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("sh
 const ls = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
 
 /* ---------- Datos ---------- */
-const ORDER = { mensajes:["creado",true], novedades:["creado",false], miembros:["nombre",true], clientes:["nombre",true], material:["creado",false], plantillas:["orden",true], prospectos:["actualizado",false] };
+const ORDER = { mensajes:["creado",true], novedades:["creado",false], miembros:["nombre",true], clientes:["nombre",true], material:["creado",false], plantillas:["orden",true], prospectos:["actualizado",false], publicados:["fecha",false] };
 async function loadTable(t){
   let q = sb.from(t).select("*");
   if(ORDER[t]) q = q.order(ORDER[t][0], {ascending:ORDER[t][1]});
   if(t==="mensajes") q = sb.from(t).select("*").order("creado",{ascending:false}).limit(1500);
   if(t==="publicaciones") q = q.gte("fecha", addDays(today(),-60));
+  if(t==="publicados") q = q.gte("fecha", addDays(today(),-120));
   const { data, error } = await q;
   if(error){ console.error(t,error); return; }
   S[t] = t==="mensajes" ? (data||[]).reverse() : (data||[]);
@@ -249,7 +252,7 @@ function render(){
       <nav class="bottom-nav" id="bnav"></nav><div class="more-sheet" id="more" onclick="if(event.target.id==='more'){S.more=false;render()}"></div>`;
   }
   renderNav();
-  const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial};
+  const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,publicados:vPublicados};
   $("#main").innerHTML = views[S.view]();
   if(aid){ const el=document.getElementById(aid); if(el){ el.focus(); try{ if(sel!=null) el.setSelectionRange(sel,sel); }catch(e){} } }
   const m2=$(".msgs"); if(m2 && atBottom) m2.scrollTop=m2.scrollHeight;
@@ -257,7 +260,7 @@ function render(){
   if(S.view==="clientes" && S.cliId && S.cliTab==="chat") markSeen(S.cliId);
 }
 function navBadges(){
-  return { chat:unreadTotal(), tareas:overdue(openTasks().filter(t=>t.asignado===S.me.id)).length, contenido:pendingToday(S.me.rol==="cm").length, prospectos:prospAtrasados(true).length };
+  return { chat:unreadTotal(), tareas:overdue(openTasks().filter(t=>t.asignado===S.me.id)).length, contenido:pendingToday(S.me.rol==="cm").length, prospectos:prospAtrasados(true).length, publicados:(S.me.rol==="admin"?S.publicados.filter(p=>!p.enviado).length:0) };
 }
 function renderNav(){
   const b=navBadges(); let html="", grp="";
@@ -343,6 +346,7 @@ function vInicio(){
     [pAtr.length,"bad","target","Prospectos con seguimiento atrasado","#prospectos"],
     [ped.length,"warn","chat","Pedidos sin resolver","#chat"],
     [paraRevisar.length,"warn","eye","Piezas esperando revisión","#clientes"],
+    [isAdmin()?S.publicados.filter(p=>!p.enviado).length:0,"warn","send","Links publicados sin enviar al cliente","#publicados"],
     [pend.length,"info","grid","Publicaciones para hoy","#contenido"],
     [evHoy.length,"info","cal","Reuniones y llamadas hoy","#agenda"],
     [pHoy.length,"info","phone","Prospectos para contactar hoy","#prospectos"]
@@ -436,7 +440,7 @@ function vContenido(){
 async function togglePub(cid,fecha,formato){
   const ex=S.publicaciones.find(p=>p.cliente_id===cid&&p.fecha===fecha&&p.formato===formato);
   if(ex){ S.publicaciones=S.publicaciones.filter(p=>p!==ex); render(); await run(sb.from("publicaciones").delete().eq("id",ex.id)); }
-  else { const row={cliente_id:cid,fecha,formato,hecho_por:S.me.id}; S.publicaciones.push(Object.assign({id:"tmp"},row)); render(); await run(sb.from("publicaciones").insert(row)); }
+  else { const row={cliente_id:cid,fecha,formato,hecho_por:S.me.id}; S.publicaciones.push(Object.assign({id:"tmp"},row)); render(); if(await run(sb.from("publicaciones").insert(row))) formPublicado(null,cid,fecha,formato,true); }
   scheduleReload("publicaciones");
 }
 
@@ -457,9 +461,9 @@ function vClientes(){
   </tbody></table></div>`:`<div class="card"><div class="empty">${S.clientes.length?"No hay clientes con esos filtros.":"Todavía no hay clientes. Cargá el primero."}</div></div>`}`;
 }
 function fichaCliente(c){
-  const tabs=[["resumen","Ficha"],["entregas","Entregas"],["chat","Chat"],["pauta","Pauta"],["agenda","Tareas y agenda"]];
+  const tabs=[["resumen","Ficha"],["entregas","Entregas"],["publicados","Publicados"],["chat","Chat"],["pauta","Pauta"],["agenda","Tareas y agenda"]];
   const un=unread(c.id);
-  const body={resumen:tabResumen,entregas:tabEntregas,chat:()=>chatBox(c.id,true),pauta:tabPauta,agenda:tabAgenda}[S.cliTab]||tabResumen;
+  const body={resumen:tabResumen,entregas:tabEntregas,publicados:c=>`<div class="toolbar"><button class="btn pri" onclick="formPublicado(null,'${c.id}')">${icon("plus")}Cargar link</button></div>`+pubGroup(c,S.publicados.filter(p=>p.cliente_id===c.id)),chat:()=>chatBox(c.id,true),pauta:tabPauta,agenda:tabAgenda}[S.cliTab]||tabResumen;
   return `
   <div class="head"><div><div class="eyebrow"><a href="#clientes" style="text-decoration:none">← Clientes</a></div><h1>${esc(c.nombre)}</h1><p>${esc([c.rubro,c.sede,c.plan].filter(Boolean).join(" · "))} ${estPill(c.estado)}</p></div>
     <div class="acts"><button class="btn" onclick="formCliente('${c.id}')">Editar ficha</button></div></div>
@@ -922,6 +926,108 @@ async function saveMaterial(e,id){
   }
   const ok = id ? await run(sb.from("material").update(data).eq("id",id),"Material actualizado") : await run(sb.from("material").insert(Object.assign({autor:S.me.id},data)),"Material subido");
   if(ok) closeModal(); else { $("#maSave").disabled=false; $("#maSave").textContent="Guardar"; }
+}
+
+/* ---------- Publicados (links para enviar al cliente) ---------- */
+const FMT_PUB = ["Reel","Post","Carrusel","Historia","Video","Otro"];
+const REDES = ["Instagram","Facebook","TikTok","YouTube","Otra"];
+const shortUrl = u => String(u).replace(/^https?:\/\/(www\.)?/,"").replace(/\/$/,"").slice(0,48)+(String(u).length>55?"…":"");
+function vPublicados(){
+  const q=S.f.pubQ.toLowerCase();
+  let list=S.publicados.filter(p=>(S.f.pubEst!=="pendientes"||!p.enviado)&&(!S.f.pubCli||p.cliente_id===S.f.pubCli));
+  if(q) list=list.filter(p=>[cliName(p.cliente_id),p.url,p.nota,p.formato].join(" ").toLowerCase().includes(q));
+  const byCli={}; list.forEach(p=>(byCli[p.cliente_id]=byCli[p.cliente_id]||[]).push(p));
+  const ids=Object.keys(byCli).sort((a,b)=>cliName(a).localeCompare(cliName(b)));
+  const pend=S.publicados.filter(p=>!p.enviado).length;
+  return `${pageHead("Cuentas","Publicados","La CM carga el link de cada publicación. Después se los mandás al cliente por WhatsApp, todos juntos en un solo mensaje.",`<button class="btn pri" onclick="formPublicado()">${icon("plus")}Cargar link</button>`)}
+  <div class="toolbar">
+    <div class="seg"><button class="${S.f.pubEst==="pendientes"?"on":""}" onclick="S.f.pubEst='pendientes';render()">Sin enviar <span class="count" style="margin-left:4px">${pend}</span></button><button class="${S.f.pubEst==="todos"?"on":""}" onclick="S.f.pubEst='todos';render()">Todos</button></div>
+    <select id="pubCli" aria-label="Cliente" onchange="S.f.pubCli=this.value;render()"><option value="">Todos los clientes</option>${S.clientes.filter(c=>S.publicados.some(p=>p.cliente_id===c.id)).map(c=>`<option value="${c.id}" ${S.f.pubCli===c.id?"selected":""}>${esc(c.nombre)}</option>`).join("")}</select>
+    <input type="search" id="pubQ" placeholder="Buscar…" value="${esc(S.f.pubQ)}" oninput="S.f.pubQ=this.value;render()">
+  </div>
+  <div class="grid">${ids.map(id=>`<section class="card">${cardH(`<a href="#cliente-${id}" style="color:inherit;text-decoration:none">${esc(cliName(id))}</a> <span class="count">${byCli[id].length}</span>`, cli(id)?.whatsapp?`<span class="s">${icon("phone")} ${esc(cli(id).whatsapp)}</span>`:"")}${pubGroup(cli(id)||{id}, byCli[id], true)}</section>`).join("")
+    || `<div class="card">${emptyMsg(S.f.pubEst==="pendientes"?"No hay links pendientes de enviar. Todo al día.":"Todavía no hay links cargados.","link")}</div>`}</div>`;
+}
+function pubGroup(c, items, inCard){
+  items=items.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+  if(!items.length) return `<div class="${inCard?"":"card"}">${emptyMsg("Sin links cargados para este cliente.","link")}</div>`;
+  const sel=items.filter(p=>S.selPub[p.id]).length;
+  const rows=items.map(p=>{ const u=safeUrl(p.url); return `<div class="row">
+    <input type="checkbox" aria-label="Seleccionar" ${S.selPub[p.id]?"checked":""} onchange="S.selPub['${p.id}']=this.checked;render()" style="width:17px;height:17px;accent-color:var(--brand)">
+    <div class="main"><div class="t">${esc(p.formato)} · ${esc(p.red)} <span class="s" style="font-weight:400">· ${fmtDate(p.fecha)}</span></div>
+      <div class="s">${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(shortUrl(p.url))}</a>`:esc(p.url)}${p.nota?" · "+esc(p.nota):""}</div></div>
+    ${p.enviado?`<span class="pill ok">${icon("ok")}Enviado</span>`:`<span class="pill warn">Sin enviar</span>`}
+    <button class="btn sm ghost" data-v="${esc(p.url)}" onclick="copyText(this.dataset.v)" aria-label="Copiar link">${icon("copy")}</button>
+    <button class="btn sm ghost" onclick="formPublicado('${p.id}')">Editar</button></div>`; }).join("");
+  const unsent=items.filter(p=>!p.enviado).map(p=>p.id);
+  return `${inCard?"":`<div class="card">`}<div class="list">${rows}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+      <button class="btn wa" onclick="enviarPublicados('${c.id}')">${icon("wa")}Enviar ${sel?sel+" seleccionado"+(sel>1?"s":""):unsent.length?"los "+unsent.length+" sin enviar":"todos"}</button>
+      ${sel?`<button class="btn ghost" onclick="${items.map(p=>`S.selPub['${p.id}']=false;`).join("")}render()">Quitar selección</button>`:""}
+    </div>${inCard?"":"</div>"}`;
+}
+function enviarPublicados(cid){
+  const c=cli(cid)||{}; const all=S.publicados.filter(p=>p.cliente_id===cid);
+  let items=all.filter(p=>S.selPub[p.id]);
+  if(!items.length) items=all.filter(p=>!p.enviado);
+  if(!items.length) items=all;
+  items=items.sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
+  S.envio={cid,ids:items.map(p=>p.id)};
+  const saludo=(c.contacto||"").split(" ")[0];
+  const txt=`Hola${saludo?" "+saludo:""}! 👋 Te compartimos lo que publicamos para ${c.nombre||"tu cuenta"}:\n\n${items.map(p=>`▸ ${p.formato} (${fmtDate(p.fecha)}): ${p.url}`).join("\n")}\n\nCualquier comentario o idea, nos avisás. ¡Seguimos!`;
+  const n=waNumber(c.whatsapp);
+  openModal(`<h2>Enviar a ${esc(c.nombre||"cliente")}</h2><div class="form">
+    <label class="f full" for="envTxt">Mensaje (lo podés editar)<textarea id="envTxt" style="min-height:220px" oninput="refreshEnvio()">${esc(txt)}</textarea></label>
+    <label class="check full"><input type="checkbox" id="envMark" checked><span>Marcar ${items.length} link${items.length>1?"s":""} como enviado${items.length>1?"s":""}</span></label>
+    ${n?"":`<p class="full s" style="margin:0">Este cliente no tiene WhatsApp cargado en su ficha: usá "Elegir chat" y seleccionalo en WhatsApp.</p>`}
+    <div class="actions"><button type="button" class="btn" onclick="closeModal()">Cerrar</button><div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn" onclick="confirmarEnvio('copiar')">${icon("copy")}Copiar</button>
+      <a class="btn ${n?"":"wa"}" id="envElegir" href="#" target="_blank" rel="noopener" onclick="confirmarEnvio('wa')">${icon("wa")}Elegir chat</a>
+      ${n?`<a class="btn wa" id="envDirecto" href="#" target="_blank" rel="noopener" onclick="confirmarEnvio('wa')">${icon("wa")}WhatsApp de ${esc(c.nombre)}</a>`:""}
+    </div></div></div>`);
+  refreshEnvio();
+}
+function refreshEnvio(){
+  const t=encodeURIComponent($("#envTxt").value), c=cli(S.envio.cid)||{}, n=waNumber(c.whatsapp);
+  $("#envElegir").href="https://wa.me/?text="+t;
+  const d=$("#envDirecto"); if(d) d.href="https://wa.me/"+n+"?text="+t;
+}
+async function confirmarEnvio(modo){
+  refreshEnvio();
+  if(modo==="copiar") await copyText($("#envTxt").value);
+  if($("#envMark").checked){
+    $("#envMark").checked=false;
+    const ids=S.envio.ids; ids.forEach(id=>S.selPub[id]=false);
+    await run(sb.from("publicados").update({enviado:true,enviado_el:new Date().toISOString(),enviado_por:S.me.id}).in("id",ids),"Marcados como enviados");
+  }
+}
+function formPublicado(id, cid, fecha, formato, desdeCalendario){
+  const p=id?S.publicados.find(x=>x.id===id)||{}:{cliente_id:cid||S.f.pubCli||"",fecha:fecha||today(),formato:{"Feed":"Post"}[formato]||formato||"Reel",red:"Instagram"};
+  openModal(`<h2>${id?"Editar link":desdeCalendario?"¿Pegás el link de la publicación?":"Cargar link publicado"}</h2>
+  ${desdeCalendario?`<p class="s" style="margin:-8px 0 14px">Marcaste ${esc(formato)} de ${esc(cliName(cid))} como publicado. Si pegás el link ahora, queda listo para mandárselo al cliente.</p>`:""}
+  <form class="form" onsubmit="savePublicado(event,'${id||""}')">
+    <label class="f full" for="puUrl">${id?"Link":"Link (podés pegar varios, uno por línea)"}${id?`<input type="url" id="puUrl" required value="${esc(p.url)}">`:`<textarea id="puUrl" required style="min-height:70px" placeholder="https://www.instagram.com/reel/…"></textarea>`}</label>
+    <label class="f" for="puCli">Cliente<select id="puCli" required><option value="">Elegí el cliente</option>${S.clientes.filter(c=>c.estado!=="Baja"||c.id===p.cliente_id).map(c=>`<option value="${c.id}" ${p.cliente_id===c.id?"selected":""}>${esc(c.nombre)}</option>`).join("")}</select></label>
+    <label class="f" for="puFecha">Fecha de publicación<input type="date" id="puFecha" value="${esc(p.fecha)}"></label>
+    <label class="f" for="puFmt">Formato<select id="puFmt">${opts(FMT_PUB,p.formato)}</select></label>
+    <label class="f" for="puRed">Red<select id="puRed">${opts(REDES,p.red)}</select></label>
+    <label class="f full" for="puNota">Nota (opcional)<input type="text" id="puNota" value="${esc(p.nota)}" placeholder="Ej: Promo Black Friday"></label>
+    ${id?`<label class="check full"><input type="checkbox" id="puEnv" ${p.enviado?"checked":""}><span>Ya se envió al cliente</span></label>`:""}
+    <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('publicados','${id}','este link')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">${desdeCalendario?"Ahora no":"Cancelar"}</button><button class="btn pri">Guardar</button></div></div></form>`);
+}
+async function savePublicado(e,id){
+  e.preventDefault();
+  const base={cliente_id:v("puCli"),fecha:v("puFecha")||today(),formato:v("puFmt"),red:v("puRed"),nota:v("puNota")};
+  if(!base.cliente_id){ toast("Elegí el cliente."); return; }
+  if(id){
+    const enviado=$("#puEnv").checked;
+    if(await run(sb.from("publicados").update(Object.assign({url:v("puUrl"),enviado,enviado_el:enviado?(S.publicados.find(x=>x.id===id)?.enviado_el||new Date().toISOString()):null},base)).eq("id",id),"Link actualizado")) closeModal();
+    return;
+  }
+  const urls=$("#puUrl").value.split(/\s+/).map(x=>x.trim()).filter(Boolean);
+  if(!urls.length){ toast("Pegá al menos un link."); return; }
+  const rows=urls.map(url=>Object.assign({url,autor:S.me.id},base));
+  if(await run(sb.from("publicados").insert(rows), urls.length>1?urls.length+" links cargados":"Link cargado")) closeModal();
 }
 
 /* ---------- Modales y formularios ---------- */
