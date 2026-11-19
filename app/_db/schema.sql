@@ -166,6 +166,11 @@ create table if not exists public.config (
   actualizado timestamptz not null default now()
 );
 
+-- ---------- Permisos de tablas (la seguridad fina la dan las políticas) ----------
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.miembros, public.clientes, public.tareas, public.eventos, public.entregas, public.publicaciones, public.mensajes, public.novedades, public.config to authenticated;
+revoke all on public.miembros, public.clientes, public.tareas, public.eventos, public.entregas, public.publicaciones, public.mensajes, public.novedades, public.config from anon;
+
 -- ---------- Seguridad por filas ----------
 alter table public.miembros enable row level security;
 alter table public.clientes enable row level security;
