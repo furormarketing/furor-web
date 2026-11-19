@@ -37,12 +37,14 @@ $$;
 
 -- Solo se pueden registrar los mails cargados en miembros
 create or replace function public.validar_registro() returns trigger
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, auth as $$
 begin
   if not exists (select 1 from public.miembros where lower(email) = lower(new.email) and activo) then
     raise exception 'MAIL_NO_AUTORIZADO';
   end if;
   update public.miembros set user_id = new.id where lower(email) = lower(new.email);
+  -- Los mails autorizados por el admin no necesitan confirmar por correo
+  update auth.users set email_confirmed_at = coalesce(email_confirmed_at, now()) where id = new.id;
   return new;
 end $$;
 
