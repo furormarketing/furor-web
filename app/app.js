@@ -10,9 +10,41 @@ const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY,
   auth: { persistSession: true, autoRefreshToken: true }
 });
 const NAV = [
-  ["inicio","Inicio"],["agenda","Agenda"],["contenido","Contenido"],["clientes","Clientes"],
-  ["tareas","Tareas"],["chat","Chat"],["novedades","Novedades"],["equipo","Equipo"]
+  ["inicio","Inicio","home","Operación"],["agenda","Agenda","cal","Operación"],["tareas","Tareas","check","Operación"],["chat","Chat","chat","Operación"],
+  ["clientes","Clientes","briefcase","Cuentas"],["contenido","Contenido","grid","Cuentas"],
+  ["prospectos","Prospectos","target","Ventas"],["plantillas","Plantillas","message","Ventas"],["material","Material","file","Ventas"],
+  ["novedades","Novedades","bell","Equipo"],["equipo","Equipo","users","Equipo"]
 ];
+const MOBILE_NAV = ["inicio","agenda","prospectos","chat"];
+const ICONS = {
+  home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
+  cal:'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>',
+  check:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/>',
+  chat:'<path d="M20 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
+  briefcase:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
+  grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
+  message:'<path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12.5h5"/>',
+  file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
+  bell:'<path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',
+  more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  alert:'<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  phone:'<path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2"/>',
+  wa:'<path d="M3.5 20.5 5 16a8.5 8.5 0 1 1 3 3z"/><path d="M9 9.5c.5 2 2 3.5 4.5 4.5l1-1.2 2 .9c-.3 1.3-1.3 1.8-2.3 1.6-3-.6-5.4-3-6-6-.2-1 .3-2 1.6-2.3l.9 2z"/>',
+  ok:'<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+  download:'<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
+  copy:'<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>'
+};
+const icon = n => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]||""}</svg>`;
+const ETAPAS = ["Nuevo","Contactado","Reunión agendada","Propuesta enviada","Ganado","Perdido"];
+const ETAPA_C = {"Nuevo":"var(--s-otra)","Contactado":"var(--info)","Reunión agendada":"var(--warn)","Propuesta enviada":"var(--s-sde)","Ganado":"var(--ok)","Perdido":"var(--danger)"};
+const CAT_MAT = ["Honorarios","Propuestas","Contratos","Presentaciones","Guías y procesos","General"];
+const ETAPAS_TPL = ["Primer contacto","Seguimiento","Reunión","Propuesta","Cierre","Recuperar","Otro"];
+const ORIGENES = ["Anuncio Meta","Instagram orgánico","Referido","Búsqueda en frío","Google","Web","Otro"];
 const SEDES = ["Tucumán","Salta","Santiago del Estero","Otra provincia"];
 const SEDE_VAR = {"Tucumán":"--s-tuc","Salta":"--s-sal","Santiago del Estero":"--s-sde"};
 const ROLES = {admin:"Dirección",cm:"Community Manager",setter:"Setter",diseno:"Diseño gráfico",ugc:"UGC",web:"Desarrollo web",otro:"Otro"};
@@ -26,15 +58,16 @@ const DKEYS = ["lun","mar","mie","jue","vie","sab","dom"];
 const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const MES_C = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-const TABLES = ["miembros","clientes","tareas","eventos","entregas","publicaciones","mensajes","novedades","config"];
+const TABLES = ["miembros","clientes","tareas","eventos","entregas","publicaciones","mensajes","novedades","config","material","plantillas","prospectos"];
 const MAX_MB = 50;
 
 /* ---------- Estado ---------- */
 const S = {
   session:null, me:null, loading:true, authMode:"entrar", authErr:"", authBusy:false,
-  miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[],
+  miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[], material:[], plantillas:[], prospectos:[],
+  more:false,
   view:"inicio", cliId:null, cliTab:"resumen",
-  f:{ cliQ:"", cliSede:"", cliEstado:"Activo", tScope:"todas", tArea:"", agSede:"", calSel:null, ctScope:"todas", chatQ:"" },
+  f:{ cliQ:"", cliSede:"", cliEstado:"Activo", tScope:"todas", tArea:"", agSede:"", calSel:null, ctScope:"todas", chatQ:"", pScope:"todos", pSede:"", pQ:"", matCat:"", tplEt:"" },
   cal:(()=>{const d=new Date();return {y:d.getFullYear(),m:d.getMonth()};})(),
   weekOff:0, chatCh:"general", drafts:{}, pedido:false
 };
@@ -67,7 +100,7 @@ function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("sh
 const ls = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
 
 /* ---------- Datos ---------- */
-const ORDER = { mensajes:["creado",true], novedades:["creado",false], miembros:["nombre",true], clientes:["nombre",true] };
+const ORDER = { mensajes:["creado",true], novedades:["creado",false], miembros:["nombre",true], clientes:["nombre",true], material:["creado",false], plantillas:["orden",true], prospectos:["actualizado",false] };
 async function loadTable(t){
   let q = sb.from(t).select("*");
   if(ORDER[t]) q = q.order(ORDER[t][0], {ascending:ORDER[t][1]});
@@ -198,53 +231,75 @@ function markSeen(ch){ const last=S.mensajes.filter(m=>(m.cliente_id||"general")
 const openPedidos = () => S.mensajes.filter(m=>m.pedido && !m.resuelto);
 
 /* ---------- Render ---------- */
+const LOGO = "img/logo-furor.png";
 function render(){
   const root=$("#root");
-  if(S.loading){ root.innerHTML=`<div class="login"><div class="box"><h1>Furor</h1><p>Cargando…</p></div></div>`; return; }
+  if(S.loading){ root.innerHTML=`<div class="login"><div class="side-brand"><img src="${LOGO}" alt="Furor Marketing"><div></div><small>Cargando…</small></div><div class="form-side"><div class="box"><p>Cargando…</p></div></div></div>`; return; }
   if(!S.session) return renderLogin();
   if(!S.me || !S.me.activo){
-    root.innerHTML=`<div class="login"><div class="box"><h1>Acceso pendiente</h1><p>Tu cuenta (${esc(S.session.user.email)}) no está habilitada en el equipo de Furor. Pedile a Marcelo que te sume.</p><button class="btn block" onclick="logout()">Salir</button></div></div>`;
+    root.innerHTML=`<div class="login"><div class="side-brand"><img src="${LOGO}" alt="Furor Marketing"><div><h2>Panel interno del equipo Furor</h2></div><small>Furor Marketing · Tucumán · Salta · Santiago del Estero</small></div><div class="form-side"><div class="box"><img class="mobile-logo" src="${LOGO}" alt="Furor Marketing"><h1>Acceso pendiente</h1><p>Tu cuenta (${esc(S.session.user.email)}) todavía no está habilitada en el equipo de Furor. Pedile a Marcelo que te sume.</p><button class="btn block" onclick="logout()">Salir</button></div></div></div>`;
     return;
   }
   const ae=document.activeElement, aid=ae&&ae.id, sel=ae&&typeof ae.selectionStart==="number"?ae.selectionStart:null;
   const msgsEl=$(".msgs"), atBottom = msgsEl ? (msgsEl.scrollHeight-msgsEl.scrollTop-msgsEl.clientHeight<60) : true;
   if(!$(".app")){
-    root.innerHTML=`<div class="app"><aside class="side"><div class="brand"><b>Furor Marketing</b><span>Panel interno</span></div><nav class="nav" id="nav"></nav><div class="me" id="meBox"></div></aside><div><nav class="mobile-nav" id="mnav"></nav><main id="main"></main></div></div>`;
+    root.innerHTML=`<div class="app">
+      <aside class="side"><div class="brand"><img src="${LOGO}" alt="Furor Marketing"><div><b>Furor Marketing</b><span>Panel interno</span></div></div><nav id="nav"></nav><div class="me" id="meBox"></div></aside>
+      <div><header class="topbar" id="topbar"></header><main id="main"></main></div></div>
+      <nav class="bottom-nav" id="bnav"></nav><div class="more-sheet" id="more" onclick="if(event.target.id==='more'){S.more=false;render()}"></div>`;
   }
   renderNav();
-  const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo};
+  const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial};
   $("#main").innerHTML = views[S.view]();
   if(aid){ const el=document.getElementById(aid); if(el){ el.focus(); try{ if(sel!=null) el.setSelectionRange(sel,sel); }catch(e){} } }
   const m2=$(".msgs"); if(m2 && atBottom) m2.scrollTop=m2.scrollHeight;
   if(S.view==="chat") markSeen(S.chatCh);
   if(S.view==="clientes" && S.cliId && S.cliTab==="chat") markSeen(S.cliId);
 }
+function navBadges(){
+  return { chat:unreadTotal(), tareas:overdue(openTasks().filter(t=>t.asignado===S.me.id)).length, contenido:pendingToday(S.me.rol==="cm").length, prospectos:prospAtrasados(true).length };
+}
 function renderNav(){
-  const badge={ chat:unreadTotal(), tareas:overdue(openTasks().filter(t=>t.asignado===S.me.id)).length, contenido:pendingToday(S.me.rol==="cm").length };
-  const item=(k,l,cls)=>`<a href="#${k}" class="${S.view===k?"on":""}">${l}${badge[k]?`<span class="badge">${badge[k]}</span>`:""}</a>`;
-  $("#nav").innerHTML=NAV.map(([k,l])=>item(k,l)).join("");
-  $("#mnav").innerHTML=NAV.map(([k,l])=>item(k,l)).join("");
-  $("#meBox").innerHTML=`<div class="n">${esc(S.me.nombre||S.me.email)}</div><div class="r">${esc(ROLES[S.me.rol]||"")}${S.me.sede?" · "+esc(S.me.sede):""}</div><div><button class="btn sm ghost" onclick="logout()" style="padding-left:0">Cerrar sesión</button></div>`;
+  const b=navBadges(); let html="", grp="";
+  NAV.forEach(([k,l,ic,g])=>{
+    if(g!==grp){ html+=`<div class="nav-group">${g}</div>`; grp=g; }
+    html+=`<a href="#${k}" class="${S.view===k?"on":""}">${icon(ic)}<span class="lbl">${l}</span>${b[k]?`<span class="badge">${b[k]}</span>`:""}</a>`;
+  });
+  $("#nav").innerHTML=`<div class="nav">${html}</div>`;
+  const nm=S.me.nombre||S.me.email;
+  $("#meBox").innerHTML=`<div class="avatar">${esc(initials(nm))}</div><div style="min-width:0"><div class="n">${esc(nm)}</div><div class="r">${esc(ROLES[S.me.rol]||"")}${S.me.sede?" · "+esc(S.me.sede):""}</div><button onclick="logout()">Cerrar sesión</button></div>`;
+  const cur=NAV.find(n=>n[0]===S.view);
+  $("#topbar").innerHTML=`<img src="${LOGO}" alt="Furor"><b>${esc(cur?cur[1]:"Furor")}</b><button class="avatar" onclick="S.more=true;render()" aria-label="Más opciones">${esc(initials(nm))}</button>`;
+  const inMore=!MOBILE_NAV.includes(S.view), moreBadge=NAV.filter(n=>!MOBILE_NAV.includes(n[0])).reduce((a,n)=>a+(b[n[0]]||0),0);
+  $("#bnav").innerHTML=MOBILE_NAV.map(k=>{const n=NAV.find(x=>x[0]===k);return `<a href="#${k}" class="${S.view===k?"on":""}">${icon(n[2])}${n[1]}${b[k]?`<span class="badge">${b[k]}</span>`:""}</a>`;}).join("")+`<button class="${inMore?"on":""}" onclick="S.more=true;render()">${icon("more")}Más${moreBadge?`<span class="badge">${moreBadge}</span>`:""}</button>`;
+  const mo=$("#more"); mo.classList.toggle("open",!!S.more);
+  mo.innerHTML=S.more?`<div class="sheet">${NAV.filter(n=>!MOBILE_NAV.includes(n[0])).map(([k,l,ic])=>`<a href="#${k}" onclick="S.more=false">${icon(ic)}${l}${b[k]?`<span class="badge" style="position:absolute;top:6px;right:8px">${b[k]}</span>`:""}</a>`).join("")}<button onclick="logout()">${icon("users")}Cerrar sesión</button></div>`:"";
 }
 function renderLogin(){
   const m=S.authMode;
-  $("#root").innerHTML=`<div class="login"><div class="box">
-    <h1>Furor · Panel interno</h1>
-    <p>${m==="registro"?"Primera vez: creá tu contraseña con el mail que te habilitó Marcelo.":m==="recuperar"?"Te mandamos un link para crear una contraseña nueva.":"Ingresá con tu mail y contraseña."}</p>
+  $("#root").innerHTML=`<div class="login">
+   <div class="side-brand"><img src="${LOGO}" alt="Furor Marketing"><div><h2>El panel donde trabaja el equipo Furor.</h2><p>Agenda de las tres sedes, clientes, contenido, prospectos y material de venta en un solo lugar.</p></div><small>Furor Marketing · Tucumán · Salta · Santiago del Estero</small></div>
+   <div class="form-side"><div class="box">
+    <img class="mobile-logo" src="${LOGO}" alt="Furor Marketing">
+    <h1>${m==="registro"?"Crear mi acceso":m==="recuperar"?"Recuperar contraseña":"Ingresar"}</h1>
+    <p>${m==="registro"?"Usá el mail con el que te sumó Marcelo y elegí tu contraseña.":m==="recuperar"?"Te mandamos un link para crear una contraseña nueva.":"Ingresá con tu mail y contraseña del equipo."}</p>
     <form onsubmit="doAuth(event)">
       ${S.authErr?`<div class="err">${esc(S.authErr)}</div>`:""}
-      <label class="f" for="aMail">Mail<input type="email" id="aMail" required autocomplete="email"></label>
-      ${m!=="recuperar"?`<label class="f" for="aPass">Contraseña<input type="password" id="aPass" required minlength="${m==="registro"?8:1}" autocomplete="${m==="registro"?"new-password":"current-password"}"></label>`:""}
+      <label class="f" for="aMail">Mail<input type="email" id="aMail" required autocomplete="email" autocapitalize="none"></label>
+      ${m!=="recuperar"?`<label class="f" for="aPass">Contraseña<input type="password" id="aPass" required minlength="${m==="registro"?8:1}" autocomplete="${m==="registro"?"new-password":"current-password"}" autocapitalize="none"></label>`:""}
       <button class="btn pri block" ${S.authBusy?"disabled":""}>${S.authBusy?"Un momento…":m==="registro"?"Crear mi acceso":m==="recuperar"?"Enviar link":"Entrar"}</button>
     </form>
     <div class="alt">${m==="entrar"?`¿Primera vez? <a href="#" onclick="S.authMode='registro';S.authErr='';renderLogin();return false;">Crear mi acceso</a> · <a href="#" onclick="S.authMode='recuperar';S.authErr='';renderLogin();return false;">Olvidé mi contraseña</a>`:`<a href="#" onclick="S.authMode='entrar';S.authErr='';renderLogin();return false;">Volver a ingresar</a>`}</div>
-  </div></div>`;
+   </div></div></div>`;
 }
+const pageHead = (eyebrow, title, sub, acts) => `<div class="head"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1>${sub?`<p>${sub}</p>`:""}</div>${acts?`<div class="acts">${acts}</div>`:""}</div>`;
+const cardH = (title, right) => `<div class="card-h"><h2>${title}</h2>${right||""}</div>`;
+const emptyMsg = (txt, ic) => `<div class="empty">${icon(ic||"ok")}<span>${txt}</span></div>`;
 
 /* ---------- Piezas comunes ---------- */
 function evRow(e){
   const d=parseYmd(e.fecha), parts=(e.participantes||[]).map(memName).join(", "), link=safeUrl(e.link);
-  return `<div class="row"><div class="when" style="border-left-color:${sedeColor(e.sede)}"><b>${d.getDate()}</b><span>${MES_C[d.getMonth()]}</span></div>
+  return `<div class="row"><div class="when" style="--sc:${sedeColor(e.sede)}"><b>${d.getDate()}</b><span>${MES_C[d.getMonth()]}</span></div>
   <div class="main"><div class="t">${esc(e.titulo)}</div>
   <div class="s">${esc([e.tipo, hhmm(e.hora)?hhmm(e.hora)+" hs":"", relDays(e.fecha), e.cliente_id?cliName(e.cliente_id):e.contacto, e.sede].filter(Boolean).join(" · "))}</div>
   ${parts?`<div class="s">Con: ${esc(parts)}</div>`:""}
@@ -258,12 +313,12 @@ function taskRow(t){
   ${t.vence?`<span class="pill ${late?"bad":t.vence===today()?"warn":""}">${esc(late?"Venció "+fmtDate(t.vence):fmtDate(t.vence))}</span>`:""}
   <button class="btn sm" onclick="advance('${t.id}')">${t.estado==="curso"?"Terminar":"Empezar"}</button></div>`;
 }
-function postHtml(n){
+function postHtml(n,compact){
   const d=new Date(n.creado);
   return `<div class="row"><div class="avatar">${esc(initials(memName(n.autor)))}</div><div class="main">
   <div><b>${esc(memName(n.autor))}</b> <span class="s">${d.getDate()} ${MES_C[d.getMonth()]} · ${pad(d.getHours())}:${pad(d.getMinutes())}</span> ${n.fijada?`<span class="pill ok">Fijada</span>`:""} ${n.etiqueta?`<span class="pill info">${esc(n.etiqueta)}</span>`:""}</div>
   <div style="white-space:pre-wrap;margin-top:4px;overflow-wrap:anywhere">${esc(n.texto)}</div></div>
-  ${(isAdmin()||n.autor===S.me.id)?`<div><button class="btn sm ghost" onclick="pinNov('${n.id}')">${n.fijada?"Desfijar":"Fijar"}</button><button class="btn sm ghost danger" onclick="askDel('novedades','${n.id}','esta novedad')">Borrar</button></div>`:""}</div>`;
+  ${!compact&&(isAdmin()||n.autor===S.me.id)?`<div><button class="btn sm ghost" onclick="pinNov('${n.id}')">${n.fijada?"Desfijar":"Fijar"}</button><button class="btn sm ghost danger" onclick="askDel('novedades','${n.id}','esta novedad')">Borrar</button></div>`:""}</div>`;
 }
 const sortNov = () => S.novedades.slice().sort((a,b)=>(b.fijada?1:0)-(a.fijada?1:0) || String(b.creado).localeCompare(String(a.creado)));
 const estPill = e => `<span class="pill ${e==="Activo"?"ok":e==="Onboarding"?"info":e==="En pausa"?"warn":"bad"}">${esc(e||"—")}</span>`;
@@ -271,43 +326,62 @@ const entPill = e => `<span class="pill ${e==="Publicada"?"ok":e==="Aprobada"||e
 
 /* ---------- Inicio (Mi día) ---------- */
 function vInicio(){
-  const t=today(), mine=sortTasks(openTasks().filter(x=>x.asignado===S.me.id));
+  const t=today(), mineAll=openTasks().filter(x=>x.asignado===S.me.id), mine=sortTasks(mineAll);
+  const evHoy=S.eventos.filter(e=>e.fecha===t).sort((a,b)=>String(a.hora||"").localeCompare(String(b.hora||"")));
   const myEv=evFrom(t).filter(e=>(e.participantes||[]).includes(S.me.id)||e.creado_por===S.me.id).slice(0,6);
-  const allEv=evFrom(t).slice(0,6);
-  const evs = myEv.length ? myEv : allEv;
-  const pend=pendingToday(S.me.rol==="cm");
-  const ped=openPedidos();
-  const paraRevisar=S.entregas.filter(e=>e.estado==="Para revisar");
+  const evs = myEv.length ? myEv : evFrom(t).slice(0,6);
+  const pend=pendingToday(S.me.rol==="cm"), lateW=lateThisWeek();
+  const ped=openPedidos(), paraRevisar=S.entregas.filter(e=>e.estado==="Para revisar");
+  const venc=overdue(S.me.rol==="admin"?openTasks():mineAll);
+  const pAtr=prospAtrasados(S.me.rol!=="admin"), pHoy=S.prospectos.filter(p=>p.proximo===t&&!["Ganado","Perdido"].includes(p.etapa)&&(S.me.rol==="admin"||p.setter===S.me.id));
   const enf=cfg("enfoque")||{}; const objs=Array.isArray(enf.objetivos)?enf.objetivos:[];
-  const venc=overdue(openTasks());
   const first=(S.me.nombre||"").split(" ")[0];
+
+  const alerts=[
+    [lateW,"bad","alert","Publicaciones atrasadas esta semana","#contenido"],
+    [venc.length,"bad","clock",S.me.rol==="admin"?"Tareas vencidas del equipo":"Tareas tuyas vencidas","#tareas"],
+    [pAtr.length,"bad","target","Prospectos con seguimiento atrasado","#prospectos"],
+    [ped.length,"warn","chat","Pedidos sin resolver","#chat"],
+    [paraRevisar.length,"warn","eye","Piezas esperando revisión","#clientes"],
+    [pend.length,"info","grid","Publicaciones para hoy","#contenido"],
+    [evHoy.length,"info","cal","Reuniones y llamadas hoy","#agenda"],
+    [pHoy.length,"info","phone","Prospectos para contactar hoy","#prospectos"]
+  ].filter(a=>a[0]>0);
+
   return `
-  <div class="head"><div><h1>${first?"Hola, "+esc(first):"Mi día"}</h1><p style="text-transform:capitalize">${esc(fmtDayLong(t))}</p></div>
-    <div class="acts"><button class="btn" onclick="formTarea()">+ Tarea</button><button class="btn pri" onclick="formEvento()">+ Agendar</button></div></div>
-  <div class="stats">
-    <div class="stat"><div class="v">${S.clientes.filter(c=>c.estado==="Activo").length}</div><div class="l">Clientes activos</div></div>
-    <div class="stat ${pend.length?"alert":""}"><div class="v">${pend.length}</div><div class="l">Publicaciones pendientes hoy</div></div>
-    <div class="stat"><div class="v">${evFrom(t).filter(e=>e.fecha<addDays(t,7)).length}</div><div class="l">Agendados próximos 7 días</div></div>
-    <div class="stat ${venc.length?"alert":""}"><div class="v">${venc.length}</div><div class="l">Tareas vencidas</div></div>
-  </div>
-  <div class="grid g2">
-    <section class="card"><h2>Enfoque de la semana ${isAdmin()?`<button class="btn sm" onclick="formEnfoque()">Editar</button>`:""}</h2>
-      ${enf.texto?`<p class="focus-text">${esc(enf.texto)}</p>`:`<div class="empty">${isAdmin()?"Definí la prioridad de la semana para todo el equipo.":"Todavía no hay enfoque cargado."}</div>`}
-      ${objs.map((o,i)=>`<label class="check ${o.hecho?"done":""}"><input type="checkbox" ${o.hecho?"checked":""} ${isAdmin()?"":"disabled"} onchange="toggleObj(${i})"><span>${esc(o.t)}</span></label>`).join("")}
-    </section>
-    <section class="card"><h2>Publicar hoy <a href="#contenido">Calendario de contenido</a></h2>
-      <div class="list">${pend.length?pend.slice(0,10).map(({c,f})=>`<div class="row"><div class="main"><div class="t">${esc(c.nombre)}</div><div class="s">${esc(f)}${c.instagram?" · "+esc(c.instagram):""}</div></div><button class="btn sm pri" onclick="togglePub('${c.id}','${t}','${f}')">Publicado</button></div>`).join(""):`<div class="empty">${pautaClients().length?"Todo publicado por hoy.":"Cargá la pauta de publicación en cada cliente para ver acá lo que toca subir."}</div>`}</div>
-    </section>
-    <section class="card"><h2>${myEv.length?"Mi agenda":"Agenda del equipo"} <a href="#agenda">Ver todo</a></h2>
-      <div class="list">${evs.length?evs.map(evRow).join(""):`<div class="empty">Nada agendado.</div>`}</div></section>
-    <section class="card"><h2>Mis tareas <a href="#tareas">Tablero</a></h2>
-      <div class="list">${mine.length?mine.slice(0,8).map(taskRow).join(""):`<div class="empty">No tenés tareas pendientes.</div>`}</div></section>
-    <section class="card"><h2>Pedidos sin resolver <a href="#chat">Chat</a></h2>
-      <div class="list">${ped.length?ped.slice(-8).reverse().map(m=>`<div class="row"><div class="main"><div class="t">${esc(m.texto.length>120?m.texto.slice(0,120)+"…":m.texto)}</div><div class="s">${esc(memName(m.autor))} · ${esc(m.cliente_id?cliName(m.cliente_id):"General")}</div></div><button class="btn sm" onclick="resolver('${m.id}')">Resuelto</button></div>`).join(""):`<div class="empty">No hay pedidos abiertos.</div>`}</div></section>
-    <section class="card"><h2>Piezas para revisar</h2>
-      <div class="list">${paraRevisar.length?paraRevisar.map(e=>`<div class="row"><div class="main"><div class="t">${esc(e.titulo)}</div><div class="s">${esc(cliName(e.cliente_id))} · ${esc(e.formato)}${e.fecha_pub?" · sale "+fmtDate(e.fecha_pub):""}</div></div><a class="btn sm" href="#cliente-${e.cliente_id}" onclick="S.cliTab='entregas'">Ver</a></div>`).join(""):`<div class="empty">Nada esperando revisión.</div>`}</div></section>
-    <section class="card" style="grid-column:1/-1"><h2>Novedades <a href="#novedades">Ver todas</a></h2>
-      <div class="list">${S.novedades.length?sortNov().slice(0,4).map(postHtml).join(""):`<div class="empty">Sin novedades.</div>`}</div></section>
+  ${pageHead(esc(fmtDayLong(t)), first?"Hola, "+esc(first):"Mi día", "", `<button class="btn" onclick="formTarea()">${icon("plus")}Tarea</button><button class="btn" onclick="formProspecto()">${icon("plus")}Prospecto</button><button class="btn pri" onclick="formEvento()">${icon("cal")}Agendar</button>`)}
+
+  <section class="hero">
+    <div><div class="eyebrow">Enfoque de la semana</div>
+      ${enf.texto?`<p class="focus-text">${esc(enf.texto)}</p>`:`<p class="focus-text" style="opacity:.75">${isAdmin()?"Definí la prioridad de la semana para que todo el equipo empuje para el mismo lado.":"Todavía no hay enfoque cargado para esta semana."}</p>`}
+      ${objs.length?`<div class="objs">${objs.map((o,i)=>`<label class="obj ${o.hecho?"done":""}"><input type="checkbox" ${o.hecho?"checked":""} ${isAdmin()?"":"disabled"} onchange="toggleObj(${i})">${esc(o.t)}</label>`).join("")}</div>`:""}
+      ${objs.length?`<div class="meta">${objs.filter(o=>o.hecho).length} de ${objs.length} objetivos cumplidos</div>`:""}
+    </div>
+    ${isAdmin()?`<button class="btn sm" onclick="formEnfoque()">Editar enfoque</button>`:""}
+  </section>
+
+  <div class="section-t">${icon("alert")}Requiere atención</div>
+  ${alerts.length?`<div class="alerts">${alerts.map(([n,c,ic,l,h])=>`<a class="alert ${c}" href="${h}"><div class="ic">${icon(ic)}</div><div><div class="v">${n}</div><div class="l">${l}</div></div></a>`).join("")}</div>`
+    :`<div class="allgood">${icon("ok")}Todo al día. No hay nada atrasado ni pendiente urgente.</div>`}
+
+  <div class="section-t">${icon("clock")}Tu día</div>
+  <div class="split">
+    <div class="grid">
+      <section class="card">${cardH(`${myEv.length?"Mi agenda":"Agenda del equipo"}`, `<a href="#agenda">Ver agenda →</a>`)}
+        <div class="list">${evs.length?evs.map(evRow).join(""):emptyMsg("Nada agendado por ahora.","cal")}</div></section>
+      <section class="card">${cardH(`Publicar hoy <span class="count">${pend.length}</span>`, `<a href="#contenido">Calendario →</a>`)}
+        <div class="list">${pend.length?pend.slice(0,10).map(({c,f})=>`<div class="row"><div class="main"><div class="t">${esc(c.nombre)}</div><div class="s">${esc(f)}${c.instagram?" · "+esc(c.instagram):""}</div></div><button class="btn sm pri" onclick="togglePub('${c.id}','${t}','${f}')">${icon("ok")}Publicado</button></div>`).join(""):emptyMsg(pautaClients().length?"Todo publicado por hoy.":"Cargá la pauta de cada cliente para ver acá lo que toca subir.","grid")}</div></section>
+      ${(S.me.rol==="setter"||isAdmin())?`<section class="card">${cardH(`Prospectos a contactar <span class="count">${pAtr.length+pHoy.length}</span>`, `<a href="#prospectos">Prospectos →</a>`)}
+        <div class="list">${[...pAtr,...pHoy].slice(0,8).map(prospRow).join("")||emptyMsg("No hay seguimientos pendientes.","target")}</div></section>`:""}
+    </div>
+    <div class="grid">
+      <section class="card">${cardH(`Mis tareas <span class="count">${mine.length}</span>`, `<a href="#tareas">Tablero →</a>`)}
+        <div class="list">${mine.length?mine.slice(0,7).map(taskRow).join(""):emptyMsg("No tenés tareas pendientes.","check")}</div></section>
+      <section class="card">${cardH(`Pedidos abiertos <span class="count">${ped.length}</span>`, `<a href="#chat">Chat →</a>`)}
+        <div class="list">${ped.length?ped.slice(-6).reverse().map(m=>`<div class="row"><div class="main"><div class="t">${esc(m.texto.length>110?m.texto.slice(0,110)+"…":m.texto)}</div><div class="s">${esc(memName(m.autor))} · ${esc(m.cliente_id?cliName(m.cliente_id):"General")}</div></div><button class="btn sm" onclick="resolver('${m.id}')">Resuelto</button></div>`).join(""):emptyMsg("No hay pedidos abiertos.","chat")}</div></section>
+      <section class="card">${cardH("Novedades", `<a href="#novedades">Ver todas →</a>`)}
+        <div class="list">${S.novedades.length?sortNov().slice(0,3).map(n=>postHtml(n,true)).join(""):emptyMsg("Sin novedades.","bell")}</div></section>
+    </div>
   </div>`;
 }
 
@@ -320,15 +394,15 @@ function vAgenda(){
   let cells=DIAS.map(d=>`<div class="dow">${d}</div>`).join("");
   for(let i=0;i<42;i++){
     const d=new Date(start); d.setDate(start.getDate()+i); const k=ymd(d), it=by[k]||{e:[],t:[]};
-    const list=[...it.e.sort((a,b)=>String(a.hora||"").localeCompare(String(b.hora||""))).map(e=>`<div class="ev" style="background:${sedeColor(e.sede)}" title="${esc(e.tipo+": "+e.titulo)}">${esc((hhmm(e.hora)?hhmm(e.hora)+" ":"")+e.titulo)}</div>`), ...it.t.map(x=>`<div class="ev task" title="${esc(x.titulo)}">${esc(x.titulo)}</div>`)];
+    const list=[...it.e.sort((a,b)=>String(a.hora||"").localeCompare(String(b.hora||""))).map(e=>`<div class="ev" style="--sc:${sedeColor(e.sede)}" title="${esc(e.tipo+": "+e.titulo)}">${esc((hhmm(e.hora)?hhmm(e.hora)+" ":"")+e.titulo)}</div>`), ...it.t.map(x=>`<div class="ev task" title="${esc(x.titulo)}">${esc(x.titulo)}</div>`)];
     cells+=`<div class="day ${d.getMonth()!==m?"out":""} ${k===t?"today":""} ${S.f.calSel===k?"sel":""}" tabindex="0" onclick="S.f.calSel='${k}';render()" onkeydown="if(event.key==='Enter'){S.f.calSel='${k}';render()}"><div class="num">${d.getDate()}</div>${list.slice(0,3).join("")}${list.length>3?`<div class="ev more">+${list.length-3} más</div>`:""}</div>`;
   }
   const sel=S.f.calSel||t, si=by[sel]||{e:[],t:[]};
   return `
-  <div class="head"><div><h1>Agenda Furor</h1><p>Reuniones, llamadas y videollamadas de Tucumán, Salta y Santiago del Estero</p></div>
-    <div class="acts"><button class="btn" onclick="calMove(-1)" aria-label="Mes anterior">‹</button><h2 style="min-width:150px;text-align:center;text-transform:capitalize">${MESES[m]} ${y}</h2><button class="btn" onclick="calMove(1)" aria-label="Mes siguiente">›</button><button class="btn" onclick="calToday()">Hoy</button><button class="btn pri" onclick="formEvento(null,'${sel}')">+ Agendar</button></div></div>
+  <div class="head"><div><div class="eyebrow">Operación</div><h1>Agenda Furor</h1><p>Reuniones, llamadas y videollamadas de Tucumán, Salta y Santiago del Estero</p></div>
+    <div class="acts"><button class="btn" onclick="calMove(-1)" aria-label="Mes anterior">‹</button><h2 style="min-width:150px;text-align:center;text-transform:capitalize">${MESES[m]} ${y}</h2><button class="btn" onclick="calMove(1)" aria-label="Mes siguiente">›</button><button class="btn" onclick="calToday()">Hoy</button><button class="btn pri" onclick="formEvento(null,'${sel}')">${icon("plus")}Agendar</button></div></div>
   <div class="toolbar"><div class="seg">${["",...SEDES.slice(0,3)].map(s=>`<button class="${S.f.agSede===s?"on":""}" onclick="S.f.agSede='${s}';render()">${s||"Todas las sedes"}</button>`).join("")}</div>
-    <div class="legend">${SEDES.slice(0,3).map(s=>`<span><span class="sede-dot" style="background:${sedeColor(s)}"></span>${s}</span>`).join("")}<span><span class="sede-dot" style="border:1px solid var(--warn)"></span>Vence tarea</span></div></div>
+    <div class="legend">${SEDES.slice(0,3).map(s=>`<span><span class="sede-dot" style="--sc:${sedeColor(s)}"></span>${s}</span>`).join("")}<span><span class="sede-dot" style="border:1px solid var(--warn)"></span>Vence tarea</span></div></div>
   <div class="cal-layout"><div class="cal">${cells}</div>
     <section class="card"><h2 style="text-transform:capitalize">${esc(fmtDayLong(sel))}</h2>
       <div class="list">${si.e.length?si.e.map(evRow).join(""):`<div class="empty">Nada agendado.</div>`}</div>
@@ -351,7 +425,7 @@ function vContenido(){
       return `<td class="${d===t?"today":""}">${exp}${ents}</td>`;
     }).join("")}</tr>`).join("");
   return `
-  <div class="head"><div><h1>Calendario de contenido</h1><p>Qué se publica en cada cuenta, día por día. Tocá cada casilla para marcarla como publicada.</p></div>
+  <div class="head"><div><div class="eyebrow">Cuentas</div><h1>Calendario de contenido</h1><p>Qué se publica en cada cuenta, día por día. Tocá cada casilla para marcarla como publicada.</p></div>
     <div class="acts"><button class="btn" onclick="S.weekOff--;render()" aria-label="Semana anterior">‹</button><h2 style="min-width:170px;text-align:center">${fmtDate(days[0])} – ${fmtDate(days[6])}</h2><button class="btn" onclick="S.weekOff++;render()" aria-label="Semana siguiente">›</button><button class="btn" onclick="S.weekOff=0;render()">Esta semana</button></div></div>
   <div class="toolbar"><div class="seg"><button class="${S.f.ctScope==="todas"?"on":""}" onclick="S.f.ctScope='todas';render()">Todas las cuentas</button><button class="${S.f.ctScope==="mias"?"on":""}" onclick="S.f.ctScope='mias';render()">Mis cuentas</button></div>
     ${late?`<span class="pill bad">${late} publicaciones atrasadas esta semana</span>`:`<span class="pill ok">Semana al día</span>`}
@@ -372,14 +446,14 @@ function vClientes(){
   const q=S.f.cliQ.toLowerCase();
   const list=S.clientes.filter(c=>(!S.f.cliSede||c.sede===S.f.cliSede)&&(!S.f.cliEstado||c.estado===S.f.cliEstado)&&(!q||[c.nombre,c.rubro,c.instagram,c.contacto].join(" ").toLowerCase().includes(q)));
   return `
-  <div class="head"><div><h1>Clientes</h1><p>Ficha, recursos, entregas y chat de cada cuenta</p></div><button class="btn pri" onclick="formCliente()">+ Nuevo cliente</button></div>
+  <div class="head"><div><div class="eyebrow">Cuentas</div><h1>Clientes</h1><p>Ficha, recursos, entregas y chat de cada cuenta</p></div><button class="btn pri" onclick="formCliente()">${icon("plus")}Nuevo cliente</button></div>
   <div class="toolbar">
     <input type="search" id="cliQ" placeholder="Buscar por nombre, rubro, Instagram…" value="${esc(S.f.cliQ)}" oninput="S.f.cliQ=this.value;render()">
     <select id="cliSede" aria-label="Sede" onchange="S.f.cliSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.map(s=>`<option ${S.f.cliSede===s?"selected":""}>${s}</option>`).join("")}</select>
     <select id="cliEstado" aria-label="Estado" onchange="S.f.cliEstado=this.value;render()"><option value="">Todos los estados</option>${ESTADOS_CLI.map(s=>`<option ${S.f.cliEstado===s?"selected":""}>${s}</option>`).join("")}</select>
     <span class="pill">${list.length} de ${S.clientes.length}</span></div>
   ${list.length?`<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Sede</th><th>Servicio</th><th>Responsable</th><th>Estado</th><th>Pendiente</th></tr></thead><tbody>
-  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click" onclick="location.hash='cliente-${c.id}'"><td><b>${esc(c.nombre)}</b>${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</td><td>${c.sede?`<span class="sede-dot" style="background:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td>${estPill(c.estado)}</td><td>${ents?`<span class="pill info">${ents} piezas</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
+  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click" onclick="location.hash='cliente-${c.id}'"><td><b>${esc(c.nombre)}</b>${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td>${estPill(c.estado)}</td><td>${ents?`<span class="pill info">${ents} piezas</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
   </tbody></table></div>`:`<div class="card"><div class="empty">${S.clientes.length?"No hay clientes con esos filtros.":"Todavía no hay clientes. Cargá el primero."}</div></div>`}`;
 }
 function fichaCliente(c){
@@ -387,7 +461,7 @@ function fichaCliente(c){
   const un=unread(c.id);
   const body={resumen:tabResumen,entregas:tabEntregas,chat:()=>chatBox(c.id,true),pauta:tabPauta,agenda:tabAgenda}[S.cliTab]||tabResumen;
   return `
-  <div class="head"><div><a href="#clientes">← Clientes</a><h1 style="margin-top:6px">${esc(c.nombre)}</h1><p>${esc([c.rubro,c.sede,c.plan].filter(Boolean).join(" · "))} ${estPill(c.estado)}</p></div>
+  <div class="head"><div><div class="eyebrow"><a href="#clientes" style="text-decoration:none">← Clientes</a></div><h1>${esc(c.nombre)}</h1><p>${esc([c.rubro,c.sede,c.plan].filter(Boolean).join(" · "))} ${estPill(c.estado)}</p></div>
     <div class="acts"><button class="btn" onclick="formCliente('${c.id}')">Editar ficha</button></div></div>
   <div class="tabs">${tabs.map(([k,l])=>`<button class="${S.cliTab===k?"on":""}" onclick="S.cliTab='${k}';render()">${l}${k==="chat"&&un?` <span class="badge">${un}</span>`:""}</button>`).join("")}</div>
   ${body(c)}`;
@@ -490,7 +564,7 @@ function vChat(){
   const chs=[{id:"general",n:"General del equipo"}].concat(S.clientes.filter(c=>c.estado!=="Baja").map(c=>({id:c.id,n:c.nombre})));
   const last = id => (S.mensajes.filter(m=>(m.cliente_id||"general")===id).slice(-1)[0]||{}).creado||"";
   const sorted=chs.filter(c=>!q||c.n.toLowerCase().includes(q)).sort((a,b)=>a.id==="general"?-1:b.id==="general"?1:String(last(b.id)).localeCompare(String(last(a.id))) || a.n.localeCompare(b.n));
-  return `<div class="head"><div><h1>Chat</h1><p>Pedidos y conversaciones del equipo, por cliente o generales</p></div>
+  return `<div class="head"><div><div class="eyebrow">Operación</div><h1>Chat</h1><p>Pedidos y conversaciones del equipo, por cliente o generales</p></div>
     <span class="pill ${openPedidos().length?"warn":"ok"}">${openPedidos().length} pedidos abiertos</span></div>
   <div class="chat"><div class="channels"><input type="search" id="chatQ" placeholder="Buscar cliente…" value="${esc(S.f.chatQ)}" oninput="S.f.chatQ=this.value;render()">
     ${sorted.map(c=>{const u=unread(c.id);return `<button class="${S.chatCh===c.id?"on":""}" onclick="S.chatCh='${c.id}';render()"><span>${esc(c.n)}</span>${u?`<span class="badge">${u}</span>`:""}</button>`;}).join("")}</div>
@@ -537,7 +611,7 @@ function vTareas(){
   if(S.f.tArea) list=list.filter(t=>t.area===S.f.tArea);
   const col=([k,l])=>{ let it=list.filter(t=>t.estado===k); it = k==="hecha" ? it.sort((a,b)=>String(b.hecha_el||"").localeCompare(String(a.hecha_el||""))).slice(0,20) : sortTasks(it);
     return `<div class="col"><h3>${l}<span class="pill">${it.length}</span></h3>${it.length?it.map(taskCard).join(""):`<div class="empty">Vacío</div>`}</div>`; };
-  return `<div class="head"><div><h1>Tareas</h1><p>Quién hace qué, para qué cliente y para cuándo</p></div><button class="btn pri" onclick="formTarea()">+ Nueva tarea</button></div>
+  return `<div class="head"><div><div class="eyebrow">Operación</div><h1>Tareas</h1><p>Quién hace qué, para qué cliente y para cuándo</p></div><button class="btn pri" onclick="formTarea()">${icon("plus")}Nueva tarea</button></div>
   <div class="toolbar"><div class="seg"><button class="${S.f.tScope==="todas"?"on":""}" onclick="S.f.tScope='todas';render()">Todas</button><button class="${S.f.tScope==="mias"?"on":""}" onclick="S.f.tScope='mias';render()">Mías</button></div>
     <select id="tArea" aria-label="Área" onchange="S.f.tArea=this.value;render()"><option value="">Todas las áreas</option>${AREAS.map(a=>`<option ${S.f.tArea===a?"selected":""}>${a}</option>`).join("")}</select></div>
   <div class="board">${[["pendiente","Por hacer"],["curso","En curso"],["hecha","Hechas"]].map(col).join("")}</div>`;
@@ -557,7 +631,7 @@ async function advance(id){
 
 /* ---------- Novedades ---------- */
 function vNovedades(){
-  return `<div class="head"><div><h1>Novedades</h1><p>Avisos, cambios de clientes y anuncios del equipo</p></div></div>
+  return `<div class="head"><div><div class="eyebrow">Equipo</div><h1>Novedades</h1><p>Avisos, cambios de clientes y anuncios del equipo</p></div></div>
   <section class="card" style="margin-bottom:16px"><h2>Publicar</h2><form class="form" onsubmit="postNov(event)">
     <label class="f full" for="novTxt">Mensaje<textarea id="novTxt" required placeholder="Ej: Desde el lunes, las reuniones con prospectos de Salta las toma el setter de Salta."></textarea></label>
     <label class="f" for="novTag">Etiqueta<select id="novTag"><option value="">Sin etiqueta</option><option>Aviso</option><option>Cliente nuevo</option><option>Baja de cliente</option><option>Proceso</option><option>Logro</option></select></label>
@@ -570,8 +644,8 @@ async function pinNov(id){ const n=S.novedades.find(x=>x.id===id); if(n) await r
 /* ---------- Equipo ---------- */
 function vEquipo(){
   const list=S.miembros.slice().sort((a,b)=>(b.activo-a.activo)||String(a.nombre).localeCompare(String(b.nombre)));
-  return `<div class="head"><div><h1>Equipo</h1><p>Quién es quién y qué tiene cada uno en curso</p></div>${isAdmin()?`<button class="btn pri" onclick="formMiembro()">+ Sumar integrante</button>`:""}</div>
-  ${isAdmin()?`<div class="note info">Al sumar a alguien, avisale que entre al link del panel, toque <b>"Crear mi acceso"</b> con ese mismo mail y elija su contraseña. Si lo desactivás, pierde el acceso al instante.</div>`:""}
+  return `<div class="head"><div><div class="eyebrow">Equipo</div><h1>Equipo</h1><p>Quién es quién y qué tiene cada uno en curso</p></div>${isAdmin()?`<button class="btn pri" onclick="formMiembro()">${icon("plus")}Sumar integrante</button>`:""}</div>
+  ${isAdmin()?`<div class="note">${icon("users")}<span>Al sumar a alguien, avisale que entre al link del panel, toque <b>"Crear mi acceso"</b> con ese mismo mail y elija su contraseña. Si lo desactivás, pierde el acceso al instante.</span></div>`:""}
   <div class="people">${list.map(m=>{ const ab=openTasks().filter(t=>t.asignado===m.id), v=overdue(ab).length, cuentas=S.clientes.filter(c=>c.responsable===m.id&&c.estado!=="Baja").length;
     return `<div class="card" style="display:flex;gap:12px;${m.activo?"":"opacity:.55"}"><div class="avatar">${esc(initials(m.nombre||m.email))}</div><div style="min-width:0;flex:1">
       <b>${esc(m.nombre||m.email)}</b><div class="s">${esc(ROLES[m.rol]||m.rol)}${m.sede?" · "+esc(m.sede):""}</div><div class="s">${esc(m.email)}</div>
@@ -599,6 +673,257 @@ async function saveMiembro(e,id){
   if(ok) closeModal();
 }
 
+/* ---------- Prospectos ---------- */
+const activeProsp = p => !["Ganado","Perdido"].includes(p.etapa);
+function prospAtrasados(onlyMine){
+  const t=today();
+  return S.prospectos.filter(p=>activeProsp(p) && p.proximo && p.proximo<t && (!onlyMine || p.setter===S.me?.id));
+}
+function prospRow(p){
+  const late=p.proximo&&p.proximo<today();
+  return `<div class="row"><div class="main"><div class="t" style="cursor:pointer" onclick="formProspecto('${p.id}')">${esc(p.nombre)}${p.negocio?" · "+esc(p.negocio):""}</div>
+    <div class="s">${esc([p.etapa, p.sede, p.setter?memName(p.setter):""].filter(Boolean).join(" · "))}</div></div>
+    ${p.proximo?`<span class="pill ${late?"bad":"warn"}">${late?"Atrasado "+fmtDate(p.proximo):"Hoy"}</span>`:""}
+    <button class="btn sm wa" onclick="usarPlantilla(null,'${p.id}')">${icon("wa")}Escribir</button></div>`;
+}
+function vProspectos(){
+  const t=today(), q=S.f.pQ.toLowerCase();
+  let list=S.prospectos.slice();
+  if(S.f.pScope==="mios") list=list.filter(p=>p.setter===S.me.id);
+  if(S.f.pSede) list=list.filter(p=>p.sede===S.f.pSede);
+  if(q) list=list.filter(p=>[p.nombre,p.negocio,p.rubro,p.whatsapp,p.instagram].join(" ").toLowerCase().includes(q));
+  const act=list.filter(activeProsp), atr=act.filter(p=>p.proximo&&p.proximo<t), hoy=act.filter(p=>p.proximo===t);
+  const mes=t.slice(0,7), ganMes=list.filter(p=>p.etapa==="Ganado"&&String(p.actualizado).slice(0,7)===mes).length;
+  const cerrados=list.filter(p=>!activeProsp(p)).length, ganTot=list.filter(p=>p.etapa==="Ganado").length;
+  const col=e=>{
+    let it=list.filter(p=>p.etapa===e);
+    it = activeProsp({etapa:e}) ? it.sort((a,b)=>String(a.proximo||"9999").localeCompare(String(b.proximo||"9999"))) : it.sort((a,b)=>String(b.actualizado).localeCompare(String(a.actualizado))).slice(0,15);
+    return `<div class="col" style="--c:${ETAPA_C[e]}"><h3><span><span class="dot"></span>${e}</span><span class="count">${list.filter(p=>p.etapa===e).length}</span></h3>${it.map(pCard).join("")||`<div class="empty" style="font-size:13px">Sin prospectos</div>`}</div>`;
+  };
+  return `${pageHead("Ventas","Prospectos","Seguimiento de cada prospecto, de sede en sede. Lo atrasado se marca en rojo.",`<a class="btn" href="#plantillas">${icon("message")}Plantillas</a><button class="btn pri" onclick="formProspecto()">${icon("plus")}Nuevo prospecto</button>`)}
+  <div class="kpis" style="margin-bottom:16px">
+    <div class="kpi"><div class="v">${act.length}</div><div class="l">En seguimiento</div></div>
+    <div class="kpi"><div class="v" style="color:var(--warn)">${hoy.length}</div><div class="l">Para contactar hoy</div></div>
+    <div class="kpi"><div class="v" style="color:${atr.length?"var(--danger)":"inherit"}">${atr.length}</div><div class="l">Seguimiento atrasado</div></div>
+    <div class="kpi"><div class="v" style="color:var(--ok)">${ganMes}</div><div class="l">Ganados este mes</div></div>
+    <div class="kpi"><div class="v">${cerrados?Math.round(ganTot/cerrados*100)+"%":"—"}</div><div class="l">Tasa de cierre</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="seg"><button class="${S.f.pScope==="todos"?"on":""}" onclick="S.f.pScope='todos';render()">Todos</button><button class="${S.f.pScope==="mios"?"on":""}" onclick="S.f.pScope='mios';render()">Míos</button></div>
+    <div class="seg">${["",...SEDES.slice(0,3)].map(s=>`<button class="${S.f.pSede===s?"on":""}" onclick="S.f.pSede='${s}';render()">${s||"Todas las sedes"}</button>`).join("")}</div>
+    <input type="search" id="pQ" placeholder="Buscar prospecto…" value="${esc(S.f.pQ)}" oninput="S.f.pQ=this.value;render()">
+  </div>
+  <div class="board">${ETAPAS.map(col).join("")}</div>`;
+}
+function pCard(p){
+  const t=today(), late=activeProsp(p)&&p.proximo&&p.proximo<t;
+  const next=ETAPAS[ETAPAS.indexOf(p.etapa)+1];
+  return `<div class="pcard ${late?"late":""}">
+    <div class="t" onclick="formProspecto('${p.id}')">${esc(p.nombre)}</div>
+    ${p.negocio||p.rubro?`<div class="s">${esc([p.negocio,p.rubro].filter(Boolean).join(" · "))}</div>`:""}
+    <div class="s">${p.sede?`<span class="sede-dot" style="--sc:${sedeColor(p.sede)}"></span>${esc(p.sede)} · `:""}${esc(p.setter?memName(p.setter):"Sin setter")}${p.contactos?` · ${p.contactos} contacto${p.contactos>1?"s":""}`:""}</div>
+    ${activeProsp(p)&&p.proximo?`<div><span class="pill ${late?"bad":p.proximo===t?"warn":""}">${icon("clock")}${late?"Atrasado · ":p.proximo===t?"Hoy · ":""}${fmtDate(p.proximo)}</span></div>`:""}
+    ${p.etapa==="Ganado"&&!p.cliente_id?`<button class="btn sm pri" onclick="pasarACliente('${p.id}')">Pasar a cliente</button>`:""}
+    ${p.etapa==="Perdido"&&p.motivo_perdida?`<div class="s">Motivo: ${esc(p.motivo_perdida)}</div>`:""}
+    ${activeProsp(p)?`<div class="acts">${p.whatsapp?`<button class="btn sm wa" onclick="usarPlantilla(null,'${p.id}')">${icon("wa")}Escribir</button>`:`<button class="btn sm" onclick="usarPlantilla(null,'${p.id}')">${icon("message")}Mensaje</button>`}${next&&next!=="Perdido"?`<button class="btn sm" onclick="moverEtapa('${p.id}','${next}')">→ ${next}</button>`:""}</div>`:""}
+  </div>`;
+}
+async function moverEtapa(id, etapa){
+  const p=S.prospectos.find(x=>x.id===id); if(!p) return;
+  if(etapa==="Perdido"){ formProspecto(id); return; }
+  const data={etapa,actualizado:new Date().toISOString()};
+  if(etapa==="Ganado") data.proximo=null;
+  await run(sb.from("prospectos").update(data).eq("id",id), etapa==="Ganado"?"¡Prospecto ganado!":"Movido a "+etapa);
+}
+function formProspecto(id){
+  const p=id?S.prospectos.find(x=>x.id===id)||{}:{etapa:"Nuevo",setter:S.me.id,sede:S.me.sede||"",proximo:today()};
+  openModal(`<h2>${id?esc(p.nombre):"Nuevo prospecto"}</h2><form class="form" onsubmit="saveProspecto(event,'${id||""}')">
+    <label class="f" for="pNom">Nombre del contacto<input type="text" id="pNom" required value="${esc(p.nombre)}"></label>
+    <label class="f" for="pNeg">Negocio<input type="text" id="pNeg" value="${esc(p.negocio)}"></label>
+    <label class="f" for="pRub">Rubro<input type="text" id="pRub" value="${esc(p.rubro)}"></label>
+    <label class="f" for="pWa">WhatsApp<input type="tel" id="pWa" value="${esc(p.whatsapp)}" placeholder="381 555 1234"></label>
+    <label class="f" for="pIg">Instagram<input type="text" id="pIg" value="${esc(p.instagram)}" placeholder="@negocio"></label>
+    <label class="f" for="pOri">Origen<select id="pOri"><option value="">—</option>${opts(ORIGENES,p.origen)}</select></label>
+    <div class="sep">Seguimiento</div>
+    <label class="f" for="pEt">Etapa<select id="pEt">${opts(ETAPAS,p.etapa)}</select></label>
+    <label class="f" for="pProx">Próximo contacto<input type="date" id="pProx" value="${esc(p.proximo)}"></label>
+    <label class="f" for="pSede">Sede<select id="pSede"><option value="">—</option>${opts(SEDES,p.sede)}</select></label>
+    <label class="f" for="pSet">Setter<select id="pSet">${memOptions(p.setter)}</select></label>
+    <label class="f" for="pPlan">Plan de interés<select id="pPlan"><option value="">—</option>${opts(PLANES,p.plan)}</select></label>
+    <label class="f" for="pMot">Motivo si se perdió<input type="text" id="pMot" value="${esc(p.motivo_perdida)}" placeholder="Precio, no responde, ya tiene agencia…"></label>
+    <label class="f full" for="pNot">Notas<textarea id="pNot" placeholder="Qué necesita, objeciones, presupuesto…">${esc(p.notas)}</textarea></label>
+    ${id&&p.ultimo_contacto?`<p class="full s" style="margin:0">Último contacto: ${esc(new Date(p.ultimo_contacto).toLocaleString("es-AR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))} · ${p.contactos} en total</p>`:""}
+    <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('prospectos','${id}','este prospecto')">Borrar</button>`:""}</div><div style="display:flex;gap:8px">${id?`<button type="button" class="btn wa" onclick="usarPlantilla(null,'${id}')">${icon("wa")}Escribir</button>`:""}<button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
+}
+async function saveProspecto(e,id){
+  e.preventDefault();
+  const etapa=v("pEt");
+  const data={nombre:v("pNom"),negocio:v("pNeg"),rubro:v("pRub"),whatsapp:v("pWa"),instagram:v("pIg"),origen:v("pOri"),etapa,proximo:activeProsp({etapa})?nz(v("pProx")):null,sede:v("pSede"),setter:nz(v("pSet")),plan:v("pPlan"),motivo_perdida:v("pMot"),notas:v("pNot"),actualizado:new Date().toISOString()};
+  const ok = id ? await run(sb.from("prospectos").update(data).eq("id",id),"Prospecto actualizado") : await run(sb.from("prospectos").insert(data),"Prospecto cargado");
+  if(ok) closeModal();
+}
+async function pasarACliente(id){
+  const p=S.prospectos.find(x=>x.id===id); if(!p) return;
+  const { data:row, error } = await sb.from("clientes").insert({nombre:p.negocio||p.nombre,rubro:p.rubro,sede:p.sede,estado:"Onboarding",plan:p.plan,contacto:p.nombre,whatsapp:p.whatsapp,instagram:p.instagram,notas:p.notas}).select().single();
+  if(error){ toast("No se pudo crear el cliente: "+error.message); return; }
+  await sb.from("prospectos").update({cliente_id:row.id}).eq("id",id);
+  toast("Cliente creado. Completá su ficha."); location.hash="cliente-"+row.id;
+}
+
+/* ---------- Plantillas ---------- */
+const tplHighlight = txt => esc(txt).replace(/\{(\w+)\}/g,'<mark>{$1}</mark>');
+function fillTpl(txt, vars){ return String(txt).replace(/\{(\w+)\}/g,(m,k)=>vars[k]!=null&&vars[k]!==""?vars[k]:m); }
+function vPlantillas(){
+  const list=S.plantillas.filter(p=>!S.f.tplEt||p.etapa===S.f.tplEt);
+  const etapas=ETAPAS_TPL.filter(e=>S.plantillas.some(p=>p.etapa===e));
+  return `${pageHead("Ventas","Plantillas de mensajes","Mensajes probados para cada etapa del seguimiento. Tocá <b>Usar</b>, completá el nombre y mandalo por WhatsApp.",isAdmin()?`<button class="btn pri" onclick="formPlantilla()">${icon("plus")}Nueva plantilla</button>`:"")}
+  <div class="note">${icon("message")}<span>Las palabras entre llaves se completan solas: <b>{nombre}</b>, <b>{negocio}</b>, <b>{sede}</b> y <b>{setter}</b> (tu nombre).</span></div>
+  <div class="toolbar"><div class="seg">${["",...etapas].map(e=>`<button class="${S.f.tplEt===e?"on":""}" onclick="S.f.tplEt='${e}';render()">${e||"Todas"}</button>`).join("")}</div></div>
+  <div class="grid g3">${list.map(p=>`<div class="tpl">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><div class="t">${esc(p.titulo)}</div><div class="s">${esc(p.etapa)} · ${esc(p.canal)}</div></div>${isAdmin()?`<button class="btn sm ghost" onclick="formPlantilla('${p.id}')">Editar</button>`:""}</div>
+    <div class="txt">${tplHighlight(p.texto)}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm pri" onclick="usarPlantilla('${p.id}')">Usar</button><button class="btn sm" data-v="${esc(p.texto)}" onclick="copyText(this.dataset.v)">${icon("copy")}Copiar</button></div>
+  </div>`).join("")||emptyMsg("No hay plantillas en esta etapa.","message")}</div>`;
+}
+function usarPlantilla(tplId, prospId){
+  const p=prospId?S.prospectos.find(x=>x.id===prospId):null;
+  const tpls=S.plantillas;
+  if(!tpls.length){ toast("Todavía no hay plantillas cargadas."); return; }
+  let tpl=tplId?tpls.find(x=>x.id===tplId):null;
+  if(!tpl){
+    const sug={"Nuevo":"Primer contacto","Contactado":"Seguimiento","Reunión agendada":"Reunión","Propuesta enviada":"Propuesta"}[p?.etapa]||"Primer contacto";
+    tpl=tpls.find(x=>x.etapa===sug)||tpls[0];
+  }
+  S.uso={tpl:tpl.id,prosp:prospId||""};
+  openModal(`<h2>Enviar mensaje</h2>
+    <div class="form">
+      <label class="f full" for="uTpl">Plantilla<select id="uTpl" onchange="S.uso.tpl=this.value;refreshUso()">${ETAPAS_TPL.map(e=>{const g=tpls.filter(x=>x.etapa===e);return g.length?`<optgroup label="${e}">${g.map(x=>`<option value="${x.id}" ${x.id===tpl.id?"selected":""}>${esc(x.titulo)}</option>`).join("")}</optgroup>`:"";}).join("")}</select></label>
+      <label class="f full" for="uPro">Prospecto<select id="uPro" onchange="S.uso.prosp=this.value;fillUsoFromProsp();refreshUso()"><option value="">— Escribir a mano —</option>${S.prospectos.filter(activeProsp).map(x=>`<option value="${x.id}" ${x.id===prospId?"selected":""}>${esc(x.nombre)}${x.negocio?" · "+esc(x.negocio):""}</option>`).join("")}</select></label>
+      <label class="f" for="uNom">Nombre<input type="text" id="uNom" value="${esc(p?.nombre?.split(" ")[0]||"")}" oninput="refreshUso()"></label>
+      <label class="f" for="uNeg">Negocio<input type="text" id="uNeg" value="${esc(p?.negocio||"tu negocio")}" oninput="refreshUso()"></label>
+      <label class="f" for="uSede">Sede<input type="text" id="uSede" value="${esc(p?.sede||S.me.sede||"")}" oninput="refreshUso()"></label>
+      <label class="f" for="uWa">WhatsApp<input type="tel" id="uWa" value="${esc(p?.whatsapp||"")}" oninput="refreshUso()"></label>
+      <label class="f full" for="uTxt">Mensaje (lo podés retocar)<textarea id="uTxt" style="min-height:190px" oninput="refreshUso()"></textarea></label>
+      <div class="full" id="uReg">${prospId?`<label class="check"><input type="checkbox" id="uLog" checked><span>Registrar el contacto y programar el próximo seguimiento en <select id="uDias" style="width:auto;display:inline-block;padding:3px 6px"><option value="1">1 día</option><option value="2" selected>2 días</option><option value="3">3 días</option><option value="7">1 semana</option></select></span></label>`:""}</div>
+      <div class="actions"><button type="button" class="btn" onclick="closeModal()">Cerrar</button><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="enviarUso('copiar')">${icon("copy")}Copiar</button><a class="btn wa" id="uWaBtn" href="#" target="_blank" rel="noopener" onclick="enviarUso('wa')">${icon("wa")}Abrir WhatsApp</a></div></div>
+    </div>`);
+  refreshUso();
+}
+function fillUsoFromProsp(){
+  const p=S.prospectos.find(x=>x.id===S.uso.prosp);
+  $("#uNom").value=p?.nombre?.split(" ")[0]||""; $("#uNeg").value=p?.negocio||"tu negocio"; $("#uSede").value=p?.sede||S.me.sede||""; $("#uWa").value=p?.whatsapp||"";
+  $("#uReg").innerHTML=p?`<label class="check"><input type="checkbox" id="uLog" checked><span>Registrar el contacto y programar el próximo seguimiento en <select id="uDias" style="width:auto;display:inline-block;padding:3px 6px"><option value="1">1 día</option><option value="2" selected>2 días</option><option value="3">3 días</option><option value="7">1 semana</option></select></span></label>`:"";
+}
+function waNumber(raw){
+  let d=String(raw||"").replace(/\D/g,"");
+  if(!d) return "";
+  if(d.startsWith("00")) d=d.slice(2);
+  if(d.startsWith("0")) d=d.slice(1);
+  d=d.replace(/^(\d{2,4})15(\d{6,8})$/,"$1$2");
+  if(!d.startsWith("54")) d="549"+d; else if(!d.startsWith("549")) d="549"+d.slice(2);
+  return d;
+}
+function refreshUso(){
+  const tpl=S.plantillas.find(x=>x.id===S.uso.tpl); if(!tpl) return;
+  const txt=fillTpl(tpl.texto,{nombre:v("uNom"),negocio:v("uNeg"),sede:v("uSede"),setter:(S.me.nombre||"").split(" ")[0]});
+  const ta=$("#uTxt"); if(document.activeElement!==ta) ta.value=txt;
+  const n=waNumber(v("uWa")), btn=$("#uWaBtn");
+  btn.href = "https://wa.me/"+n+"?text="+encodeURIComponent(ta.value);
+  btn.toggleAttribute("aria-disabled", !n); btn.style.opacity = n?1:.5;
+}
+async function enviarUso(modo){
+  const txt=$("#uTxt").value;
+  if(modo==="copiar") await copyText(txt);
+  if(modo==="wa"){ const n=waNumber(v("uWa")); if(!n){ toast("Cargá el número de WhatsApp."); event.preventDefault(); return; } $("#uWaBtn").href="https://wa.me/"+n+"?text="+encodeURIComponent(txt); }
+  const log=$("#uLog");
+  if(log&&log.checked&&S.uso.prosp){
+    const p=S.prospectos.find(x=>x.id===S.uso.prosp); if(!p) return;
+    const data={contactos:(p.contactos||0)+1,ultimo_contacto:new Date().toISOString(),proximo:addDays(today(),Number($("#uDias").value||2)),actualizado:new Date().toISOString()};
+    if(p.etapa==="Nuevo") data.etapa="Contactado";
+    await run(sb.from("prospectos").update(data).eq("id",p.id),"Contacto registrado");
+    log.checked=false;
+  }
+}
+function formPlantilla(id){
+  const p=id?S.plantillas.find(x=>x.id===id)||{}:{etapa:"Seguimiento",canal:"WhatsApp",orden:100};
+  openModal(`<h2>${id?"Editar plantilla":"Nueva plantilla"}</h2><form class="form" onsubmit="savePlantilla(event,'${id||""}')">
+    <label class="f full" for="plTit">Título<input type="text" id="plTit" required value="${esc(p.titulo)}"></label>
+    <label class="f" for="plEt">Etapa<select id="plEt">${opts(ETAPAS_TPL,p.etapa)}</select></label>
+    <label class="f" for="plCan">Canal<select id="plCan">${opts(["WhatsApp","Instagram","Mail"],p.canal)}</select></label>
+    <label class="f full" for="plTxt">Texto<textarea id="plTxt" required style="min-height:200px" placeholder="Hola {nombre}, soy {setter} de Furor…">${esc(p.texto)}</textarea></label>
+    <label class="f" for="plOrd">Orden<input type="number" id="plOrd" value="${esc(p.orden)}"></label>
+    <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('plantillas','${id}','esta plantilla')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
+}
+async function savePlantilla(e,id){
+  e.preventDefault();
+  const data={titulo:v("plTit"),etapa:v("plEt"),canal:v("plCan"),texto:$("#plTxt").value.trim(),orden:Number(v("plOrd")||100)};
+  const ok = id ? await run(sb.from("plantillas").update(data).eq("id",id),"Plantilla guardada") : await run(sb.from("plantillas").insert(Object.assign({autor:S.me.id},data)),"Plantilla creada");
+  if(ok) closeModal();
+}
+
+/* ---------- Material ---------- */
+function vMaterial(){
+  const list=S.material.filter(m=>!S.f.matCat||m.categoria===S.f.matCat).sort((a,b)=>(b.vigente-a.vigente)||(CAT_MAT.indexOf(a.categoria)-CAT_MAT.indexOf(b.categoria))||String(b.actualizado).localeCompare(String(a.actualizado)));
+  const cats=CAT_MAT.filter(c=>S.material.some(m=>m.categoria===c));
+  const hon=S.material.filter(m=>m.categoria==="Honorarios"&&m.vigente);
+  return `${pageHead("Ventas","Material","Honorarios vigentes, propuestas, contratos y presentaciones para usar con prospectos y clientes.",isAdmin()?`<button class="btn pri" onclick="formMaterial()">${icon("plus")}Subir material</button>`:"")}
+  ${hon.length?`<div class="note" style="background:var(--brand-soft)">${icon("ok")}<span><b>Honorarios vigentes:</b> ${hon.map(h=>esc(h.titulo)+(h.sede?" ("+esc(h.sede)+")":"")).join(", ")}. Usá siempre estos al pasar precios.</span></div>`:`<div class="note">${icon("file")}<span>${isAdmin()?"Subí el PDF de honorarios actualizado y marcalo como <b>vigente</b>: el equipo lo va a ver destacado arriba de todo.":"Todavía no hay honorarios cargados. Consultale a Marcelo antes de pasar precios."}</span></div>`}
+  <div class="toolbar"><div class="seg">${["",...cats].map(c=>`<button class="${S.f.matCat===c?"on":""}" onclick="S.f.matCat='${c}';render()">${c||"Todo"}</button>`).join("")}</div></div>
+  <div class="grid g2">${list.map(docCard).join("")||`<div class="card">${emptyMsg("No hay material cargado todavía.","file")}</div>`}</div>`;
+}
+function docCard(m){
+  const a=m.archivo, ext=a?(a.nombre.split(".").pop()||"").slice(0,4).toUpperCase():"LINK", link=safeUrl(m.link);
+  return `<div class="doc ${m.vigente?"vig":""}"><div class="fic ${a?"":"link"}">${esc(ext)}</div><div class="main">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">${esc(m.titulo)}</span>${m.vigente?`<span class="pill brand">Vigente</span>`:`<span class="pill">Anterior</span>`}</div>
+    <div class="s">${esc([m.categoria,m.sede||"Todas las sedes","actualizado "+fmtDate(String(m.actualizado).slice(0,10))].join(" · "))}</div>
+    ${m.descripcion?`<div style="font-size:14px;white-space:pre-wrap">${esc(m.descripcion)}</div>`:""}
+    <div class="acts">${a?`<button class="btn sm pri" onclick="abrirMaterial('${m.id}',false)">${icon("eye")}Ver</button><button class="btn sm" onclick="abrirMaterial('${m.id}',true)">${icon("download")}Descargar</button>`:""}${link?`<a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Abrir link</a>`:""}${isAdmin()?`<button class="btn sm ghost" onclick="formMaterial('${m.id}')">Editar</button>`:""}</div>
+  </div></div>`;
+}
+async function abrirMaterial(id, descargar){
+  const m=S.material.find(x=>x.id===id); if(!m?.archivo) return;
+  const w = descargar ? null : window.open("", "_blank");
+  const { data, error } = await sb.storage.from("material").createSignedUrl(m.archivo.path, 3600, descargar?{download:m.archivo.nombre}:undefined);
+  if(error){ if(w) w.close(); toast("No se pudo abrir el archivo."); return; }
+  if(w) w.location=data.signedUrl; else window.location.href=data.signedUrl;
+}
+function formMaterial(id){
+  const m=id?S.material.find(x=>x.id===id)||{}:{categoria:"Honorarios",vigente:true};
+  openModal(`<h2>${id?"Editar material":"Subir material"}</h2><form class="form" onsubmit="saveMaterial(event,'${id||""}')">
+    <label class="f full" for="maTit">Título<input type="text" id="maTit" required value="${esc(m.titulo)}" placeholder="Ej: Honorarios Furor · Diciembre 2026"></label>
+    <label class="f" for="maCat">Categoría<select id="maCat">${opts(CAT_MAT,m.categoria)}</select></label>
+    <label class="f" for="maSede">Sede<select id="maSede"><option value="">Todas las sedes</option>${opts(SEDES,m.sede)}</select></label>
+    <label class="f full" for="maFile">Archivo (PDF, imagen, hasta 50 MB)${m.archivo?` <span class="s">Actual: ${esc(m.archivo.nombre)}. Elegí otro solo si querés reemplazarlo.</span>`:""}<input type="file" id="maFile" accept="application/pdf,image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx"></label>
+    <label class="f full" for="maLink">O un link (Drive, Canva…)<input type="url" id="maLink" value="${esc(m.link)}"></label>
+    <label class="f full" for="maDes">Descripción / cómo usarlo<textarea id="maDes" placeholder="Ej: Usar para prospectos de Salta y Santiago desde el 1/12.">${esc(m.descripcion)}</textarea></label>
+    <label class="check full"><input type="checkbox" id="maVig" ${m.vigente?"checked":""}><span>Vigente (si es honorarios, los anteriores de la misma sede pasan a "Anterior")</span></label>
+    <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('material','${id}','este material')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" id="maSave">Guardar</button></div></div></form>`);
+}
+async function saveMaterial(e,id){
+  e.preventDefault();
+  const prev=id?S.material.find(x=>x.id===id)||{}:{};
+  const f=$("#maFile").files[0];
+  if(!f && !v("maLink") && !prev.archivo){ toast("Subí un archivo o pegá un link."); return; }
+  if(f && f.size>MAX_MB*1048576){ toast(`El archivo pesa más de ${MAX_MB} MB.`); return; }
+  $("#maSave").disabled=true; $("#maSave").textContent="Guardando…";
+  let archivo=prev.archivo||null;
+  if(f){
+    const safe=f.name.normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^\w.-]+/g,"_");
+    const path=`${Date.now()}_${safe}`;
+    const up=await sb.storage.from("material").upload(path,f,{contentType:f.type||undefined});
+    if(up.error){ toast("No se pudo subir: "+up.error.message); $("#maSave").disabled=false; $("#maSave").textContent="Guardar"; return; }
+    if(prev.archivo) await sb.storage.from("material").remove([prev.archivo.path]);
+    archivo={path,nombre:f.name,tipo:f.type,tam:f.size};
+  }
+  const data={titulo:v("maTit"),categoria:v("maCat"),sede:v("maSede"),link:v("maLink"),descripcion:v("maDes"),vigente:$("#maVig").checked,archivo,actualizado:new Date().toISOString()};
+  if(data.vigente && data.categoria==="Honorarios"){
+    const otros=S.material.filter(x=>x.id!==id&&x.categoria==="Honorarios"&&x.vigente&&(x.sede||"")===data.sede).map(x=>x.id);
+    if(otros.length) await sb.from("material").update({vigente:false}).in("id",otros);
+  }
+  const ok = id ? await run(sb.from("material").update(data).eq("id",id),"Material actualizado") : await run(sb.from("material").insert(Object.assign({autor:S.me.id},data)),"Material subido");
+  if(ok) closeModal(); else { $("#maSave").disabled=false; $("#maSave").textContent="Guardar"; }
+}
+
 /* ---------- Modales y formularios ---------- */
 function openModal(html){ $("#modal").innerHTML=html; $("#modalBg").classList.add("open"); const f=$("#modal input:not([type=checkbox]):not([disabled]), #modal select, #modal textarea"); if(f) f.focus(); }
 function closeModal(){ $("#modalBg").classList.remove("open"); $("#modal").innerHTML=""; }
@@ -613,6 +938,7 @@ function askDel(table,id,what){
   openModal(`<h2>¿Borrar ${esc(what)}?</h2><p>Se borra para todo el equipo y no se puede deshacer.</p><div class="form"><div class="actions"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" style="background:var(--danger);border-color:var(--danger)" onclick="doDel('${table}','${id}')">Borrar</button></div></div>`);
 }
 async function doDel(table,id){
+  if(table==="material"){ const m=S.material.find(x=>x.id===id); if(m?.archivo) await sb.storage.from("material").remove([m.archivo.path]); }
   if(table==="entregas"){ const e=S.entregas.find(x=>x.id===id); const paths=(e?.archivos||[]).map(f=>f.path); if(paths.length) await sb.storage.from("entregas").remove(paths); }
   if(await run(sb.from(table).delete().eq("id",id),"Borrado")){ closeModal(); if(table==="clientes") location.hash="clientes"; }
 }
