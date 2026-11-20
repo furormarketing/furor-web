@@ -1515,7 +1515,7 @@ function formCliente(id){
     <label class="f" for="cEst">Estado<select id="cEst">${opts(ESTADOS_CLI,c.estado)}</select></label>
     <label class="f" for="cPlan">Servicio<select id="cPlan"><option value="">—</option>${opts(PLANES,c.plan)}</select></label>
     <label class="f" for="cResp">Responsable<select id="cResp">${memOptions(c.responsable)}</select></label>
-    <label class="f" for="cCont">Contacto<input type="text" id="cCont" value="${esc(c.contacto)}"></label>
+    <label class="f" for="cCont">Titular / dueño<input type="text" id="cCont" value="${esc(c.contacto)}" placeholder="Nombre de quien decide"></label>
     <label class="f" for="cWa">WhatsApp<input type="text" id="cWa" value="${esc(c.whatsapp)}"></label>
     <label class="f" for="cIg">Instagram<input type="text" id="cIg" value="${esc(c.instagram)}" placeholder="@usuario"></label>
     <label class="f" for="cWeb">Web<input type="text" id="cWeb" value="${esc(c.web)}"></label>
