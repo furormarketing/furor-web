@@ -499,3 +499,4 @@ tr.dim td{opacity:.55}
 table.anual td,table.anual th{padding:9px 10px;font-size:13px}
 @media (max-width:900px){ .mes-sel b{min-width:120px;font-size:14px} .kpi.big .v{font-size:20px} .hb{grid-template-columns:90px 1fr auto} }
 .dir td:has(.sede-dot){white-space:nowrap}
+.titular{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-2);margin-top:2px}.titular .ico{width:13px;height:13px;opacity:.7}

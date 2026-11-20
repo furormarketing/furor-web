@@ -515,8 +515,8 @@ function vClientes(){
     <select id="cliSede" aria-label="Sede" onchange="S.f.cliSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.map(s=>`<option ${S.f.cliSede===s?"selected":""}>${s}</option>`).join("")}</select>
     <select id="cliEstado" aria-label="Estado" onchange="S.f.cliEstado=this.value;render()"><option value="">Todos los estados</option>${ESTADOS_CLI.map(s=>`<option ${S.f.cliEstado===s?"selected":""}>${s}</option>`).join("")}</select>
     <span class="pill">${list.length} de ${S.clientes.length}</span></div>
-  ${list.length?`<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Sede</th><th>Servicio</th><th>Responsable</th><th>Estado</th><th>Pendiente</th></tr></thead><tbody>
-  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click" onclick="location.hash='cliente-${c.id}'"><td><b>${esc(c.nombre)}</b>${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td>${estPill(c.estado)}</td><td>${ents?`<span class="pill info">${ents} piezas</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
+  ${list.length?`<div class="table-wrap"><table><thead><tr><th>Negocio · Titular</th><th>Sede</th><th>Servicio</th><th>Responsable</th><th>Estado</th><th>Pendiente</th></tr></thead><tbody>
+  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click" onclick="location.hash='cliente-${c.id}'"><td><b>${esc(c.nombre)}</b>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}</div>`:c.contacto===c.nombre?`<div class="s" style="color:var(--warn)">Falta el nombre del negocio</div>`:""}${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td>${estPill(c.estado)}</td><td>${ents?`<span class="pill info">${ents} piezas</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
   </tbody></table></div>`:`<div class="card"><div class="empty">${S.clientes.length?"No hay clientes con esos filtros.":"Todavía no hay clientes. Cargá el primero."}</div></div>`}`;
 }
 function fichaCliente(c){
@@ -524,7 +524,7 @@ function fichaCliente(c){
   const un=unread(c.id);
   const body={resumen:tabResumen,entregas:tabEntregas,publicados:c=>`<div class="toolbar"><button class="btn pri" onclick="formPublicado(null,'${c.id}')">${icon("plus")}Cargar link</button></div>`+pubGroup(c,S.publicados.filter(p=>p.cliente_id===c.id)),chat:()=>chatBox(c.id,true),pauta:tabPauta,agenda:tabAgenda}[S.cliTab]||tabResumen;
   return `
-  <div class="head"><div><div class="eyebrow"><a href="#clientes" style="text-decoration:none">← Clientes</a></div><h1>${esc(c.nombre)}</h1><p>${esc([c.rubro,c.sede,c.plan].filter(Boolean).join(" · "))} ${estPill(c.estado)}</p></div>
+  <div class="head"><div><div class="eyebrow"><a href="#clientes" style="text-decoration:none">← Clientes</a></div><h1>${esc(c.nombre)}</h1><p>${c.contacto&&c.contacto!==c.nombre?`<b>Titular:</b> ${esc(c.contacto)} · `:""}${esc([c.rubro,c.sede,c.plan].filter(Boolean).join(" · "))} ${estPill(c.estado)}</p></div>
     <div class="acts"><button class="btn" onclick="formCliente('${c.id}')">Editar ficha</button></div></div>
   <div class="tabs">${tabs.map(([k,l])=>`<button class="${S.cliTab===k?"on":""}" onclick="S.cliTab='${k}';render()">${l}${k==="chat"&&un?` <span class="badge">${un}</span>`:""}</button>`).join("")}</div>
   ${body(c)}`;
@@ -1509,7 +1509,7 @@ function formCliente(id){
   const c=id?cli(id)||{}:{estado:"Onboarding",sede:S.me.sede||""};
   const mk=c.marca||{}, rec=(c.recursos||[]).length?c.recursos:[{}], acc=(c.accesos||[]).length?c.accesos:[{}];
   openModal(`<h2>${id?"Editar ficha":"Nuevo cliente"}</h2><form class="form" onsubmit="saveCliente(event,'${id||""}')">
-    <label class="f" for="cNom">Nombre<input type="text" id="cNom" required value="${esc(c.nombre)}"></label>
+    <label class="f" for="cNom">Nombre del negocio<input type="text" id="cNom" required value="${esc(c.nombre)}"></label>
     <label class="f" for="cRub">Rubro<input type="text" id="cRub" value="${esc(c.rubro)}"></label>
     <label class="f" for="cSede">Sede<select id="cSede"><option value="">—</option>${opts(SEDES,c.sede)}</select></label>
     <label class="f" for="cEst">Estado<select id="cEst">${opts(ESTADOS_CLI,c.estado)}</select></label>
