@@ -160,6 +160,7 @@ async function afterAuth(){
   if(S.me && S.me.activo){
     await Promise.all(TABLES.filter(t=>t!=="miembros").map(loadTable));
     subscribe();
+    estadoPush().then(render);
   }
   S.loading=false; render();
 }
@@ -362,6 +363,7 @@ function vInicio(){
   return `
   ${pageHead(esc(fmtDayLong(t)), first?"Hola, "+esc(first):"Mi día", "", `<button class="btn" onclick="formTarea()">${icon("plus")}Tarea</button><button class="btn" onclick="formProspecto()">${icon("plus")}Prospecto</button><button class="btn pri" onclick="formEvento()">${icon("cal")}Agendar</button>`)}
 
+  ${bannerNotis()}
   <section class="hero">
     <div><div class="eyebrow">Enfoque de la semana</div>
       ${enf.texto?`<p class="focus-text">${esc(enf.texto)}</p>`:`<p class="focus-text" style="opacity:.75">${isAdmin()?"Definí la prioridad de la semana para que todo el equipo empuje para el mismo lado.":"Todavía no hay enfoque cargado para esta semana."}</p>`}
@@ -637,7 +639,7 @@ function agregarAdj(ch, files){
   if(!imgs.length) return;
   const big=imgs.find(f=>f.size>25*1048576); if(big){ toast("La imagen "+big.name+" es demasiado pesada."); return; }
   S.pendAtt[ch]=(S.pendAtt[ch]||[]).concat(imgs.map(f=>({file:f,url:URL.createObjectURL(f)}))).slice(0,10);
-  render();
+  if(ch==="form-tarea") pintarFotosForm(); else render();
 }
 function pegarAdj(e, ch){
   const files=[...(e.clipboardData?.files||[])].filter(f=>/^image\//.test(f.type));
@@ -726,6 +728,53 @@ function vTarea(t){
     </section></div>`;
 }
 
+/* ---------- Notificaciones push ---------- */
+const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const esInstalada = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+function b64ToU8(b64){ const p="=".repeat((4-b64.length%4)%4), s=atob((b64+p).replace(/-/g,"+").replace(/_/g,"/")); return Uint8Array.from([...s].map(c=>c.charCodeAt(0))); }
+async function estadoPush(){
+  if(!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)){ S.push = esIOS && !esInstalada ? "ios" : "nosoporta"; return; }
+  if(Notification.permission==="denied"){ S.push="bloqueada"; return; }
+  try{
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(sub && Notification.permission==="granted"){ S.push="on"; guardarSub(sub); } else S.push="off";
+  }catch(e){ S.push="off"; }
+}
+async function guardarSub(sub){
+  const j=sub.toJSON();
+  const disp=(esIOS?"iPhone":/android/i.test(navigator.userAgent)?"Android":/mac/i.test(navigator.userAgent)?"Mac":/win/i.test(navigator.userAgent)?"Windows":"Otro")+(esInstalada?" · app":" · navegador");
+  return sb.from("push_subs").upsert({miembro_id:S.me.id,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth,dispositivo:disp},{onConflict:"endpoint"});
+}
+async function activarNotis(){
+  if(S.push==="ios"){ openModal(`<h2>Notificaciones en iPhone</h2><p>En iPhone, las notificaciones funcionan solo si la app está agregada a la pantalla de inicio:</p><ol style="line-height:1.7"><li>Abrí este link en <b>Safari</b>.</li><li>Tocá el botón <b>Compartir</b> (el cuadrado con la flecha).</li><li>Elegí <b>"Agregar a inicio"</b>.</li><li>Abrí la app <b>Furor</b> desde el ícono y tocá de nuevo "Activar notificaciones".</li></ol><div class="form"><div class="actions"><span></span><button class="btn pri" onclick="closeModal()">Entendido</button></div></div>`); return; }
+  if(S.push==="bloqueada"){ openModal(`<h2>Notificaciones bloqueadas</h2><p>Bloqueaste las notificaciones para esta app. Para activarlas:</p><ul style="line-height:1.7"><li><b>Android (Chrome):</b> tocá el candado o los tres puntos → Configuración del sitio → Notificaciones → Permitir.</li><li><b>Compu (Chrome):</b> tocá el candado a la izquierda de la dirección → Notificaciones → Permitir.</li></ul><p>Después recargá la página.</p><div class="form"><div class="actions"><span></span><button class="btn pri" onclick="closeModal()">Entendido</button></div></div>`); return; }
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm!=="granted"){ S.push = perm==="denied"?"bloqueada":"off"; render(); toast("No se activaron las notificaciones."); return; }
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(CFG.VAPID_PUBLIC)});
+    const { error } = await guardarSub(sub);
+    if(error) throw error;
+    S.push="on"; render();
+    await sb.rpc("probar_notificacion");
+    toast("Listo. Te mandamos una notificación de prueba.");
+  }catch(e){ console.error(e); toast("No se pudieron activar: "+(e.message||e)); }
+}
+async function desactivarNotis(){
+  try{
+    const reg=await navigator.serviceWorker.ready; const sub=await reg.pushManager.getSubscription();
+    if(sub){ await sb.from("push_subs").delete().eq("endpoint",sub.endpoint); await sub.unsubscribe(); }
+    S.push="off"; render(); toast("Notificaciones desactivadas en este dispositivo.");
+  }catch(e){ toast("No se pudo desactivar."); }
+}
+function bannerNotis(){
+  if(S.push==="on"||S.push==="nosoporta"||!S.push||ls.get("furor-notis-later","")===today()) return "";
+  return `<div class="notibar">${icon("bell")}<div style="flex:1"><b>Activá las notificaciones en este ${S.mobile?"celular":"dispositivo"}</b><div class="s">Te avisamos cuando te asignan una tarea, te escriben o tenés un seguimiento pendiente.</div></div><button class="btn pri sm" onclick="activarNotis()">Activar</button><button class="btn ghost sm" onclick="ls.set('furor-notis-later',today());render()">Más tarde</button></div>`;
+}
+if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e=>{ if(e.data?.tipo==="ir"){ location.hash=e.data.url; } });
+
 /* ---------- Botón flotante (celular) ---------- */
 function renderFab(){
   const f=$("#fab"); if(!f) return;
@@ -753,6 +802,7 @@ async function pinNov(id){ const n=S.novedades.find(x=>x.id===id); if(n) await r
 function vEquipo(){
   const list=S.miembros.slice().sort((a,b)=>(b.activo-a.activo)||String(a.nombre).localeCompare(String(b.nombre)));
   return `<div class="head"><div><div class="eyebrow">Equipo</div><h1>Equipo</h1><p>Quién es quién y qué tiene cada uno en curso</p></div>${isAdmin()?`<button class="btn pri" onclick="formMiembro()">${icon("plus")}Sumar integrante</button>`:""}</div>
+  <section class="card" style="margin-bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">${icon("bell")}<div style="flex:1;min-width:200px"><b>Tus notificaciones en este dispositivo</b><div class="s">${S.push==="on"?"Activadas. Te llegan avisos de tareas, mensajes, prospectos y el resumen de la mañana.":S.push==="nosoporta"?"Este navegador no permite notificaciones. Probá con Chrome o con la app instalada.":S.push==="ios"?"En iPhone, primero agregá la app a la pantalla de inicio.":S.push==="bloqueada"?"Están bloqueadas en este navegador.":"Desactivadas."}</div></div>${S.push==="on"?`<button class="btn sm" onclick="sb.rpc('probar_notificacion');toast('Notificación de prueba enviada')">Probar</button><button class="btn sm ghost" onclick="desactivarNotis()">Desactivar</button>`:S.push!=="nosoporta"?`<button class="btn sm pri" onclick="activarNotis()">Activar</button>`:""}</section>
   ${isAdmin()?`<div class="note">${icon("users")}<span>Al sumar a alguien, avisale que entre al link del panel, toque <b>"Crear mi acceso"</b> con ese mismo mail y elija su contraseña. Si lo desactivás, pierde el acceso al instante.</span></div>`:""}
   <div class="people">${list.map(m=>{ const ab=openTasks().filter(t=>t.asignado===m.id), v=overdue(ab).length, cuentas=S.clientes.filter(c=>c.responsable===m.id&&c.estado!=="Baja").length;
     return `<div class="card" style="display:flex;gap:12px;${m.activo?"":"opacity:.55"}"><div class="avatar">${esc(initials(m.nombre||m.email))}</div><div style="min-width:0;flex:1">
@@ -1165,17 +1215,24 @@ async function doDel(table,id){
   if(await run(sb.from(table).delete().eq("id",id),"Borrado")){ closeModal(); if(table==="clientes") location.hash="clientes"; }
 }
 
+function pintarFotosForm(){ const el=$("#tFotos"); if(!el) return; el.innerHTML=(S.pendAtt["form-tarea"]||[]).map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" onclick="S.pendAtt['form-tarea'].splice(${i},1);pintarFotosForm()" aria-label="Quitar">✕</button></div>`).join(""); }
 function formTarea(id, cliId){
+  S.pendAtt["form-tarea"]=[];
   const t=id?S.tareas.find(x=>x.id===id)||{}:{asignado:S.me.id,cliente_id:cliId||"",prioridad:"media",estado:"pendiente",area:"General"};
   openModal(`<h2>${id?"Editar tarea":"Nueva tarea"}</h2><form class="form" onsubmit="saveTarea(event,'${id||""}')">
     <label class="f full" for="tTit">Tarea<input type="text" id="tTit" required value="${esc(t.titulo)}" placeholder="Ej: Diseñar 3 placas de feed para TANK"></label>
-    <label class="f full" for="tDet">Detalle<textarea id="tDet" placeholder="Brief, links, referencias">${esc(t.detalle)}</textarea></label>
+    <label class="f full" for="tDet">Detalle<textarea id="tDet" onpaste="pegarAdj(event,'form-tarea')" placeholder="Brief, links, referencias">${esc(t.detalle)}</textarea></label>
     <label class="f" for="tAsig">Responsable<select id="tAsig">${memOptions(t.asignado)}</select></label>
     <label class="f" for="tCli">Cliente<select id="tCli">${cliOptions(t.cliente_id)}</select></label>
     <label class="f" for="tArea2">Área<select id="tArea2">${opts(AREAS,t.area)}</select></label>
     <label class="f" for="tPrio">Prioridad<select id="tPrio">${[["alta","Alta"],["media","Media"],["baja","Baja"]].map(([k,l])=>`<option value="${k}" ${t.prioridad===k?"selected":""}>${l}</option>`).join("")}</select></label>
     <label class="f" for="tVence">Vence<input type="date" id="tVence" value="${esc(t.vence)}"></label>
     <label class="f" for="tEst">Estado<select id="tEst">${[["pendiente","Por hacer"],["curso","En curso"],["hecha","Hecha"]].map(([k,l])=>`<option value="${k}" ${t.estado===k?"selected":""}>${l}</option>`).join("")}</select></label>
+    <div class="full"><div class="f" style="margin-bottom:6px">Fotos de referencia</div>
+      <div class="pend" id="tFotos" style="border:0;padding:0 0 8px"></div>
+      <label class="btn" style="cursor:pointer">${icon("image")}Agregar fotos<input type="file" hidden accept="image/*" multiple onchange="agregarAdj('form-tarea',this.files);pintarFotosForm();this.value=''"></label>
+      <span class="s" style="margin-left:8px">También podés pegar una captura acá (Ctrl+V).</span>
+      ${id?`<div style="margin-top:10px"><a href="#tarea-${id}" onclick="closeModal()">${icon("chat")} Ver la conversación de la tarea (${S.mensajes.filter(m=>m.tarea_id===id).length} mensajes)</a></div>`:""}</div>
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('tareas','${id}','esta tarea')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
 }
 async function saveTarea(e,id){
@@ -1183,8 +1240,27 @@ async function saveTarea(e,id){
   const prev=id?S.tareas.find(x=>x.id===id)||{}:{};
   const estado=v("tEst");
   const data={titulo:v("tTit"),detalle:v("tDet"),asignado:nz(v("tAsig")),cliente_id:nz(v("tCli")),area:v("tArea2"),prioridad:v("tPrio"),vence:nz(v("tVence")),estado,hecha_el:estado==="hecha"?(prev.hecha_el||new Date().toISOString()):null};
-  const ok = id ? await run(sb.from("tareas").update(data).eq("id",id),"Tarea actualizada") : await run(sb.from("tareas").insert(Object.assign({creado_por:S.me.id},data)),"Tarea creada");
-  if(ok) closeModal();
+  const btn=e.submitter||document.querySelector("#modal .btn.pri"); if(btn){ btn.disabled=true; btn.textContent="Guardando…"; }
+  let tid=id;
+  if(id){ if(!await run(sb.from("tareas").update(data).eq("id",id))){ if(btn){btn.disabled=false;btn.textContent="Guardar";} return; } }
+  else {
+    const { data:row, error } = await sb.from("tareas").insert(Object.assign({creado_por:S.me.id},data)).select().single();
+    if(error){ toast("No se pudo guardar: "+error.message); if(btn){btn.disabled=false;btn.textContent="Guardar";} return; }
+    tid=row.id;
+  }
+  const fotos=S.pendAtt["form-tarea"]||[];
+  if(fotos.length){
+    const adjuntos=[];
+    for(const p of fotos){
+      const blob=await comprimirImagen(p.file);
+      const path=`t-${tid}/${Date.now()}_${Math.random().toString(36).slice(2,7)}.${blob.type==="image/png"?"png":blob.type==="image/gif"?"gif":"jpg"}`;
+      const up=await sb.storage.from("chat").upload(path,blob,{contentType:blob.type});
+      if(!up.error) adjuntos.push({path,nombre:p.file.name,tipo:blob.type,tam:blob.size});
+    }
+    fotos.forEach(p=>URL.revokeObjectURL(p.url)); S.pendAtt["form-tarea"]=[];
+    if(adjuntos.length) await run(sb.from("mensajes").insert({tarea_id:tid,autor:S.me.id,texto:"Fotos de referencia",adjuntos}));
+  }
+  toast(id?"Tarea actualizada":"Tarea creada"); closeModal();
 }
 
 function formEvento(id, fecha, cliId){
