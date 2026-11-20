@@ -93,7 +93,7 @@ function vResumen(){
     <div class="kpi big ok"><div class="l">Cobrado</div><div class="v">${money(t.cobrado)}</div>${delta(t.cobrado,prev.cobrado)}</div>
     <div class="kpi big warn"><div class="l">Por cobrar</div><div class="v">${money(totPC)}</div><div class="s">${pc.length} cliente${pc.length!==1?"s":""}${venc.length?` · <b style="color:var(--danger)">${venc.length} vencido${venc.length>1?"s":""}</b>`:""}</div></div>
     <div class="kpi big gas"><div class="l">Gastos + equipo</div><div class="v">${money(t.gastos+t.equipo)}</div><div class="s">Operativos ${moneyK(t.gastos)} · Equipo ${moneyK(t.equipo)}</div></div>
-    <div class="kpi big ${t.resultado>=0?"res":"bad"}"><div class="l">Resultado del mes</div><div class="v">${money(t.resultado)}</div><div class="s">Margen ${margen}%${t.retiro?` · Retiro MC ${moneyK(t.retiro)}`:""}</div></div>
+    <div class="kpi big ${t.resultado>=0?"res":"bad"}"><div class="l">Sueldo Marcelo</div><div class="v">${money(t.resultado)}</div><div class="s">${t.retiro?`Retiraste ${moneyK(t.retiro)} · queda en caja ${moneyK(t.resultado-t.retiro)}`:`Lo que queda después de gastos y equipo · margen ${margen}%`}</div></div>
   </div>
   <div class="kpis dir-sub" style="margin-top:12px">
     <div class="kpi"><div class="v">${activas.length}</div><div class="l">Clientes activos</div></div>
