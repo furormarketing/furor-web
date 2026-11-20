@@ -701,7 +701,7 @@ td.estcell{white-space:nowrap}
 .pr-steps button.on{background:var(--c);color:#fff}
 .pr-steps button.lost:not(.on){color:color-mix(in srgb,var(--danger) 70%,var(--muted))}
 .kpis.pk .kpi{padding:10px 14px} .kpis.pk .kpi .v{font-size:22px}
-@media (max-width:1250px){ .prow2{grid-template-columns:minmax(190px,1fr) auto minmax(150px,1fr)} .pr-steps{grid-column:1/-1;justify-self:start} }
+@media (max-width:1440px){ .prow2{grid-template-columns:minmax(190px,1fr) auto minmax(150px,1fr)} .pr-steps{grid-column:1/-1;justify-self:start} }
 @media (max-width:900px){
   .etcells{flex-wrap:nowrap;overflow-x:auto;margin:0 -16px 12px;padding:0 16px 2px;scrollbar-width:none}
   .prow2{grid-template-columns:1fr;gap:8px;padding:12px}

@@ -50,8 +50,10 @@ const ICONS = {
   send:'<path d="M21 3 3 10.5l7 3 3 7z"/><path d="m10 13.5 4.5-4.5"/>'
 };
 const icon = n => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]||""}</svg>`;
-const ETAPAS = ["Nuevo","Contactado","Reunión agendada","Propuesta enviada","Ganado","Perdido"];
-const ETAPA_C = {"Nuevo":"var(--s-otra)","Contactado":"var(--info)","Reunión agendada":"var(--warn)","Propuesta enviada":"var(--s-sde)","Ganado":"var(--ok)","Perdido":"var(--danger)"};
+const ETAPAS = ["Contactado","Honorarios enviados","Llamada","Reunión","Ganado","Perdido"];
+const ETAPA_C = {"Contactado":"var(--info)","Honorarios enviados":"var(--s-sde)","Llamada":"var(--warn)","Reunión":"#7a4fd0","Ganado":"var(--ok)","Perdido":"var(--danger)"};
+const ETAPA_L = {"Ganado":"Cliente nuevo"};
+const etapaL = e => ETAPA_L[e]||e;
 const CAT_MAT = ["Honorarios","Propuestas","Contratos","Presentaciones","Guías y procesos","General"];
 const ETAPAS_TPL = ["Primer contacto","Seguimiento","Reunión","Propuesta","Cierre","Recuperar","Otro"];
 const ORIGENES = ["Anuncio Meta","Instagram orgánico","Referido","Búsqueda en frío","Google","Web","Otro"];
@@ -1096,7 +1098,7 @@ function vDireccion(){
   if(window.DIR) return DIR.vista();
   if(!_dirCargando){
     _dirCargando=true;
-    const sc=document.createElement("script"); sc.src="direccion.js?v=7"; sc.onload=()=>render();
+    const sc=document.createElement("script"); sc.src="direccion.js?v=8"; sc.onload=()=>render();
     sc.onerror=()=>{ _dirCargando=false; toast("No se pudo abrir Dirección. Revisá la conexión."); };
     document.body.appendChild(sc);
   }
@@ -1193,12 +1195,12 @@ function vProspectos(){
     <button class="${et==="todos"?"on":""}" style="--c:var(--ink-2)" onclick="S.f.pEt='todos';render()">Todos<b>${list.length}</b></button></div>`;
   const mesNom = m => { const [y,mm]=m.split("-"), n=MESES[+mm-1]||mm; return `${n[0].toUpperCase()+n.slice(1)} ${y}`; };
   const grupos = meses.filter(m=>rows.some(p=>mesDe(p)===m)).map(m=>{ const all=list.filter(p=>mesDe(p)===m), r=rows.filter(p=>mesDe(p)===m), g=all.filter(p=>p.etapa==="Ganado").length;
-    return `<div class="pmes"><div class="pmes-h"><h2>${mesNom(m)}</h2><span class="pill">${all.length} prospecto${all.length!==1?"s":""}</span>${g?`<span class="pill ok">${g} ganado${g>1?"s":""} · ${Math.round(g/all.length*100)}%</span>`:""}${r.length!==all.length?`<span class="s">Mostrando ${r.length}</span>`:""}</div><div class="plist">${r.map(pRow).join("")}</div></div>`; }).join("");
+    return `<div class="pmes"><div class="pmes-h"><h2>${mesNom(m)}</h2><span class="pill">${all.length} prospecto${all.length!==1?"s":""}</span>${g?`<span class="pill ok">${g} cliente${g>1?"s":""} nuevo${g>1?"s":""} · ${Math.round(g/all.length*100)}%</span>`:""}${r.length!==all.length?`<span class="s">Mostrando ${r.length}</span>`:""}</div><div class="plist">${r.map(pRow).join("")}</div></div>`; }).join("");
   const mesSel = `<select id="pMes" aria-label="Mes" onchange="S.f.pMes=this.value;render()"><option value="">Todos los meses</option>${meses.map(m=>`<option value="${m}" ${S.f.pMes===m?"selected":""}>${mesNom(m)}</option>`).join("")}</select>`;
   const body = rows.length ? grupos : `<div class="card">${emptyMsg(et===""?"No hay prospectos en seguimiento. Cargá el primero con “Nuevo prospecto”.":"No hay prospectos en esta etapa.","target")}</div>`;
   if(S.mobile){
     return `<div class="m-head"><div><div class="eyebrow">Ventas</div><h1>Prospectos</h1></div><a class="btn sm" href="#plantillas">${icon("message")}Plantillas</a></div>
-    <div class="m-kpis"><div><b>${act.length}</b><span>En seguimiento</span></div><div class="${hoy.length?"warn":""}"><b>${hoy.length}</b><span>Hoy</span></div><div class="${atr.length?"bad":""}"><b>${atr.length}</b><span>Atrasados</span></div><div class="ok"><b>${ganMes}</b><span>Ganados mes</span></div></div>
+    <div class="m-kpis"><div><b>${act.length}</b><span>En seguimiento</span></div><div class="${hoy.length?"warn":""}"><b>${hoy.length}</b><span>Hoy</span></div><div class="${atr.length?"bad":""}"><b>${atr.length}</b><span>Atrasados</span></div><div class="ok"><b>${ganMes}</b><span>Clientes nuevos</span></div></div>
     <div class="m-filters"><div class="seg"><button class="${S.f.pScope==="todos"?"on":""}" onclick="S.f.pScope='todos';render()">Todos</button><button class="${S.f.pScope==="mios"?"on":""}" onclick="S.f.pScope='mios';render()">Míos</button></div>
       <select id="pSedeM" aria-label="Sede" onchange="S.f.pSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.slice(0,3).map(x=>`<option ${S.f.pSede===x?"selected":""}>${x}</option>`).join("")}</select></div>
     <div style="margin-bottom:8px">${mesSel}</div>
@@ -1210,7 +1212,7 @@ function vProspectos(){
     <div class="kpi"><div class="v">${act.length}</div><div class="l">En seguimiento</div></div>
     <div class="kpi"><div class="v" style="color:var(--warn)">${hoy.length}</div><div class="l">Para contactar hoy</div></div>
     <div class="kpi"><div class="v" style="color:${atr.length?"var(--danger)":"inherit"}">${atr.length}</div><div class="l">Seguimiento atrasado</div></div>
-    <div class="kpi"><div class="v" style="color:var(--ok)">${ganMes}</div><div class="l">Ganados este mes</div></div>
+    <div class="kpi"><div class="v" style="color:var(--ok)">${ganMes}</div><div class="l">Clientes nuevos este mes</div></div>
     <div class="kpi"><div class="v">${cerrados?Math.round(ganTot/cerrados*100)+"%":"—"}</div><div class="l">Tasa de cierre</div></div>
   </div>
   <div class="toolbar">
@@ -1221,7 +1223,7 @@ function vProspectos(){
   </div>
   ${cells}${body}`;
 }
-const ETAPA_CORTA = {"Nuevo":"Nuevo","Contactado":"Contactado","Reunión agendada":"Reunión","Propuesta enviada":"Propuesta","Ganado":"Ganado","Perdido":"Perdido"};
+const ETAPA_CORTA = {"Contactado":"Contactado","Honorarios enviados":"Honorarios","Llamada":"Llamada","Reunión":"Reunión","Ganado":"Cliente nuevo","Perdido":"Perdido"};
 function pRow(p){
   const t=today(), late=activeProsp(p)&&p.proximo&&p.proximo<t, wa=waNumber(p.whatsapp||""), idx=ETAPAS.indexOf(p.etapa);
   const steps=ETAPAS.map((e,i)=>`<button type="button" class="${e===p.etapa?"on":""} ${e!=="Perdido"&&i<idx&&p.etapa!=="Perdido"?"done":""} ${e==="Perdido"?"lost":""}" style="--c:${ETAPA_C[e]}" title="${e===p.etapa?"Etapa actual":"Mover a "+e}" onclick="moverEtapa('${p.id}','${e}')">${ETAPA_CORTA[e]}</button>`).join("");
@@ -1260,10 +1262,10 @@ async function moverEtapa(id, etapa){
   const data={etapa,actualizado:new Date().toISOString()};
   if(etapa==="Ganado") data.proximo=null;
   const prev={etapa:p.etapa,proximo:p.proximo,actualizado:p.actualizado}; Object.assign(p,data); render();
-  if(!await run(sb.from("prospectos").update(data).eq("id",id), etapa==="Ganado"?"¡Prospecto ganado!":"Movido a "+etapa)){ Object.assign(p,prev); render(); }
+  if(!await run(sb.from("prospectos").update(data).eq("id",id), etapa==="Ganado"?"¡Cliente nuevo!":"Movido a "+etapaL(etapa))){ Object.assign(p,prev); render(); }
 }
 function formProspecto(id){
-  const p=id?S.prospectos.find(x=>x.id===id)||{}:{etapa:"Nuevo",setter:S.me.id,sede:S.me.sede||"",proximo:today()};
+  const p=id?S.prospectos.find(x=>x.id===id)||{}:{etapa:"Contactado",setter:S.me.id,sede:S.me.sede||"",proximo:today()};
   openModal(`<h2>${id?esc(p.nombre):"Nuevo prospecto"}</h2><form class="form" onsubmit="saveProspecto(event,'${id||""}')">
     <label class="f" for="pNom">Nombre del contacto<input type="text" id="pNom" required value="${esc(p.nombre)}"></label>
     <label class="f" for="pNeg">Negocio<input type="text" id="pNeg" value="${esc(p.negocio)}"></label>
@@ -1272,7 +1274,7 @@ function formProspecto(id){
     <label class="f" for="pIg">Instagram<input type="text" id="pIg" value="${esc(p.instagram)}" placeholder="@negocio"></label>
     <label class="f" for="pOri">Origen<select id="pOri"><option value="">—</option>${opts(ORIGENES,p.origen)}</select></label>
     <div class="sep">Seguimiento</div>
-    <label class="f" for="pEt">Etapa<select id="pEt">${opts(ETAPAS,p.etapa)}</select></label>
+    <label class="f" for="pEt">Etapa<select id="pEt">${ETAPAS.map(e=>`<option value="${e}" ${p.etapa===e?"selected":""}>${esc(etapaL(e))}</option>`).join("")}</select></label>
     <label class="f" for="pProx">Próximo contacto<input type="date" id="pProx" value="${esc(p.proximo)}"></label>
     <label class="f" for="pSede">Sede<select id="pSede"><option value="">—</option>${opts(SEDES,p.sede)}</select></label>
     <label class="f" for="pSet">Setter<select id="pSet">${memOptions(p.setter)}</select></label>
@@ -1318,7 +1320,7 @@ function usarPlantilla(tplId, prospId){
   if(!tpls.length){ toast("Todavía no hay plantillas cargadas."); return; }
   let tpl=tplId?tpls.find(x=>x.id===tplId):null;
   if(!tpl){
-    const sug={"Nuevo":"Primer contacto","Contactado":"Seguimiento","Reunión agendada":"Reunión","Propuesta enviada":"Propuesta"}[p?.etapa]||"Primer contacto";
+    const sug={"Contactado":"Seguimiento","Honorarios enviados":"Propuesta","Llamada":"Seguimiento","Reunión":"Reunión"}[p?.etapa]||"Primer contacto";
     tpl=tpls.find(x=>x.etapa===sug)||tpls[0];
   }
   S.uso={tpl:tpl.id,prosp:prospId||""};
