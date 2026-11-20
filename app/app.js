@@ -13,8 +13,10 @@ const NAV = [
   ["inicio","Inicio","home","Operación"],["agenda","Agenda","cal","Operación"],["tareas","Tareas","check","Operación"],["chat","Chat","chat","Operación"],
   ["clientes","Clientes","briefcase","Cuentas"],["contenido","Contenido","grid","Cuentas"],["publicados","Publicados","link","Cuentas"],
   ["prospectos","Prospectos","target","Ventas"],["plantillas","Plantillas","message","Ventas"],["material","Material","file","Ventas"],
-  ["novedades","Novedades","bell","Equipo"],["equipo","Equipo","users","Equipo"]
+  ["novedades","Novedades","bell","Equipo"],["equipo","Equipo","users","Equipo"],
+  ["direccion","Dirección","lock","Privado"]
 ];
+const navItems = () => NAV.filter(n=>n[0]!=="direccion"||isAdmin());
 const MOBILE_NAV = ["inicio","agenda","prospectos","chat"];
 const ICONS = {
   home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
@@ -28,6 +30,7 @@ const ICONS = {
   file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
   bell:'<path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9"/><path d="M10 20a2 2 0 0 0 4 0"/>',
   users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',
+  lock:'<rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
   more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   alert:'<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17.5v.01"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
@@ -238,6 +241,7 @@ function route(){
   if(h.startsWith("cliente-")){ S.view="clientes"; S.cliId=h.slice(8); }
   else if(h.startsWith("tarea-")){ S.view="tareas"; S.tareaId=h.slice(6); S.cliId=null; }
   else { S.view = NAV.some(n=>n[0]===h) ? h : "inicio"; S.cliId=null; S.tareaId=null; }
+  if(S.view==="direccion" && S.me && !isAdmin()){ S.view="inicio"; }
   render(); window.scrollTo(0,0);
 }
 window.addEventListener("hashchange", route);
@@ -304,7 +308,7 @@ function render(){
       <nav class="bottom-nav" id="bnav"></nav><button class="fab" id="fab" hidden></button><div class="more-sheet" id="more" onclick="if(event.target.id==='more'){S.more=false;render()}"></div>`;
   }
   renderNav();
-  const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,publicados:vPublicados};
+  const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,publicados:vPublicados,direccion:vDireccion};
   $("#main").innerHTML = views[S.view]();
   if(aid){ const el=document.getElementById(aid); if(el){ el.focus(); try{ if(sel!=null) el.setSelectionRange(sel,sel); }catch(e){} } }
   const m2=$(".msgs"); if(m2 && atBottom) m2.scrollTop=m2.scrollHeight;
@@ -319,7 +323,7 @@ function navBadges(){
 }
 function renderNav(){
   const b=navBadges(); let html="", grp="";
-  NAV.forEach(([k,l,ic,g])=>{
+  navItems().forEach(([k,l,ic,g])=>{
     if(g!==grp){ html+=`<div class="nav-group">${g}</div>`; grp=g; }
     html+=`<a href="#${k}" class="${S.view===k?"on":""}">${icon(ic)}<span class="lbl">${l}</span>${b[k]?`<span class="badge">${b[k]}</span>`:""}</a>`;
   });
@@ -328,10 +332,10 @@ function renderNav(){
   $("#meBox").innerHTML=`<div class="avatar">${esc(initials(nm))}</div><div style="min-width:0"><div class="n">${esc(nm)}</div><div class="r">${esc(ROLES[S.me.rol]||"")}${S.me.sede?" · "+esc(S.me.sede):""}</div><button onclick="logout()">Cerrar sesión</button></div>`;
   const cur=NAV.find(n=>n[0]===S.view);
   $("#topbar").innerHTML=`<img src="${LOGO}" alt="Furor"><b>${esc(cur?cur[1]:"Furor")}</b><button class="avatar" onclick="S.more=true;render()" aria-label="Más opciones">${esc(initials(nm))}</button>`;
-  const inMore=!MOBILE_NAV.includes(S.view), moreBadge=NAV.filter(n=>!MOBILE_NAV.includes(n[0])).reduce((a,n)=>a+(b[n[0]]||0),0);
+  const inMore=!MOBILE_NAV.includes(S.view), moreBadge=navItems().filter(n=>!MOBILE_NAV.includes(n[0])).reduce((a,n)=>a+(b[n[0]]||0),0);
   $("#bnav").innerHTML=MOBILE_NAV.map(k=>{const n=NAV.find(x=>x[0]===k);return `<a href="#${k}" class="${S.view===k?"on":""}">${icon(n[2])}${n[1]}${b[k]?`<span class="badge">${b[k]}</span>`:""}</a>`;}).join("")+`<button class="${inMore?"on":""}" onclick="S.more=true;render()">${icon("more")}Más${moreBadge?`<span class="badge">${moreBadge}</span>`:""}</button>`;
   const mo=$("#more"); mo.classList.toggle("open",!!S.more);
-  mo.innerHTML=S.more?`<div class="sheet">${NAV.filter(n=>!MOBILE_NAV.includes(n[0])).map(([k,l,ic])=>`<a href="#${k}" onclick="S.more=false">${icon(ic)}${l}${b[k]?`<span class="badge" style="position:absolute;top:6px;right:8px">${b[k]}</span>`:""}</a>`).join("")}<button onclick="logout()">${icon("users")}Cerrar sesión</button></div>`:"";
+  mo.innerHTML=S.more?`<div class="sheet">${navItems().filter(n=>!MOBILE_NAV.includes(n[0])).map(([k,l,ic])=>`<a href="#${k}" onclick="S.more=false">${icon(ic)}${l}${b[k]?`<span class="badge" style="position:absolute;top:6px;right:8px">${b[k]}</span>`:""}</a>`).join("")}<button onclick="logout()">${icon("users")}Cerrar sesión</button></div>`:"";
 }
 function renderLogin(){
   const m=S.authMode;
@@ -948,6 +952,20 @@ function bannerNotis(){
   return `<div class="notibar">${icon("bell")}<div style="flex:1"><b>Activá las notificaciones en este ${S.mobile?"celular":"dispositivo"}</b><div class="s">Te avisamos cuando te asignan una tarea, te escriben o tenés un seguimiento pendiente.</div></div><button class="btn pri sm" onclick="activarNotis()">Activar</button><button class="btn ghost sm" onclick="ls.set('furor-notis-later',today());render()">Más tarde</button></div>`;
 }
 if("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e=>{ if(e.data?.tipo==="ir"){ location.hash=e.data.url; } });
+
+/* ---------- Dirección (módulo privado, se carga a demanda) ---------- */
+let _dirCargando=false;
+function vDireccion(){
+  if(!isAdmin()) return `<div class="card">${emptyMsg("Esta sección es privada.","lock")}</div>`;
+  if(window.DIR) return DIR.vista();
+  if(!_dirCargando){
+    _dirCargando=true;
+    const sc=document.createElement("script"); sc.src="direccion.js?v=1"; sc.onload=()=>render();
+    sc.onerror=()=>{ _dirCargando=false; toast("No se pudo abrir Dirección. Revisá la conexión."); };
+    document.body.appendChild(sc);
+  }
+  return `<div class="card">${emptyMsg("Abriendo Dirección…","lock")}</div>`;
+}
 
 /* ---------- Botón flotante (celular) ---------- */
 function renderFab(){
