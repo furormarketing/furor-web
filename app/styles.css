@@ -534,3 +534,4 @@ table.anual td,table.anual th{padding:9px 10px;font-size:13px}
   .tabs button{padding:10px 11px}
 }
 @media (max-width:900px){ .chat.mthread .msgs{min-height:0} }
+.hermanos{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:13px;color:var(--muted)}.hermanos .ico{width:15px;height:15px}

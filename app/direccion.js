@@ -17,6 +17,9 @@ const ym = d => String(d).slice(0,7);
 const mesLabel = m => { const [y,mm]=m.split("-").map(Number); return MES_L[mm-1]+" "+y; };
 const addMes = (m,k) => { let [y,mm]=m.split("-").map(Number); mm+=k; while(mm<1){mm+=12;y--;} while(mm>12){mm-=12;y++;} return y+"-"+pad(mm); };
 const cuenta = id => D.fin_cuentas.find(c=>c.id===id);
+const incluidos = c => D.fin_cuentas.filter(x=>x.cobro_con===c.id && x.activo);
+const packTotal = c => Number(c.pack) + incluidos(c).reduce((a,x)=>a+Number(x.pack),0);
+const incluyeTxt = c => { const inc=incluidos(c); return inc.length ? "incluye "+inc.map(x=>x.negocio).join(", ") : ""; };
 const num = v => Number(String(v).replace(/[^\d.,-]/g,"").replace(/\./g,"").replace(",","."))||0;
 
 async function cargar(){
@@ -51,17 +54,17 @@ function ultimoMonto(cid){ const c=D.fin_cobros.filter(x=>x.cuenta_id===cid).sor
 function porCobrar(m){
   // cuentas activas sin cobro pagado en el mes + cobros pendientes del mes
   const out=[];
-  D.fin_cuentas.filter(c=>c.activo).forEach(c=>{
+  D.fin_cuentas.filter(c=>c.activo && !c.cobro_con).forEach(c=>{
     const cob=D.fin_cobros.filter(x=>x.cuenta_id===c.id&&ym(x.fecha)===m);
     if(cob.some(x=>x.estado!=="Pendiente")) return;
     const pend=cob.find(x=>x.estado==="Pendiente");
     const dia=Math.min(c.dia_cobro||1, 28);
-    out.push({cuenta:c, cobro:pend||null, fecha:pend?pend.fecha:`${m}-${pad(dia)}`, monto:pend?Number(pend.monto):(ultimoMonto(c.id)??Number(c.pack))});
+    out.push({cuenta:c, cobro:pend||null, fecha:pend?pend.fecha:`${m}-${pad(dia)}`, monto:pend?Number(pend.monto):(ultimoMonto(c.id)??packTotal(c))});
   });
   D.fin_cobros.filter(x=>ym(x.fecha)===m&&x.estado==="Pendiente"&&!out.some(o=>o.cobro&&o.cobro.id===x.id)).forEach(x=>out.push({cuenta:cuenta(x.cuenta_id)||{negocio:x.titular,titular:x.titular},cobro:x,fecha:x.fecha,monto:Number(x.monto)}));
   return out.sort((a,b)=>a.fecha.localeCompare(b.fecha));
 }
-const mrr = () => D.fin_cuentas.filter(c=>c.activo).reduce((a,c)=>a+(ultimoMonto(c.id)??Number(c.pack)),0);
+const mrr = () => D.fin_cuentas.filter(c=>c.activo && !c.cobro_con).reduce((a,c)=>a+(ultimoMonto(c.id)??packTotal(c)),0);
 
 /* ---------- vista principal ---------- */
 function vista(){
@@ -95,7 +98,7 @@ function vResumen(){
   <div class="kpis" style="margin-top:12px">
     <div class="kpi"><div class="v">${activas.length}</div><div class="l">Clientes activos</div></div>
     <div class="kpi"><div class="v">${moneyK(mrr())}</div><div class="l">Facturación mensual recurrente</div></div>
-    <div class="kpi"><div class="v">${moneyK(activas.length?mrr()/activas.length:0)}</div><div class="l">Ticket promedio</div></div>
+    <div class="kpi"><div class="v">${moneyK(activas.filter(c=>!c.cobro_con).length?mrr()/activas.filter(c=>!c.cobro_con).length:0)}</div><div class="l">Ticket promedio por titular</div></div>
     <div class="kpi"><div class="v">${D.fin_cuentas.filter(c=>c.alta&&ym(c.alta)===m).length}</div><div class="l">Altas del mes</div></div>
   </div>
   <div class="split" style="margin-top:16px">
@@ -111,7 +114,7 @@ function vResumen(){
 function filaCobrar(x){
   const c=x.cuenta, hoy=today(), late=x.fecha<hoy;
   return `<div class="row"><div class="when" style="--sc:${late?"var(--danger)":"var(--warn)"}"><b>${parseYmd(x.fecha).getDate()}</b><span>${MES_C[parseYmd(x.fecha).getMonth()]}</span></div>
-    <div class="main"><div class="t">${esc(c.negocio)}</div><div class="s">${esc(c.titular||"")} · ${money(x.monto)}${late?` · <b style="color:var(--danger)">vencido</b>`:""}</div></div>
+    <div class="main"><div class="t">${esc(c.negocio)}</div><div class="s">${esc(c.titular||"")} · ${money(x.monto)}${c.id&&incluyeTxt(c)?` · <b>${esc(incluyeTxt(c))}</b>`:""}${late?` · <b style="color:var(--danger)">vencido</b>`:""}</div></div>
     <button class="btn sm wa" onclick="DIR.recordar('${c.id||""}','${x.fecha}',${x.monto})" title="Recordar pago por WhatsApp">${icon("wa")}</button>
     <button class="btn sm pri" onclick="DIR.cobrar('${c.id||""}','${x.cobro?x.cobro.id:""}',${x.monto})">Cobrado</button></div>`;
 }
@@ -165,7 +168,7 @@ function vCobros(){
   <div class="kpis" style="margin-bottom:14px"><div class="kpi"><div class="v" style="color:var(--ok)">${money(t.cobrado)}</div><div class="l">Cobrado</div></div><div class="kpi"><div class="v" style="color:var(--warn)">${money(pc.reduce((a,x)=>a+x.monto,0))}</div><div class="l">Falta cobrar</div></div><div class="kpi"><div class="v">${list.filter(c=>c.estado!=="Pendiente").length} / ${list.length+pc.filter(x=>!x.cobro).length}</div><div class="l">Pagos recibidos</div></div></div>
   <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Monto</th><th>Estado</th><th>Observaciones</th><th></th></tr></thead><tbody>
   ${list.map(c=>{ const cu=cuenta(c.cuenta_id); const late=c.estado==="Pendiente"&&c.fecha<today(); return `<tr>
-    <td>${fmtDate(c.fecha)}</td><td><b>${esc(cu?cu.negocio:c.titular)}</b><div class="s">${esc(c.titular||cu?.titular||"")}</div></td><td class="num">${money(c.monto)}</td>
+    <td>${fmtDate(c.fecha)}</td><td><b>${esc(cu?cu.negocio:c.titular)}</b><div class="s">${esc(c.titular||cu?.titular||"")}${cu&&incluyeTxt(cu)?" · "+esc(incluyeTxt(cu)):""}</div></td><td class="num">${money(c.monto)}</td>
     <td><span class="pill ${c.estado==="Pagado"?"ok":c.estado==="Parcial"?"info":late?"bad":"warn"}">${late?"Vencido":c.estado}</span></td><td class="s">${esc(c.obs||"")}</td>
     <td class="acts-td">${c.estado!=="Pagado"?`<button class="btn sm pri" onclick="DIR.marcarPagado('${c.id}')">Cobrado</button>`:""}${c.estado!=="Pagado"&&cu?`<button class="btn sm wa" onclick="DIR.recordar('${cu.id}','${c.fecha}',${c.monto})" aria-label="Recordar por WhatsApp">${icon("wa")}</button>`:""}<button class="btn sm ghost" onclick="DIR.formCobro('${c.id}')">Editar</button></td></tr>`; }).join("")
    || `<tr><td colspan="6">${emptyMsg("Sin cobros registrados en este mes.","file")}</td></tr>`}
@@ -178,8 +181,9 @@ function vCuentas(seg){
   <div class="kpis" style="margin-bottom:14px"><div class="kpi"><div class="v">${D.fin_cuentas.filter(c=>c.activo).length}</div><div class="l">Activos</div></div><div class="kpi"><div class="v">${money(mrr())}</div><div class="l">Facturación mensual</div></div></div>
   <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Sede</th><th>Pack</th><th>Último pago</th><th>Día de cobro</th><th>Alta</th><th>Estado</th><th></th></tr></thead><tbody>
   ${list.map(c=>{ const u=D.fin_cobros.filter(x=>x.cuenta_id===c.id&&x.estado!=="Pendiente").sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)))[0];
-    return `<tr class="${c.activo?"":"dim"}"><td><b>${esc(c.negocio)}</b><div class="s">${esc(c.titular||"")}</div></td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td class="num">${money(c.pack)}</td>
-    <td>${u?`${money(u.monto)}<div class="s">${fmtDate(u.fecha)}</div>`:"—"}</td><td>${c.dia_cobro||"—"}</td><td>${c.alta?fmtDate(c.alta)+" "+c.alta.slice(2,4):"—"}</td>
+    const con=c.cobro_con?cuenta(c.cobro_con):null;
+    return `<tr class="${c.activo?"":"dim"}"><td><b>${esc(c.negocio)}</b><div class="s">${esc(c.titular||"")}</div>${con?`<div class="s" style="color:var(--info)">Se cobra junto con ${esc(con.negocio)}</div>`:incluyeTxt(c)?`<div class="s" style="color:var(--info)">Cobro unificado: ${esc(incluyeTxt(c))}</div>`:""}</td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td class="num">${money(c.pack)}</td>
+    <td>${u?`${money(u.monto)}<div class="s">${fmtDate(u.fecha)}</div>`:con?`<span class="s">con ${esc(con.negocio)}</span>`:"—"}</td><td>${c.dia_cobro||"—"}</td><td>${c.alta?fmtDate(c.alta)+" "+c.alta.slice(2,4):"—"}</td>
     <td><span class="pill ${c.activo?"ok":""}">${c.activo?"Activo":"Inactivo"}</span></td><td><button class="btn sm ghost" onclick="DIR.formCuenta('${c.id}')">Editar</button></td></tr>`; }).join("")}
   </tbody></table></div>`;
 }
@@ -299,6 +303,7 @@ function formCuenta(id){
     <label class="f" for="cuD">Día de cobro<input type="number" id="cuD" min="1" max="31" value="${esc(c.dia_cobro)}"></label>
     <label class="f" for="cuA">Fecha de alta<input type="date" id="cuA" value="${esc(c.alta)}"></label>
     <label class="f" for="cuS">Sede<select id="cuS"><option value="">—</option>${opts(SEDES,c.sede)}</select></label>
+    <label class="f full" for="cuCon">Se cobra junto con (mismo titular, un solo pago)<select id="cuCon"><option value="">— Se cobra por separado —</option>${D.fin_cuentas.filter(x=>x.id!==c.id&&!x.cobro_con).sort((a,b)=>((b.titular===c.titular)-(a.titular===c.titular))||(b.activo-a.activo)||a.negocio.localeCompare(b.negocio)).map(x=>`<option value="${x.id}" ${c.cobro_con===x.id?"selected":""}>${esc(x.negocio)} · ${esc(x.titular||"")}${x.titular&&x.titular===c.titular?" (mismo titular)":""}</option>`).join("")}</select></label>
     <label class="f full" for="cuNo">Notas<input type="text" id="cuNo" value="${esc(c.notas)}"></label>
     <label class="check full"><input type="checkbox" id="cuAc" ${c.activo?"checked":""}><span>Cliente activo (se le genera el cobro todos los meses)</span></label>
     ${!id?`<label class="check full"><input type="checkbox" id="cuEq" checked><span>Crear también la ficha en Clientes para el equipo (sin montos)</span></label>`:""}
@@ -306,7 +311,7 @@ function formCuenta(id){
 }
 async function saveCuenta(e,id){
   e.preventDefault();
-  const data={negocio:v("cuN"),titular:v("cuT"),pack:Number(v("cuP")),dia_cobro:v("cuD")?Number(v("cuD")):null,alta:nz(v("cuA")),sede:v("cuS"),notas:v("cuNo"),activo:$("#cuAc").checked};
+  const data={negocio:v("cuN"),titular:v("cuT"),pack:Number(v("cuP")),dia_cobro:v("cuD")?Number(v("cuD")):null,alta:nz(v("cuA")),sede:v("cuS"),notas:v("cuNo"),activo:$("#cuAc").checked,cobro_con:nz(v("cuCon"))};
   if(id){ if(await run(sb.from("fin_cuentas").update(data).eq("id",id),"Cliente actualizado")) closeModal(); return; }
   if($("#cuEq")?.checked){
     const { data:cl } = await sb.from("clientes").insert({nombre:data.negocio,contacto:data.titular,sede:data.sede,estado:"Onboarding",inicio:data.alta}).select().single();

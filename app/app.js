@@ -107,6 +107,8 @@ const cli = id => S.clientes.find(c=>c.id===id);
 const MEM_COLORS=["#185638","#1f5fa6","#c2570c","#8e3fb0","#b8326b","#0f7c80","#7a5a10","#4b5bd6","#a33a2a","#2f7d32"];
 function memColor(id){ const i=S.miembros.findIndex(m=>m.id===id); if(i>=0) return MEM_COLORS[i%MEM_COLORS.length]; let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))>>>0; return MEM_COLORS[h%MEM_COLORS.length]; }
 const cliName = id => cli(id)?.nombre || "";
+const norm = s => String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+const hermanos = c => c && c.contacto ? S.clientes.filter(x=>x.id!==c.id && norm(x.contacto)===norm(c.contacto) && norm(x.contacto)!==norm(x.nombre)) : [];
 const cfg = k => (S.config.find(c=>c.clave===k)||{}).valor || null;
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"),3000); }
 const ls = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
@@ -537,11 +539,11 @@ function vClientes(){
     <select id="cliEstado" aria-label="Estado" onchange="S.f.cliEstado=this.value;render()"><option value="">Todos los estados</option>${ESTADOS_CLI.map(s=>`<option ${S.f.cliEstado===s?"selected":""}>${s}</option>`).join("")}</select>
     <span class="pill">${list.length} de ${S.clientes.length}</span></div>
   ${S.mobile&&list.length?`<div class="mcards">${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id);
-    return `<a class="mcard" href="#cliente-${c.id}"><div class="mc-top"><b>${esc(c.nombre)}</b>${estPill(c.estado)}</div>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}</div>`:""}
+    return `<a class="mcard" href="#cliente-${c.id}"><div class="mc-top"><b>${esc(c.nombre)}</b>${estPill(c.estado)}</div>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:""}
     <div class="s">${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"Sin sede"}${c.rubro?" · "+esc(c.rubro):""}${c.responsable?" · "+esc(memName(c.responsable)):""}</div>
     ${ents||un?`<div style="display:flex;gap:6px;margin-top:6px">${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span>`:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</div>`:""}</a>`; }).join("")}</div>`
   :list.length?`<div class="table-wrap"><table><thead><tr><th>Negocio · Titular</th><th>Sede</th><th>Servicio</th><th>Responsable</th><th>Estado</th><th>Pendiente</th></tr></thead><tbody>
-  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click" onclick="location.hash='cliente-${c.id}'"><td><b>${esc(c.nombre)}</b>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}</div>`:c.contacto===c.nombre?`<div class="s" style="color:var(--warn)">Falta el nombre del negocio</div>`:""}${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td>${estPill(c.estado)}</td><td>${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
+  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click" onclick="location.hash='cliente-${c.id}'"><td><b>${esc(c.nombre)}</b>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:c.contacto===c.nombre?`<div class="s" style="color:var(--warn)">Falta el nombre del negocio</div>`:""}${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td>${estPill(c.estado)}</td><td>${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
   </tbody></table></div>`:`<div class="card"><div class="empty">${S.clientes.length?"No hay clientes con esos filtros.":"Todavía no hay clientes. Cargá el primero."}</div></div>`}`;
 }
 function fichaCliente(c){
@@ -549,7 +551,7 @@ function fichaCliente(c){
   const un=unread(c.id);
   const body={resumen:tabResumen,entregas:tabEntregas,publicados:c=>`<div class="toolbar"><button class="btn pri" onclick="formPublicado(null,'${c.id}')">${icon("plus")}Cargar link</button></div>`+pubGroup(c,S.publicados.filter(p=>p.cliente_id===c.id)),chat:()=>chatBox(c.id,true),pauta:tabPauta,agenda:tabAgenda}[S.cliTab]||tabResumen;
   return `
-  <div class="head"><div><div class="eyebrow"><a href="#clientes" style="text-decoration:none">← Clientes</a></div><h1>${esc(c.nombre)}</h1><p>${c.contacto&&c.contacto!==c.nombre?`<b>Titular:</b> ${esc(c.contacto)} · `:""}${esc([c.rubro,c.sede,c.plan].filter(Boolean).join(" · "))} ${estPill(c.estado)}</p></div>
+  <div class="head"><div><div class="eyebrow"><a href="#clientes" style="text-decoration:none">← Clientes</a></div><h1>${esc(c.nombre)}</h1><p>${c.contacto&&c.contacto!==c.nombre?`<b>Titular:</b> ${esc(c.contacto)} · `:""}${esc([c.rubro,c.sede,c.plan].filter(Boolean).join(" · "))} ${estPill(c.estado)}</p>${hermanos(c).length?`<div class="hermanos">${icon("briefcase")}<span>Otros negocios de ${esc(c.contacto.split(" ")[0])}:</span>${hermanos(c).map(h=>`<a class="pill info" href="#cliente-${h.id}">${esc(h.nombre)}</a>`).join("")}</div>`:""}</div>
     <div class="acts"><button class="btn" onclick="formCliente('${c.id}')">Editar ficha</button></div></div>
   <div class="tabs">${tabs.map(([k,l])=>`<button class="${S.cliTab===k?"on":""}" onclick="S.cliTab='${k}';render()">${l}${k==="chat"&&un?` <span class="badge">${un}</span>`:""}</button>`).join("")}</div>
   ${body(c)}`;
@@ -1005,7 +1007,7 @@ function vDireccion(){
   if(window.DIR) return DIR.vista();
   if(!_dirCargando){
     _dirCargando=true;
-    const sc=document.createElement("script"); sc.src="direccion.js?v=1"; sc.onload=()=>render();
+    const sc=document.createElement("script"); sc.src="direccion.js?v=2"; sc.onload=()=>render();
     sc.onerror=()=>{ _dirCargando=false; toast("No se pudo abrir Dirección. Revisá la conexión."); };
     document.body.appendChild(sc);
   }
