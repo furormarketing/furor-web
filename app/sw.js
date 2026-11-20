@@ -1,6 +1,6 @@
 // Service worker mínimo: permite instalar la app y abre el "cascarón" sin conexión.
 // Los datos siempre vienen en vivo de Supabase (no se cachean).
-const CACHE = "furor-shell-v9";
+const CACHE = "furor-shell-v11";
 const SHELL = ["./", "index.html", "styles.css", "app.js", "config.js", "manifest.webmanifest", "icons/icon-192.png", "img/logo-furor.png"];
 
 self.addEventListener("install", e => {

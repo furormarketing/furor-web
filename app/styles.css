@@ -500,3 +500,37 @@ table.anual td,table.anual th{padding:9px 10px;font-size:13px}
 @media (max-width:900px){ .mes-sel b{min-width:120px;font-size:14px} .kpi.big .v{font-size:20px} .hb{grid-template-columns:90px 1fr auto} }
 .dir td:has(.sede-dot){white-space:nowrap}
 .titular{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-2);margin-top:2px}.titular .ico{width:13px;height:13px;opacity:.7}
+
+/* ---------- Ajustes de celular (v11) ---------- */
+.mcards{display:grid;gap:10px}
+.mcard{display:block;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:13px 14px;text-decoration:none;color:var(--ink);box-shadow:var(--shadow)}
+.mcard:active{background:var(--brand-soft)}
+.mc-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:2px}
+.thread .top .back{margin-right:4px;padding-left:4px;font-size:15px}
+.thread.gen .top .back{color:#fff}
+@media (max-width:900px){
+  main{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
+  body.has-fab .head > .btn.pri{display:none}
+  /* chat tipo WhatsApp */
+  .chat.mlist{display:block;height:auto;min-height:0}
+  .chat.mlist .channels{max-height:none;border:0}
+  .chat.mlist .channels button{padding:13px 14px}
+  .chat.mthread{display:block;height:calc(100dvh - 54px - 66px - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom));min-height:380px;margin:-6px -2px 0}
+  .chat.mthread .thread{height:100%}
+  .chat.mthread .msgs{height:auto;flex:1}
+  /* publicados */
+  .prow{flex-wrap:wrap;row-gap:6px}
+  .prow .main{flex:1 1 calc(100% - 40px)}
+  .prow > .pill{margin-left:29px}
+  .prow > .btn{padding:4px 8px}
+  /* novedades */
+  .row.post{flex-wrap:wrap}
+  .row.post > .main{flex:1 1 calc(100% - 50px)}
+  .row.post > div:last-child:not(.main){width:100%;padding-left:50px;display:flex;gap:4px}
+  .board{grid-auto-columns:minmax(78vw,1fr)}
+  .ficha{grid-template-columns:1fr 1fr}
+  .head{margin-bottom:16px}
+  .head p{font-size:14px}
+  .tabs button{padding:10px 11px}
+}
+@media (max-width:900px){ .chat.mthread .msgs{min-height:0} }

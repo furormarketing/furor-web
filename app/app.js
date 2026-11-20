@@ -75,7 +75,7 @@ const MAX_MB = 50;
 const S = {
   session:null, me:null, loading:true, authMode:"entrar", authErr:"", authBusy:false,
   miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[], material:[], plantillas:[], prospectos:[], publicados:[], selPub:{}, lecturas:[], rec:null,
-  more:false, pendAtt:{}, sending:false, tareaId:null, mobile:window.matchMedia('(max-width:900px)').matches, pEtM:'',
+  more:false, chatOpen:false, tEstM:'pendiente', pendAtt:{}, sending:false, tareaId:null, mobile:window.matchMedia('(max-width:900px)').matches, pEtM:'',
   view:"inicio", cliId:null, cliTab:"resumen",
   f:{ cliQ:"", cliSede:"", cliEstado:"Activo", tScope:"todas", tArea:"", agSede:"", calSel:null, ctScope:"todas", chatQ:"", pScope:"todos", pSede:"", pQ:"", matCat:"", tplEt:"", pubEst:"pendientes", pubCli:"", pubQ:"" },
   cal:(()=>{const d=new Date();return {y:d.getFullYear(),m:d.getMonth()};})(),
@@ -138,7 +138,7 @@ function applyChange(t, p){
   const ev=p.eventType, nw=p.new, old=p.old;
   if(ev==="DELETE"){ const k=keyOf(t,old); S[t]=arr.filter(r=>keyOf(t,r)!==k); }
   else {
-    if(!nw || Object.keys(nw).length===0) return scheduleReload(t);
+    if(!nw || Array.isArray(nw) || Object.keys(nw).length===0 || (PK[t]?false:!nw.id)) return scheduleReload(t);
     const k=keyOf(t,nw), i=arr.findIndex(r=>keyOf(t,r)===k);
     // reemplaza el mensaje "enviando…" propio por el definitivo
     if(ev==="INSERT" && t==="mensajes") S.mensajes=arr.filter(r=>!(String(r.id).startsWith("tmp")&&r.autor===nw.autor&&(r.texto||"")===(nw.texto||"")&&(r.adjuntos||[]).length===(nw.adjuntos||[]).length));
@@ -150,12 +150,32 @@ function applyChange(t, p){
   if(t==="miembros") S.me = S.miembros.find(m=>m.user_id===S.session?.user?.id) || S.me;
   renderSoon();
 }
+S.rt="conectando";
 function subscribe(){
   if(channel) sb.removeChannel(channel);
+  // El canal de tiempo real necesita la credencial del usuario: sin ella, las reglas de seguridad no dejan pasar los avisos
+  if(S.session?.access_token) sb.realtime.setAuth(S.session.access_token);
   channel = sb.channel("furor-db");
   TABLES.forEach(t=>channel.on("postgres_changes",{event:"*",schema:"public",table:t},p=>applyChange(t,p)));
-  channel.subscribe(st=>{ if(st==="CHANNEL_ERROR"||st==="TIMED_OUT") setTimeout(subscribe,3000); });
+  channel.subscribe(st=>{
+    const antes=S.rt;
+    S.rt = st==="SUBSCRIBED" ? "ok" : (st==="CHANNEL_ERROR"||st==="TIMED_OUT"||st==="CLOSED") ? "caido" : "conectando";
+    if(st==="SUBSCRIBED" && antes==="caido") ponerseAlDia();
+    if(S.rt==="caido") setTimeout(()=>{ if(S.rt==="caido") subscribe(); },4000);
+    if(antes!==S.rt) renderSoon();
+  });
 }
+// Respaldo: cada pocos segundos trae solo los mensajes nuevos (por si el tiempo real se corta)
+async function ponerseAlDia(){
+  if(!S.me) return;
+  const ult=S.mensajes.filter(m=>!String(m.id).startsWith("tmp")).slice(-1)[0];
+  const q=sb.from("mensajes").select("*").order("creado",{ascending:true}).limit(200);
+  const { data } = ult ? await q.gt("creado", ult.creado) : await q;
+  (data||[]).forEach(m=>applyChange("mensajes",{eventType:"INSERT",new:m}));
+  const { data:lec } = await sb.from("lecturas").select("*");
+  if(lec){ S.lecturas=lec; renderSoon(); }
+}
+setInterval(()=>{ if(S.me && !document.hidden) ponerseAlDia(); }, 8000);
 // Al volver a la app después de un rato, se trae todo de nuevo (por si se cortó la conexión)
 let _hiddenAt=0;
 document.addEventListener("visibilitychange",async()=>{
@@ -181,6 +201,7 @@ async function boot(){
   sb.auth.onAuthStateChange((ev, session)=>{
     const before = S.session?.user?.id;
     S.session = session;
+    if(session?.access_token) sb.realtime.setAuth(session.access_token);
     if((session?.user?.id) !== before) afterAuth();
   });
   await afterAuth();
@@ -312,7 +333,7 @@ function render(){
   $("#main").innerHTML = views[S.view]();
   if(aid){ const el=document.getElementById(aid); if(el){ el.focus(); try{ if(sel!=null) el.setSelectionRange(sel,sel); }catch(e){} } }
   const m2=$(".msgs"); if(m2 && atBottom) m2.scrollTop=m2.scrollHeight;
-  if(S.view==="chat") markSeen(S.chatCh);
+  if(S.view==="chat" && (!S.mobile || S.chatOpen)) markSeen(S.chatCh);
   if(S.view==="clientes" && S.cliId && S.cliTab==="chat") markSeen(S.cliId);
   if(S.view==="tareas" && S.tareaId) markSeen("t-"+S.tareaId);
   renderFab();
@@ -377,7 +398,7 @@ function taskRow(t){
 }
 function postHtml(n,compact){
   const d=new Date(n.creado);
-  return `<div class="row"><div class="avatar">${esc(initials(memName(n.autor)))}</div><div class="main">
+  return `<div class="row post"><div class="avatar">${esc(initials(memName(n.autor)))}</div><div class="main">
   <div><b>${esc(memName(n.autor))}</b> <span class="s">${d.getDate()} ${MES_C[d.getMonth()]} · ${pad(d.getHours())}:${pad(d.getMinutes())}</span> ${n.fijada?`<span class="pill ok">Fijada</span>`:""} ${n.etiqueta?`<span class="pill info">${esc(n.etiqueta)}</span>`:""}</div>
   <div style="white-space:pre-wrap;margin-top:4px;overflow-wrap:anywhere">${esc(n.texto)}</div></div>
   ${!compact&&(isAdmin()||n.autor===S.me.id)?`<div><button class="btn sm ghost" onclick="pinNov('${n.id}')">${n.fijada?"Desfijar":"Fijar"}</button><button class="btn sm ghost danger" onclick="askDel('novedades','${n.id}','esta novedad')">Borrar</button></div>`:""}</div>`;
@@ -515,8 +536,12 @@ function vClientes(){
     <select id="cliSede" aria-label="Sede" onchange="S.f.cliSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.map(s=>`<option ${S.f.cliSede===s?"selected":""}>${s}</option>`).join("")}</select>
     <select id="cliEstado" aria-label="Estado" onchange="S.f.cliEstado=this.value;render()"><option value="">Todos los estados</option>${ESTADOS_CLI.map(s=>`<option ${S.f.cliEstado===s?"selected":""}>${s}</option>`).join("")}</select>
     <span class="pill">${list.length} de ${S.clientes.length}</span></div>
-  ${list.length?`<div class="table-wrap"><table><thead><tr><th>Negocio · Titular</th><th>Sede</th><th>Servicio</th><th>Responsable</th><th>Estado</th><th>Pendiente</th></tr></thead><tbody>
-  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click" onclick="location.hash='cliente-${c.id}'"><td><b>${esc(c.nombre)}</b>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}</div>`:c.contacto===c.nombre?`<div class="s" style="color:var(--warn)">Falta el nombre del negocio</div>`:""}${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td>${estPill(c.estado)}</td><td>${ents?`<span class="pill info">${ents} piezas</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
+  ${S.mobile&&list.length?`<div class="mcards">${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id);
+    return `<a class="mcard" href="#cliente-${c.id}"><div class="mc-top"><b>${esc(c.nombre)}</b>${estPill(c.estado)}</div>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}</div>`:""}
+    <div class="s">${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"Sin sede"}${c.rubro?" · "+esc(c.rubro):""}${c.responsable?" · "+esc(memName(c.responsable)):""}</div>
+    ${ents||un?`<div style="display:flex;gap:6px;margin-top:6px">${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span>`:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</div>`:""}</a>`; }).join("")}</div>`
+  :list.length?`<div class="table-wrap"><table><thead><tr><th>Negocio · Titular</th><th>Sede</th><th>Servicio</th><th>Responsable</th><th>Estado</th><th>Pendiente</th></tr></thead><tbody>
+  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click" onclick="location.hash='cliente-${c.id}'"><td><b>${esc(c.nombre)}</b>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}</div>`:c.contacto===c.nombre?`<div class="s" style="color:var(--warn)">Falta el nombre del negocio</div>`:""}${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td>${estPill(c.estado)}</td><td>${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
   </tbody></table></div>`:`<div class="card"><div class="empty">${S.clientes.length?"No hay clientes con esos filtros.":"Todavía no hay clientes. Cargá el primero."}</div></div>`}`;
 }
 function fichaCliente(c){
@@ -627,13 +652,19 @@ function vChat(){
   const chs=[{id:"general",n:"General del equipo"}].concat(S.clientes.filter(c=>c.estado!=="Baja").map(c=>({id:c.id,n:c.nombre})));
   const last = id => (S.mensajes.filter(m=>chKey(m)===id).slice(-1)[0]||{}).creado||"";
   const sorted=chs.filter(c=>!q||c.n.toLowerCase().includes(q)).sort((a,b)=>a.id==="general"?-1:b.id==="general"?1:String(last(b.id)).localeCompare(String(last(a.id))) || a.n.localeCompare(b.n));
+  if(S.mobile){
+    if(S.chatOpen) return `<div class="chat mthread">${thread(S.chatCh)}</div>`;
+    return `<div class="m-head"><div><div class="eyebrow">Operación</div><h1>Chat</h1></div><span class="pill ${openPedidos().length?"warn":"ok"}">${openPedidos().length} pedidos abiertos</span></div>
+    <div class="chat mlist"><div class="channels"><input type="search" id="chatQ" placeholder="Buscar cliente…" value="${esc(S.f.chatQ)}" oninput="S.f.chatQ=this.value;render()">${canales(sorted)}</div></div>`;
+  }
   return `<div class="head"><div><div class="eyebrow">Operación</div><h1>Chat</h1><p>Pedidos y conversaciones del equipo, por cliente o generales</p></div>
     <span class="pill ${openPedidos().length?"warn":"ok"}">${openPedidos().length} pedidos abiertos</span></div>
   <div class="chat"><div class="channels"><input type="search" id="chatQ" placeholder="Buscar cliente…" value="${esc(S.f.chatQ)}" oninput="S.f.chatQ=this.value;render()">
-    ${sorted.map(c=>{const u=unread(c.id), g=c.id==="general", lm=S.mensajes.filter(m=>chKey(m)===c.id).slice(-1)[0];
-      return `<button class="${S.chatCh===c.id?"on":""} ${g?"ch-gen":""}" onclick="S.chatCh='${c.id}';render()">${g?`<span class="gen-ic sm">${icon("users")}</span>`:`<span class="ch-av">${esc(initials(c.n))}</span>`}<span class="ch-txt"><span class="ch-n">${esc(c.n)}</span>${lm?`<span class="ch-l">${esc((lm.autor===S.me.id?"Vos":memName(lm.autor).split(" ")[0])+": "+msgPreview(lm))}</span>`:""}</span>${u?`<span class="badge">${u}</span>`:""}</button>`;}).join("")}</div>
+    ${canales(sorted)}</div>
     ${thread(S.chatCh)}</div>`;
 }
+function canales(sorted){ return sorted.map(c=>{const u=unread(c.id), g=c.id==="general", lm=S.mensajes.filter(m=>chKey(m)===c.id).slice(-1)[0];
+      return `<button class="${S.chatCh===c.id?"on":""} ${g?"ch-gen":""}" onclick="S.chatCh='${c.id}';S.chatOpen=true;render();if(S.mobile)window.scrollTo(0,0)">${g?`<span class="gen-ic sm">${icon("users")}</span>`:`<span class="ch-av">${esc(initials(c.n))}</span>`}<span class="ch-txt"><span class="ch-n">${esc(c.n)}</span>${lm?`<span class="ch-l">${esc((lm.autor===S.me.id?"Vos":memName(lm.autor).split(" ")[0])+": "+msgPreview(lm))}</span>`:""}</span>${u?`<span class="badge">${u}</span>`:""}</button>`;}).join(""); }
 function chatBox(ch){ return `<div class="chat solo">${thread(ch)}</div>`; }
 function lectoresDe(ch){
   // Quiénes deberían leer este canal
@@ -681,7 +712,7 @@ function thread(ch){
       </div></div>`;
   });
   const dk="d-"+ch, rec=S.rec&&S.rec.ch===ch;
-  return `<div class="thread ${isGen?"gen":""}"><div class="top">${isGen?`<div class="gen-ic">${icon("users")}</div>`:""}<div style="flex:1;min-width:0"><b>${esc(title)}</b>${isGen?`<div class="s">${S.miembros.filter(m=>m.activo).length} integrantes</div>`:""}</div>${!isGen&&!isTask&&S.view==="chat"?`<a class="btn sm" href="#cliente-${ch}">Ver cliente</a>`:""}</div>
+  return `<div class="thread ${isGen?"gen":""}"><div class="top">${S.mobile&&S.view==="chat"?`<button class="btn sm ghost back" onclick="S.chatOpen=false;render()" aria-label="Volver a los chats">‹ Chats</button>`:""}${isGen?`<div class="gen-ic">${icon("users")}</div>`:""}<div style="flex:1;min-width:0"><b>${esc(title)}</b>${isGen?`<div class="s">${S.miembros.filter(m=>m.activo).length} integrantes</div>`:""}</div>${!isGen&&!isTask&&S.view==="chat"?`<a class="btn sm" href="#cliente-${ch}">Ver cliente</a>`:""}</div>
     <div class="msgs">${html||`<div class="empty" style="align-self:center">${isTask?"Dejá acá las referencias, fotos y comentarios de esta tarea.":"Todavía no hay mensajes. Escribí el primero."}</div>`}</div>
     ${(S.pendAtt[ch]||[]).length?`<div class="pend">${S.pendAtt[ch].map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" onclick="quitarAdj('${ch}',${i})" aria-label="Quitar">✕</button></div>`).join("")}</div>`:""}
     ${rec?`<div class="recbar"><span class="dotrec"></span><b>Grabando</b><span id="recT">${fmtDur(S.rec.seg||0)}</span><span style="flex:1"></span><button type="button" class="btn sm ghost" onclick="cancelarAudio()">Cancelar</button><button type="button" class="btn sm pri" onclick="detenerAudio(true)">${icon("send")}Enviar audio</button></div>`
@@ -786,7 +817,9 @@ async function enviarAudio(ch, blob, tipo, dur){
   const row={texto:"",autor:S.me.id,cliente_id:(ch==="general"||isTask)?null:ch,tarea_id:isTask?ch.slice(2):null,pedido:false,adjuntos:[{path,nombre:"Audio",tipo,tam:blob.size,dur:Math.round(dur)}]};
   const tmp=Object.assign({id:"tmp-"+Date.now(),creado:new Date().toISOString(),resuelto:false},row);
   S.mensajes.push(tmp); S.sending=false; render();
-  if(!await run(sb.from("mensajes").insert(row))){ S.mensajes=S.mensajes.filter(m=>m!==tmp); render(); }
+  const { data:ins, error } = await sb.from("mensajes").insert(row).select().single();
+  if(error){ S.mensajes=S.mensajes.filter(m=>m!==tmp); render(); toast("No se pudo enviar el audio: "+error.message); return; }
+  applyChange("mensajes",{eventType:"INSERT",new:ins});
 }
 async function sendMsg(e, ch){
   e.preventDefault();
@@ -809,7 +842,9 @@ async function sendMsg(e, ch){
   S.pendAtt[ch]=[]; S.drafts["d-"+ch]=""; S.pedido=false; el.value="";
   const tmp=Object.assign({id:"tmp-"+Date.now(),creado:new Date().toISOString(),resuelto:false},row);
   S.mensajes.push(tmp); S.sending=false; render();
-  if(!await run(sb.from("mensajes").insert(row))){ S.mensajes=S.mensajes.filter(m=>m!==tmp); S.drafts["d-"+ch]=txt; render(); }
+  const { data:ins, error } = await sb.from("mensajes").insert(row).select().single();
+  if(error){ S.mensajes=S.mensajes.filter(m=>m!==tmp); S.drafts["d-"+ch]=txt; render(); toast("No se pudo enviar: "+error.message); return; }
+  applyChange("mensajes",{eventType:"INSERT",new:ins});
 }
 /* ---------- Imágenes del chat ---------- */
 function agregarAdj(ch, files){
@@ -867,6 +902,16 @@ function vTareas(){
   if(S.f.tArea) list=list.filter(t=>t.area===S.f.tArea);
   const col=([k,l])=>{ let it=list.filter(t=>t.estado===k); it = k==="hecha" ? it.sort((a,b)=>String(b.hecha_el||"").localeCompare(String(a.hecha_el||""))).slice(0,20) : sortTasks(it);
     return `<div class="col"><h3>${l}<span class="pill">${it.length}</span></h3>${it.length?it.map(taskCard).join(""):`<div class="empty">Vacío</div>`}</div>`; };
+  if(S.mobile){
+    const cols=[["pendiente","Por hacer"],["curso","En curso"],["hecha","Hechas"]];
+    let it=list.filter(t=>t.estado===S.tEstM);
+    it = S.tEstM==="hecha" ? it.sort((a,b)=>String(b.hecha_el||"").localeCompare(String(a.hecha_el||""))).slice(0,30) : sortTasks(it);
+    return `<div class="m-head"><div><div class="eyebrow">Operación</div><h1>Tareas</h1></div></div>
+    <div class="m-filters"><div class="seg"><button class="${S.f.tScope==="todas"?"on":""}" onclick="S.f.tScope='todas';render()">Todas</button><button class="${S.f.tScope==="mias"?"on":""}" onclick="S.f.tScope='mias';render()">Mías</button></div>
+      <select id="tAreaM" aria-label="Área" onchange="S.f.tArea=this.value;render()"><option value="">Todas las áreas</option>${AREAS.map(a=>`<option ${S.f.tArea===a?"selected":""}>${a}</option>`).join("")}</select></div>
+    <div class="etabs">${cols.map(([k,l])=>`<button class="${S.tEstM===k?"on":""}" style="--c:${k==="pendiente"?"var(--s-otra)":k==="curso"?"var(--info)":"var(--ok)"}" onclick="S.tEstM='${k}';render()"><span class="dot"></span>${l}<b>${list.filter(t=>t.estado===k).length}</b></button>`).join("")}</div>
+    <div>${it.map(taskCard).join("")||`<div class="card">${emptyMsg("No hay tareas acá.","check")}</div>`}</div>`;
+  }
   return `<div class="head"><div><div class="eyebrow">Operación</div><h1>Tareas</h1><p>Quién hace qué, para qué cliente y para cuándo</p></div><button class="btn pri" onclick="formTarea()">${icon("plus")}Nueva tarea</button></div>
   <div class="toolbar"><div class="seg"><button class="${S.f.tScope==="todas"?"on":""}" onclick="S.f.tScope='todas';render()">Todas</button><button class="${S.f.tScope==="mias"?"on":""}" onclick="S.f.tScope='mias';render()">Mías</button></div>
     <select id="tArea" aria-label="Área" onchange="S.f.tArea=this.value;render()"><option value="">Todas las áreas</option>${AREAS.map(a=>`<option ${S.f.tArea===a?"selected":""}>${a}</option>`).join("")}</select></div>
@@ -1310,7 +1355,7 @@ function pubGroup(c, items, inCard){
   items=items.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
   if(!items.length) return `<div class="${inCard?"":"card"}">${emptyMsg("Sin links cargados para este cliente.","link")}</div>`;
   const sel=items.filter(p=>S.selPub[p.id]).length;
-  const rows=items.map(p=>{ const u=safeUrl(p.url); return `<div class="row">
+  const rows=items.map(p=>{ const u=safeUrl(p.url); return `<div class="row prow">
     <input type="checkbox" aria-label="Seleccionar" ${S.selPub[p.id]?"checked":""} onchange="S.selPub['${p.id}']=this.checked;render()" style="width:17px;height:17px;accent-color:var(--brand)">
     <div class="main"><div class="t">${esc(p.formato)} · ${esc(p.red)} <span class="s" style="font-weight:400">· ${fmtDate(p.fecha)}</span></div>
       <div class="s">${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(shortUrl(p.url))}</a>`:esc(p.url)}${p.nota?" · "+esc(p.nota):""}</div></div>
