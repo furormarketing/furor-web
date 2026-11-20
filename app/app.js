@@ -1361,15 +1361,30 @@ function pubGroup(c, items, inCard){
     <input type="checkbox" aria-label="Seleccionar" ${S.selPub[p.id]?"checked":""} onchange="S.selPub['${p.id}']=this.checked;render()" style="width:17px;height:17px;accent-color:var(--brand)">
     <div class="main"><div class="t">${esc(p.formato)} · ${esc(p.red)} <span class="s" style="font-weight:400">· ${fmtDate(p.fecha)}</span></div>
       <div class="s">${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(shortUrl(p.url))}</a>`:esc(p.url)}${p.nota?" · "+esc(p.nota):""}</div></div>
-    ${p.enviado?`<span class="pill ok">${icon("ok")}Enviado</span>`:`<span class="pill warn">Sin enviar</span>`}
+    <button class="btn sm envbtn ${p.enviado?"on":""}" onclick="toggleEnviado('${p.id}')" title="${p.enviado?"Tocá para desmarcar":"Marcar como enviado al cliente"}">${p.enviado?icon("ok")+"Enviado":"Ya lo envié"}</button>
     <button class="btn sm ghost" data-v="${esc(p.url)}" onclick="copyText(this.dataset.v)" aria-label="Copiar link">${icon("copy")}</button>
     <button class="btn sm ghost" onclick="formPublicado('${p.id}')">Editar</button></div>`; }).join("");
   const unsent=items.filter(p=>!p.enviado).map(p=>p.id);
   return `${inCard?"":`<div class="card">`}<div class="list">${rows}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
       <button class="btn wa" onclick="enviarPublicados('${c.id}')">${icon("wa")}Enviar ${sel?sel+" seleccionado"+(sel>1?"s":""):unsent.length?"los "+unsent.length+" sin enviar":"todos"}</button>
+      ${unsent.length?`<button class="btn" onclick="marcarTodosEnviados('${c.id}')">${icon("ok")}Marcar ${unsent.length>1?"los "+unsent.length:"el link"} como enviado${unsent.length>1?"s":""}</button>`:""}
       ${sel?`<button class="btn ghost" onclick="${items.map(p=>`S.selPub['${p.id}']=false;`).join("")}render()">Quitar selección</button>`:""}
     </div>${inCard?"":"</div>"}`;
+}
+async function toggleEnviado(id){
+  const p=S.publicados.find(x=>x.id===id); if(!p) return;
+  const enviado=!p.enviado;
+  Object.assign(p,{enviado,enviado_el:enviado?new Date().toISOString():null,enviado_por:enviado?S.me.id:null}); render();
+  const { error } = await sb.from("publicados").update({enviado,enviado_el:p.enviado_el,enviado_por:p.enviado_por}).eq("id",id);
+  if(error){ p.enviado=!enviado; render(); toast("No se pudo guardar."); }
+  else if(enviado) toast("Marcado como enviado");
+}
+async function marcarTodosEnviados(cid){
+  const ids=S.publicados.filter(p=>p.cliente_id===cid&&!p.enviado).map(p=>p.id); if(!ids.length) return;
+  const now=new Date().toISOString();
+  S.publicados.forEach(p=>{ if(ids.includes(p.id)) Object.assign(p,{enviado:true,enviado_el:now,enviado_por:S.me.id}); }); render();
+  await run(sb.from("publicados").update({enviado:true,enviado_el:now,enviado_por:S.me.id}).in("id",ids), ids.length>1?ids.length+" links marcados como enviados":"Marcado como enviado");
 }
 function enviarPublicados(cid){
   const c=cli(cid)||{}; const all=S.publicados.filter(p=>p.cliente_id===cid);

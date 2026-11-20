@@ -535,3 +535,8 @@ table.anual td,table.anual th{padding:9px 10px;font-size:13px}
 }
 @media (max-width:900px){ .chat.mthread .msgs{min-height:0} }
 .hermanos{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;font-size:13px;color:var(--muted)}.hermanos .ico{width:15px;height:15px}
+.envbtn{border-color:var(--warn);color:var(--warn);background:var(--warn-soft);font-weight:700}
+.envbtn:hover{border-color:var(--warn)}
+.envbtn.on{border-color:transparent;color:var(--ok);background:var(--ok-soft)}
+.envbtn .ico{width:14px;height:14px}
+@media (max-width:900px){ .prow > .envbtn{margin-left:29px} }
