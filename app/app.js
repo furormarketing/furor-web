@@ -335,6 +335,8 @@ function render(){
   renderNav();
   const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,publicados:vPublicados,direccion:vDireccion};
   $("#main").innerHTML = views[S.view]();
+  document.querySelectorAll("body > .daysheet-bg").forEach(x=>x.remove());
+  const ds=$("#main .daysheet-bg"); if(ds) document.body.appendChild(ds);
   if(aid){ const el=document.getElementById(aid); if(el){ el.focus(); try{ if(sel!=null) el.setSelectionRange(sel,sel); }catch(e){} } }
   const m2=$(".msgs"); if(m2 && atBottom) m2.scrollTop=m2.scrollHeight;
   if(S.view==="chat" && (!S.mobile || S.chatOpen)) markSeen(S.chatCh);
@@ -488,7 +490,7 @@ function vAgenda(){
   for(let i=0;i<42;i++){
     const d=new Date(start); d.setDate(start.getDate()+i); const k=ymd(d), it=by[k]||{e:[],t:[]}, fer=it.e.filter(esFer);
     const list=[...it.e.filter(e=>!esFer(e)).sort((a,b)=>String(a.hora||"").localeCompare(String(b.hora||""))).map(e=>`<div class="ev" style="--sc:${sedeColor(e.sede)}" title="${esc(e.tipo+": "+e.titulo)}">${esc((hhmm(e.hora)?hhmm(e.hora)+" ":"")+e.titulo)}</div>`), ...it.t.map(x=>`<div class="ev task" title="${esc(x.titulo)}">${esc(x.titulo)}</div>`)];
-    cells+=`<div class="day ${d.getMonth()!==m?"out":""} ${k===t?"today":""} ${S.f.calSel===k?"sel":""} ${fer.length?"feriado":""}" tabindex="0" onclick="S.f.calSel='${k}';render()" onkeydown="if(event.key==='Enter'){S.f.calSel='${k}';render()}"><div class="num">${d.getDate()}</div>${fer.length?`<div class="fer" title="${esc(fer.map(f=>f.titulo+(f.sede?" ("+f.sede+")":"")).join(" · "))}">${esc(fer[0].titulo||"Feriado")}</div>`:""}${list.slice(0,3).join("")}${list.length>3?`<div class="ev more">+${list.length-3} más</div>`:""}</div>`;
+    cells+=`<div class="day ${d.getMonth()!==m?"out":""} ${k===t?"today":""} ${S.f.calSel===k?"sel":""} ${fer.length?"feriado":""}" tabindex="0" onclick="abrirDia('${k}')" onkeydown="if(event.key==='Enter')abrirDia('${k}')"><div class="num">${d.getDate()}</div>${fer.length?`<div class="fer" title="${esc(fer.map(f=>f.titulo+(f.sede?" ("+f.sede+")":"")).join(" · "))}">${esc(fer[0].titulo||"Feriado")}</div>`:""}${list.slice(0,3).join("")}${list.length>3?`<div class="ev more">+${list.length-3} más</div>`:""}</div>`;
   }
   const sel=S.f.calSel||t, si=by[sel]||{e:[],t:[]};
   return `
@@ -497,10 +499,49 @@ function vAgenda(){
   <div class="toolbar"><div class="seg">${["",...SEDES.slice(0,3)].map(s=>`<button class="${S.f.agSede===s?"on":""}" onclick="S.f.agSede='${s}';render()">${s||"Todas las sedes"}</button>`).join("")}</div>
     <div class="legend">${SEDES.slice(0,3).map(s=>`<span><span class="sede-dot" style="--sc:${sedeColor(s)}"></span>${s}</span>`).join("")}<span><span class="sede-dot" style="border:1px solid var(--warn)"></span>Vence tarea</span><span><span class="sede-dot" style="background:var(--danger)"></span>Feriado</span></div></div>
   <div class="cal-layout"><div class="cal">${cells}</div>
-    <section class="card"><h2 style="text-transform:capitalize">${esc(fmtDayLong(sel))}</h2>
-      <div class="list">${si.e.length?si.e.map(evRow).join(""):`<div class="empty">Nada agendado.</div>`}</div>
-      ${si.t.length?`<h3 style="margin:14px 0 4px">Vencen</h3><div class="list">${si.t.map(taskRow).join("")}</div>`:""}
-    </section></div>`;
+    ${S.mobile?(S.diaSheet?`<div class="daysheet-bg" onclick="if(event.target===this){S.diaSheet=false;render()}"><section class="card daypanel sheet">${dayPanel(sel,si)}</section></div>`:""):`<section class="card daypanel">${dayPanel(sel,si)}</section>`}</div>`;
+}
+const QA_TIPOS=[["Reunión","users"],["Llamada","phone"],["Videollamada","eye"],["Tarea","check"],["Feriado","cal"]];
+function dayPanel(sel, si){
+  const tp=S.qa||"Reunión", conHora=!["Tarea","Feriado"].includes(tp);
+  const ph={Reunión:"Ej: Reunión con Cálido",Llamada:"Ej: Llamar a prospecto de Salta",Videollamada:"Ej: Presentación de propuesta",Tarea:"Ej: Diseñar placas de DG Service",Feriado:"Ej: Día de la Soberanía Nacional"}[tp];
+  return `<div class="dp-h"><h2>${esc(fmtDayLong(sel))}</h2>${S.mobile?`<button class="btn sm ghost" onclick="S.diaSheet=false;render()" aria-label="Cerrar">✕</button>`:""}</div>
+  <form class="qadd" onsubmit="quickAdd(event,'${sel}')">
+    <div class="qtipos">${QA_TIPOS.map(([t,ic])=>`<button type="button" class="${tp===t?"on":""} ${t==="Feriado"?"fer-t":""}" onclick="S.qa='${t}';render();setTimeout(()=>{const i=document.getElementById('qaTit');if(i&&!S.mobile)i.focus()})">${icon(ic)}${t}</button>`).join("")}</div>
+    <div class="qrow"><input type="text" id="qaTit" required autocomplete="off" placeholder="${esc(ph)}" value="${esc(S.qaTxt||"")}" oninput="S.qaTxt=this.value">
+      ${conHora?`<input type="time" id="qaHora" aria-label="Hora" value="${esc(S.qaHora||"")}" oninput="S.qaHora=this.value">`:""}
+      <button class="btn pri" id="qaBtn">${icon("plus")}Agregar</button></div>
+    <button type="button" class="qmas" onclick="qaMas('${sel}')">Más detalles (cliente, sede, participantes…)</button>
+  </form>
+  <div class="dp-list">
+  ${si.e.length||si.t.length?"":`<div class="empty">Nada para este día todavía.</div>`}
+  ${si.e.length?`<div class="list">${si.e.map(evRow).join("")}</div>`:""}
+  ${si.t.length?`<h3 style="margin:14px 0 4px">Vencen</h3><div class="list">${si.t.map(taskRow).join("")}</div>`:""}</div>`;
+}
+function abrirDia(k){
+  if(S.f.calSel!==k){ S.qaTxt=""; S.qaHora=""; }
+  S.f.calSel=k; if(S.mobile) S.diaSheet=true; render();
+  if(!S.mobile) setTimeout(()=>{ const i=document.getElementById("qaTit"); if(i) i.focus(); });
+}
+function qaMas(fecha){
+  const tp=S.qa||"Reunión", tit=S.qaTxt||"";
+  if(tp==="Tarea"){ formTarea(null,null,fecha); }
+  else { formEvento(null,fecha,null,tp==="Feriado"); const sel=document.getElementById("eTipo"); if(sel&&tp!=="Feriado"){ sel.value=tp; } const h=document.getElementById("eHora"); if(h&&S.qaHora) h.value=S.qaHora; }
+  const ti=document.getElementById(tp==="Tarea"?"tTit":"eTit"); if(ti&&tit) ti.value=tit;
+}
+async function quickAdd(e, fecha){
+  e.preventDefault();
+  const tp=S.qa||"Reunión", titulo=(S.qaTxt||"").trim(); if(!titulo) return;
+  const btn=document.getElementById("qaBtn"); if(btn) btn.disabled=true;
+  let res;
+  if(tp==="Tarea") res=await sb.from("tareas").insert({titulo,vence:fecha,asignado:S.me.id,prioridad:"media",estado:"pendiente",area:"General",creado_por:S.me.id}).select().single();
+  else res=await sb.from("eventos").insert(tp==="Feriado"?{titulo,tipo:"Feriado",fecha,sede:"",participantes:[],creado_por:S.me.id}
+    :{titulo,tipo:tp,fecha,hora:nz(S.qaHora||""),sede:S.me.sede||"",participantes:[S.me.id],creado_por:S.me.id}).select().single();
+  if(btn) btn.disabled=false;
+  if(res.error){ toast("No se pudo guardar: "+res.error.message); return; }
+  applyChange(tp==="Tarea"?"tareas":"eventos",{eventType:"INSERT",new:res.data});
+  S.qaTxt=""; S.qaHora=""; render(); toast(tp==="Tarea"?"Tarea agregada":tp==="Feriado"?"Feriado marcado":"Agendado");
+  if(!S.mobile) setTimeout(()=>{ const i=document.getElementById("qaTit"); if(i) i.focus(); });
 }
 function calMove(n){ let {y,m}=S.cal; m+=n; if(m<0){m=11;y--;} if(m>11){m=0;y++;} S.cal={y,m}; render(); }
 function calToday(){ const d=new Date(); S.cal={y:d.getFullYear(),m:d.getMonth()}; S.f.calSel=today(); render(); }
@@ -536,54 +577,69 @@ async function togglePub(cid,fecha,formato){
 function vClientes(){
   if(S.cliId){ const c=cli(S.cliId); if(c) return fichaCliente(c); }
   const q=S.f.cliQ.toLowerCase();
+  const base=S.clientes.filter(c=>!S.f.cliEstado||c.estado===S.f.cliEstado);
+  const tiles=`<div class="sede-tiles"><button class="stile ${!S.f.cliSede?"on":""}" onclick="S.f.cliSede='';render()" style="--sc:var(--brand)"><b>${base.length}</b><span>${S.f.cliEstado?esc(S.f.cliEstado)+"s":"Todos"}</span></button>${SEDES.slice(0,3).map(sd=>`<button class="stile ${S.f.cliSede===sd?"on":""}" onclick="S.f.cliSede=S.f.cliSede==='${sd}'?'':'${sd}';render()" style="--sc:${sedeColor(sd)}"><b>${base.filter(c=>c.sede===sd).length}</b><span>${sd}</span></button>`).join("")}</div>`;
   const list=S.clientes.filter(c=>(!S.f.cliSede||c.sede===S.f.cliSede)&&(!S.f.cliEstado||c.estado===S.f.cliEstado)&&(!q||[c.nombre,c.rubro,c.instagram,c.contacto].join(" ").toLowerCase().includes(q)));
   return `
   <div class="head"><div><div class="eyebrow">Cuentas</div><h1>Clientes</h1><p>Ficha, recursos, entregas y chat de cada cuenta</p></div><button class="btn pri" onclick="formCliente()">${icon("plus")}Nuevo cliente</button></div>
+  ${tiles}
   <div class="toolbar">
     <input type="search" id="cliQ" placeholder="Buscar por nombre, rubro, Instagram…" value="${esc(S.f.cliQ)}" oninput="S.f.cliQ=this.value;render()">
     <select id="cliSede" aria-label="Sede" onchange="S.f.cliSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.map(s=>`<option ${S.f.cliSede===s?"selected":""}>${s}</option>`).join("")}</select>
     <select id="cliEstado" aria-label="Estado" onchange="S.f.cliEstado=this.value;render()"><option value="">Todos los estados</option>${ESTADOS_CLI.map(s=>`<option ${S.f.cliEstado===s?"selected":""}>${s}</option>`).join("")}</select>
     <span class="pill">${list.length} de ${S.clientes.length}</span></div>
   ${S.mobile&&list.length?`<div class="mcards">${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id);
-    return `<a class="mcard" href="#cliente-${c.id}"><div class="mc-top"><b>${esc(c.nombre)}</b>${estPill(c.estado)}</div>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:""}
+    return `<a class="mcard cli" href="#cliente-${c.id}" style="--sc:${sedeColor(c.sede)}"><div class="mc-top">${cliAv(c)}<b class="cn">${esc(c.nombre)}</b>${estPill(c.estado)}</div>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:""}
     <div class="s">${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"Sin sede"}${c.rubro?" · "+esc(c.rubro):""}${c.responsable?" · "+esc(memName(c.responsable)):""}</div>
     ${ents||un?`<div style="display:flex;gap:6px;margin-top:6px">${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span>`:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</div>`:""}</a>`; }).join("")}</div>`
   :list.length?`<div class="table-wrap"><table><thead><tr><th>Negocio · Titular</th><th>Sede</th><th>Servicio</th><th>Responsable</th><th>Estado</th><th>Pendiente</th></tr></thead><tbody>
-  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click" onclick="location.hash='cliente-${c.id}'"><td><b>${esc(c.nombre)}</b>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:c.contacto===c.nombre?`<div class="s" style="color:var(--warn)">Falta el nombre del negocio</div>`:""}${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td>${estPill(c.estado)}</td><td>${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
+  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click cli-tr" style="--sc:${sedeColor(c.sede)}" onclick="location.hash='cliente-${c.id}'"><td><div class="cli-cell">${cliAv(c)}<div><b class="cn">${esc(c.nombre)}</b>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:c.contacto===c.nombre?`<div class="s" style="color:var(--warn)">Falta el nombre del negocio</div>`:""}${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</div></div></td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td>${estPill(c.estado)}</td><td>${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
   </tbody></table></div>`:`<div class="card"><div class="empty">${S.clientes.length?"No hay clientes con esos filtros.":"Todavía no hay clientes. Cargá el primero."}</div></div>`}`;
 }
+function cliAv(c){ const ini=String(c.nombre||"?").replace(/[^\p{L}\p{N} ]/gu,"").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"?"; return `<span class="cav" style="--sc:${sedeColor(c.sede)}">${esc(ini)}</span>`; }
 function fichaCliente(c){
   const tabs=[["resumen","Ficha"],["entregas","Entregas"],["publicados","Publicados"],["chat","Chat"],["pauta","Pauta"],["agenda","Tareas y agenda"]];
   const un=unread(c.id);
   const body={resumen:tabResumen,entregas:tabEntregas,publicados:c=>`<div class="toolbar"><button class="btn pri" onclick="formPublicado(null,'${c.id}')">${icon("plus")}Cargar link</button></div>`+pubGroup(c,S.publicados.filter(p=>p.cliente_id===c.id)),chat:()=>chatBox(c.id,true),pauta:tabPauta,agenda:tabAgenda}[S.cliTab]||tabResumen;
   return `
-  <div class="head"><div><div class="eyebrow"><a href="#clientes" style="text-decoration:none">← Clientes</a></div><h1>${esc(c.nombre)}</h1><p>${c.contacto&&c.contacto!==c.nombre?`<b>Titular:</b> ${esc(c.contacto)} · `:""}${esc([c.rubro,c.sede,c.plan].filter(Boolean).join(" · "))} ${estPill(c.estado)}</p>${hermanos(c).length?`<div class="hermanos">${icon("briefcase")}<span>Otros negocios de ${esc(c.contacto.split(" ")[0])}:</span>${hermanos(c).map(h=>`<a class="pill info" href="#cliente-${h.id}">${esc(h.nombre)}</a>`).join("")}</div>`:""}</div>
-    <div class="acts"><button class="btn" onclick="formCliente('${c.id}')">Editar ficha</button></div></div>
+  <div class="eyebrow" style="margin-bottom:10px"><a href="#clientes" style="text-decoration:none">← Clientes</a></div>
+  <div class="cli-hero" style="--sc:${sedeColor(c.sede)}"><div class="ch-main">${cliAv(c)}<div style="min-width:0"><h1>${esc(c.nombre)}</h1>
+    <div class="ch-meta">${c.contacto&&c.contacto!==c.nombre?`<span class="titular">${icon("users")}<b>${esc(c.contacto)}</b></span>`:""}${c.sede?`<span class="sede-tag">${esc(c.sede)}</span>`:""}${c.rubro?`<span class="pill">${esc(c.rubro)}</span>`:""}${c.plan?`<span class="pill info">${esc(c.plan)}</span>`:""}${estPill(c.estado)}</div>${hermanos(c).length?`<div class="hermanos">${icon("briefcase")}<span>Otros negocios de ${esc(c.contacto.split(" ")[0])}:</span>${hermanos(c).map(h=>`<a class="pill info" href="#cliente-${h.id}">${esc(h.nombre)}</a>`).join("")}</div>`:""}</div>
+    </div>
+    <div class="ch-acts">${cliAcciones(c)}<button class="btn" onclick="formCliente('${c.id}')">${icon("edit")}Editar ficha</button></div></div>
   <div class="tabs">${tabs.map(([k,l])=>`<button class="${S.cliTab===k?"on":""}" onclick="S.cliTab='${k}';render()">${l}${k==="chat"&&un?` <span class="badge">${un}</span>`:""}</button>`).join("")}</div>
   ${body(c)}`;
+}
+const dd = x => (x==null||x===""||x==="—") ? `<span class="nodata">—</span>` : esc(x);
+function cliAcciones(c){
+  const ig=String(c.instagram||"").replace(/^@/,""), wa=waNumber(c.whatsapp||""), drive=(c.recursos||[]).map(r=>safeUrl(r.url)).find(Boolean);
+  return [wa?`<a class="btn wa" href="https://wa.me/${wa}" target="_blank" rel="noopener">${icon("wa")}WhatsApp</a>`:"",
+    ig?`<a class="btn" href="https://instagram.com/${encodeURIComponent(ig)}" target="_blank" rel="noopener">${icon("image")}Instagram</a>`:"",
+    drive?`<a class="btn" href="${esc(drive)}" target="_blank" rel="noopener">${icon("file")}Carpeta</a>`:"",
+    `<button class="btn" onclick="S.cliTab='chat';render()">${icon("chat")}Chat</button>`].join("");
 }
 function tabResumen(c){
   const ig=String(c.instagram||"").replace(/^@/,""), rec=c.recursos||[], acc=c.accesos||[], mk=c.marca||{};
   return `<div class="grid g2">
-    <section class="card"><h2>Recursos y carpetas</h2>
+    <section class="card"><h2>${icon("file")}Recursos y carpetas</h2>
       <div class="links">${rec.length?rec.map(r=>{const u=safeUrl(r.url);return u?`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener"><span>${esc(r.nombre||"Link")}</span><span class="s">Abrir ↗</span></a>`:"";}).join(""):`<div class="empty">Sin links. En "Editar ficha" agregá el Drive de creativos, Canva, logos, fotos.</div>`}</div></section>
-    <section class="card"><h2>Datos</h2><dl class="ficha">
-      <div><dt>Responsable</dt><dd>${esc(c.responsable?memLabel(c.responsable):"—")}</dd></div>
-      <div><dt>Contacto</dt><dd>${esc(c.contacto||"—")}</dd></div>
-      <div><dt>WhatsApp</dt><dd>${esc(c.whatsapp||"—")}</dd></div>
-      <div><dt>Instagram</dt><dd>${ig?`<a href="https://instagram.com/${encodeURIComponent(ig)}" target="_blank" rel="noopener">@${esc(ig)}</a>`:"—"}</dd></div>
-      <div><dt>Web</dt><dd>${safeUrl(c.web)?`<a href="${esc(safeUrl(c.web))}" target="_blank" rel="noopener">${esc(c.web)}</a>`:"—"}</dd></div>
-      <div><dt>Cliente desde</dt><dd>${esc(c.inicio?fmtDate(c.inicio)+" "+c.inicio.slice(0,4):"—")}</dd></div>
-      <div><dt>Inversión en ads</dt><dd>${esc(c.inversion||"—")}</dd></div></dl>
+    <section class="card"><h2>${icon("briefcase")}Datos</h2><dl class="ficha">
+      <div><dt>Responsable</dt><dd>${dd(c.responsable?memLabel(c.responsable):"—")}</dd></div>
+      <div><dt>Contacto</dt><dd>${dd(c.contacto||"—")}</dd></div>
+      <div><dt>WhatsApp</dt><dd>${dd(c.whatsapp||"—")}</dd></div>
+      <div><dt>Instagram</dt><dd>${ig?`<a href="https://instagram.com/${encodeURIComponent(ig)}" target="_blank" rel="noopener">@${esc(ig)}</a>`:dd("")}</dd></div>
+      <div><dt>Web</dt><dd>${safeUrl(c.web)?`<a href="${esc(safeUrl(c.web))}" target="_blank" rel="noopener">${esc(c.web)}</a>`:dd("")}</dd></div>
+      <div><dt>Cliente desde</dt><dd>${dd(c.inicio?fmtDate(c.inicio)+" "+c.inicio.slice(0,4):"—")}</dd></div>
+      <div><dt>Inversión en ads</dt><dd>${dd(c.inversion||"—")}</dd></div></dl>
       ${c.notas?`<h3 style="margin-top:12px">Notas</h3><p style="white-space:pre-wrap;margin:4px 0 0">${esc(c.notas)}</p>`:""}</section>
-    <section class="card"><h2>Ficha de marca</h2><dl class="ficha">
-      <div><dt>Tono</dt><dd>${esc(mk.tono||"—")}</dd></div>
-      <div><dt>Colores</dt><dd>${esc(mk.colores||"—")}</dd></div>
-      <div><dt>Tipografías</dt><dd>${esc(mk.tipos||"—")}</dd></div>
-      <div><dt>Sí</dt><dd>${esc(mk.si||"—")}</dd></div>
-      <div><dt>No</dt><dd>${esc(mk.no||"—")}</dd></div>
-      <div><dt>Competencia / referencias</dt><dd>${esc(mk.refs||"—")}</dd></div></dl></section>
-    <section class="card"><h2>Accesos</h2>
+    <section class="card"><h2>${icon("image")}Ficha de marca</h2><dl class="ficha">
+      <div><dt>Tono</dt><dd>${dd(mk.tono||"—")}</dd></div>
+      <div><dt>Colores</dt><dd>${dd(mk.colores||"—")}</dd></div>
+      <div><dt>Tipografías</dt><dd>${dd(mk.tipos||"—")}</dd></div>
+      <div><dt>Sí</dt><dd>${dd(mk.si||"—")}</dd></div>
+      <div><dt>No</dt><dd>${dd(mk.no||"—")}</dd></div>
+      <div><dt>Competencia / referencias</dt><dd>${dd(mk.refs||"—")}</dd></div></dl></section>
+    <section class="card"><h2>${icon("lock")}Accesos</h2>
       <p class="s" style="margin:0 0 10px">Las contraseñas viven en el gestor de contraseñas. Acá queda el usuario y el link al ítem.</p>
       ${acc.length?acc.map(a=>{const l=safeUrl(a.link);return `<div class="acc"><b>${esc(a.plataforma||"Cuenta")}</b><span style="overflow-wrap:anywhere">${esc(a.usuario||"—")} ${a.usuario?`<button class="btn sm ghost" data-v="${esc(a.usuario)}" onclick="copyText(this.dataset.v)">Copiar</button>`:""}</span>${l?`<a class="btn sm" href="${esc(l)}" target="_blank" rel="noopener">Ver contraseña</a>`:`<span class="pill warn">Sin link</span>`}</div>`;}).join(""):`<div class="empty">Sin accesos cargados.</div>`}</section>
   </div>`;
@@ -951,9 +1007,9 @@ function vTarea(t){
     <section class="card"><h2 style="margin-bottom:12px">Detalle</h2><dl class="ficha">
       <div><dt>Estado</dt><dd><span class="pill ${t.estado==="hecha"?"ok":t.estado==="curso"?"info":""}">${ES[t.estado]}</span></dd></div>
       <div><dt>Prioridad</dt><dd><span class="pill ${t.prioridad==="alta"?"bad":t.prioridad==="media"?"warn":"ok"}">${PR[t.prioridad]||"—"}</span></dd></div>
-      <div><dt>Responsable</dt><dd>${esc(memName(t.asignado))}</dd></div>
+      <div><dt>Responsable</dt><dd>${dd(memName(t.asignado))}</dd></div>
       <div><dt>Vence</dt><dd>${t.vence?`<span class="pill ${late?"bad":""}">${esc(late?"Venció "+fmtDate(t.vence):fmtDate(t.vence))}</span>`:"—"}</dd></div>
-      <div><dt>Creada por</dt><dd>${esc(memName(t.creado_por))}</dd></div>
+      <div><dt>Creada por</dt><dd>${dd(memName(t.creado_por))}</dd></div>
       ${t.cliente_id?`<div><dt>Cliente</dt><dd><a href="#cliente-${t.cliente_id}">${esc(cliName(t.cliente_id))}</a></dd></div>`:""}</dl>
       ${t.detalle?`<h3 style="margin:16px 0 6px">Brief</h3><p style="white-space:pre-wrap;margin:0">${esc(t.detalle)}</p>`:""}
     </section></div>`;
@@ -1013,7 +1069,7 @@ function vDireccion(){
   if(window.DIR) return DIR.vista();
   if(!_dirCargando){
     _dirCargando=true;
-    const sc=document.createElement("script"); sc.src="direccion.js?v=2"; sc.onload=()=>render();
+    const sc=document.createElement("script"); sc.src="direccion.js?v=3"; sc.onload=()=>render();
     sc.onerror=()=>{ _dirCargando=false; toast("No se pudo abrir Dirección. Revisá la conexión."); };
     document.body.appendChild(sc);
   }
@@ -1476,9 +1532,9 @@ async function doDel(table,id){
 }
 
 function pintarFotosForm(){ const el=$("#tFotos"); if(!el) return; el.innerHTML=(S.pendAtt["form-tarea"]||[]).map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" onclick="S.pendAtt['form-tarea'].splice(${i},1);pintarFotosForm()" aria-label="Quitar">✕</button></div>`).join(""); }
-function formTarea(id, cliId){
+function formTarea(id, cliId, vence){
   S.pendAtt["form-tarea"]=[];
-  const t=id?S.tareas.find(x=>x.id===id)||{}:{asignado:S.me.id,cliente_id:cliId||"",prioridad:"media",estado:"pendiente",area:"General"};
+  const t=id?S.tareas.find(x=>x.id===id)||{}:{asignado:S.me.id,cliente_id:cliId||"",prioridad:"media",estado:"pendiente",area:"General",vence:vence||""};
   openModal(`<h2>${id?"Editar tarea":"Nueva tarea"}</h2><form class="form" onsubmit="saveTarea(event,'${id||""}')">
     <label class="f full" for="tTit">Tarea<input type="text" id="tTit" required value="${esc(t.titulo)}" placeholder="Ej: Diseñar 3 placas de feed para TANK"></label>
     <label class="f full" for="tDet">Detalle<textarea id="tDet" onpaste="pegarAdj(event,'form-tarea')" placeholder="Brief, links, referencias">${esc(t.detalle)}</textarea></label>

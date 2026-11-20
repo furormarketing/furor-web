@@ -92,10 +92,10 @@ function vResumen(){
   <div class="kpis dir-kpis">
     <div class="kpi big ok"><div class="l">Cobrado</div><div class="v">${money(t.cobrado)}</div>${delta(t.cobrado,prev.cobrado)}</div>
     <div class="kpi big warn"><div class="l">Por cobrar</div><div class="v">${money(totPC)}</div><div class="s">${pc.length} cliente${pc.length!==1?"s":""}${venc.length?` · <b style="color:var(--danger)">${venc.length} vencido${venc.length>1?"s":""}</b>`:""}</div></div>
-    <div class="kpi big"><div class="l">Gastos + equipo</div><div class="v">${money(t.gastos+t.equipo)}</div><div class="s">Operativos ${moneyK(t.gastos)} · Equipo ${moneyK(t.equipo)}</div></div>
+    <div class="kpi big gas"><div class="l">Gastos + equipo</div><div class="v">${money(t.gastos+t.equipo)}</div><div class="s">Operativos ${moneyK(t.gastos)} · Equipo ${moneyK(t.equipo)}</div></div>
     <div class="kpi big ${t.resultado>=0?"res":"bad"}"><div class="l">Resultado del mes</div><div class="v">${money(t.resultado)}</div><div class="s">Margen ${margen}%${t.retiro?` · Retiro MC ${moneyK(t.retiro)}`:""}</div></div>
   </div>
-  <div class="kpis" style="margin-top:12px">
+  <div class="kpis dir-sub" style="margin-top:12px">
     <div class="kpi"><div class="v">${activas.length}</div><div class="l">Clientes activos</div></div>
     <div class="kpi"><div class="v">${moneyK(mrr())}</div><div class="l">Facturación mensual recurrente</div></div>
     <div class="kpi"><div class="v">${moneyK(activas.filter(c=>!c.cobro_con).length?mrr()/activas.filter(c=>!c.cobro_con).length:0)}</div><div class="l">Ticket promedio por titular</div></div>
@@ -114,7 +114,7 @@ function vResumen(){
 function filaCobrar(x){
   const c=x.cuenta, hoy=today(), late=x.fecha<hoy;
   return `<div class="row"><div class="when" style="--sc:${late?"var(--danger)":"var(--warn)"}"><b>${parseYmd(x.fecha).getDate()}</b><span>${MES_C[parseYmd(x.fecha).getMonth()]}</span></div>
-    <div class="main"><div class="t">${esc(c.negocio)}</div><div class="s">${esc(c.titular||"")} · ${money(x.monto)}${c.id&&incluyeTxt(c)?` · <b>${esc(incluyeTxt(c))}</b>`:""}${late?` · <b style="color:var(--danger)">vencido</b>`:""}</div></div>
+    <div class="main"><div class="t">${esc(c.negocio)}</div><div class="s">${esc(c.titular||"")}${c.id&&incluyeTxt(c)?` · <b>${esc(incluyeTxt(c))}</b>`:""}</div><div class="cob-m"><b>${money(x.monto)}</b>${late?`<span class="pill bad">Vencido</span>`:`<span class="pill warn">Pendiente</span>`}</div></div>
     <button class="btn sm wa" onclick="DIR.recordar('${c.id||""}','${x.fecha}',${x.monto})" title="Recordar pago por WhatsApp">${icon("wa")}</button>
     <button class="btn sm pri" onclick="DIR.cobrar('${c.id||""}','${x.cobro?x.cobro.id:""}',${x.monto})">Cobrado</button></div>`;
 }
