@@ -38,6 +38,8 @@ const ICONS = {
   download:'<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
   copy:'<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+  edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
   link:'<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/>',
   send:'<path d="M21 3 3 10.5l7 3 3 7z"/><path d="m10 13.5 4.5-4.5"/>'
 };
@@ -67,7 +69,7 @@ const MAX_MB = 50;
 const S = {
   session:null, me:null, loading:true, authMode:"entrar", authErr:"", authBusy:false,
   miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[], material:[], plantillas:[], prospectos:[], publicados:[], selPub:{},
-  more:false,
+  more:false, pendAtt:{}, sending:false, tareaId:null, mobile:window.matchMedia('(max-width:900px)').matches, pEtM:'',
   view:"inicio", cliId:null, cliTab:"resumen",
   f:{ cliQ:"", cliSede:"", cliEstado:"Activo", tScope:"todas", tArea:"", agSede:"", calSel:null, ctScope:"todas", chatQ:"", pScope:"todos", pSede:"", pQ:"", matCat:"", tplEt:"", pubEst:"pendientes", pubCli:"", pubQ:"" },
   cal:(()=>{const d=new Date();return {y:d.getFullYear(),m:d.getMonth()};})(),
@@ -201,7 +203,8 @@ async function saveNewPass(e){ e.preventDefault(); if(await run(sb.auth.updateUs
 function route(){
   const h=(location.hash||"").replace(/^#/,"");
   if(h.startsWith("cliente-")){ S.view="clientes"; S.cliId=h.slice(8); }
-  else { S.view = NAV.some(n=>n[0]===h) ? h : "inicio"; S.cliId=null; }
+  else if(h.startsWith("tarea-")){ S.view="tareas"; S.tareaId=h.slice(6); S.cliId=null; }
+  else { S.view = NAV.some(n=>n[0]===h) ? h : "inicio"; S.cliId=null; S.tareaId=null; }
   render(); window.scrollTo(0,0);
 }
 window.addEventListener("hashchange", route);
@@ -225,12 +228,13 @@ function lateThisWeek(){
   for(let d=ws; d<t; d=addDays(d,1)) pautaClients().forEach(c=>expected(c,d).forEach(f=>{ if(!pubDone(c.id,d,f)) n++; }));
   return n;
 }
+const chKey = m => m.tarea_id ? "t-"+m.tarea_id : (m.cliente_id||"general");
 function unread(ch){
   const seen=ls.get("furor-seen-"+ch, "");
-  return S.mensajes.filter(m=>(m.cliente_id||"general")===ch && m.autor!==S.me?.id && m.creado>seen).length;
+  return S.mensajes.filter(m=>chKey(m)===ch && m.autor!==S.me?.id && m.creado>seen).length;
 }
-function unreadTotal(){ const chs=new Set(S.mensajes.map(m=>m.cliente_id||"general")); let n=0; chs.forEach(c=>n+=unread(c)); return n; }
-function markSeen(ch){ const last=S.mensajes.filter(m=>(m.cliente_id||"general")===ch).slice(-1)[0]; if(last) ls.set("furor-seen-"+ch,last.creado); }
+function unreadTotal(){ const chs=new Set(S.mensajes.filter(m=>!m.tarea_id).map(chKey)); let n=0; chs.forEach(c=>n+=unread(c)); return n; }
+function markSeen(ch){ const last=S.mensajes.filter(m=>chKey(m)===ch).slice(-1)[0]; if(last) ls.set("furor-seen-"+ch,last.creado); }
 const openPedidos = () => S.mensajes.filter(m=>m.pedido && !m.resuelto);
 
 /* ---------- Render ---------- */
@@ -249,7 +253,7 @@ function render(){
     root.innerHTML=`<div class="app">
       <aside class="side"><div class="brand"><img src="${LOGO}" alt="Furor Marketing"><div><b>Furor Marketing</b><span>Panel interno</span></div></div><nav id="nav"></nav><div class="me" id="meBox"></div></aside>
       <div><header class="topbar" id="topbar"></header><main id="main"></main></div></div>
-      <nav class="bottom-nav" id="bnav"></nav><div class="more-sheet" id="more" onclick="if(event.target.id==='more'){S.more=false;render()}"></div>`;
+      <nav class="bottom-nav" id="bnav"></nav><button class="fab" id="fab" hidden></button><div class="more-sheet" id="more" onclick="if(event.target.id==='more'){S.more=false;render()}"></div>`;
   }
   renderNav();
   const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,publicados:vPublicados};
@@ -258,6 +262,9 @@ function render(){
   const m2=$(".msgs"); if(m2 && atBottom) m2.scrollTop=m2.scrollHeight;
   if(S.view==="chat") markSeen(S.chatCh);
   if(S.view==="clientes" && S.cliId && S.cliTab==="chat") markSeen(S.cliId);
+  if(S.view==="tareas" && S.tareaId) markSeen("t-"+S.tareaId);
+  renderFab();
+  hidratarImagenes();
 }
 function navBadges(){
   return { chat:unreadTotal(), tareas:overdue(openTasks().filter(t=>t.asignado===S.me.id)).length, contenido:pendingToday(S.me.rol==="cm").length, prospectos:prospAtrasados(true).length, publicados:(S.me.rol==="admin"?S.publicados.filter(p=>!p.enviado).length:0) };
@@ -311,7 +318,7 @@ function evRow(e){
 }
 function taskRow(t){
   const late=t.vence&&t.vence<today();
-  return `<div class="row"><div class="main"><div class="t" style="cursor:pointer" onclick="formTarea('${t.id}')">${esc(t.titulo)}</div>
+  return `<div class="row"><div class="main"><a class="t" href="#tarea-${t.id}" style="color:inherit;text-decoration:none;display:block">${esc(t.titulo)}</a>
   <div class="s">${esc([memName(t.asignado), t.cliente_id?cliName(t.cliente_id):"", t.area].filter(Boolean).join(" · "))}</div></div>
   ${t.vence?`<span class="pill ${late?"bad":t.vence===today()?"warn":""}">${esc(late?"Venció "+fmtDate(t.vence):fmtDate(t.vence))}</span>`:""}
   <button class="btn sm" onclick="advance('${t.id}')">${t.estado==="curso"?"Terminar":"Empezar"}</button></div>`;
@@ -566,7 +573,7 @@ async function copyText(v){ try{ await navigator.clipboard.writeText(v); toast("
 function vChat(){
   const q=S.f.chatQ.toLowerCase();
   const chs=[{id:"general",n:"General del equipo"}].concat(S.clientes.filter(c=>c.estado!=="Baja").map(c=>({id:c.id,n:c.nombre})));
-  const last = id => (S.mensajes.filter(m=>(m.cliente_id||"general")===id).slice(-1)[0]||{}).creado||"";
+  const last = id => (S.mensajes.filter(m=>chKey(m)===id).slice(-1)[0]||{}).creado||"";
   const sorted=chs.filter(c=>!q||c.n.toLowerCase().includes(q)).sort((a,b)=>a.id==="general"?-1:b.id==="general"?1:String(last(b.id)).localeCompare(String(last(a.id))) || a.n.localeCompare(b.n));
   return `<div class="head"><div><div class="eyebrow">Operación</div><h1>Chat</h1><p>Pedidos y conversaciones del equipo, por cliente o generales</p></div>
     <span class="pill ${openPedidos().length?"warn":"ok"}">${openPedidos().length} pedidos abiertos</span></div>
@@ -576,8 +583,9 @@ function vChat(){
 }
 function chatBox(ch){ return `<div class="chat solo">${thread(ch)}</div>`; }
 function thread(ch){
-  const msgs=S.mensajes.filter(m=>(m.cliente_id||"general")===ch);
-  const title= ch==="general" ? "General del equipo" : cliName(ch);
+  const msgs=S.mensajes.filter(m=>chKey(m)===ch);
+  const isTask=ch.startsWith("t-");
+  const title= ch==="general" ? "General del equipo" : isTask ? "Conversación de la tarea" : cliName(ch);
   let lastDay="", html="";
   msgs.forEach(m=>{
     const d=new Date(m.creado), day=ymd(d);
@@ -585,31 +593,95 @@ function thread(ch){
     const me=m.autor===S.me.id;
     html+=`<div class="msg ${me?"me":""} ${m.pedido?"pedido":""} ${m.resuelto?"ok":""}">
       <div class="who">${me?"Vos":esc(memName(m.autor))} · ${pad(d.getHours())}:${pad(d.getMinutes())}</div>
-      <div class="b">${esc(m.texto)}</div>
+      ${(m.adjuntos||[]).length?`<div class="atts">${m.adjuntos.map((a,i)=>`<button type="button" class="att" onclick="verImagen('${m.id}',${i})" aria-label="Ver imagen"><img data-path="${esc(a.path)}" alt="${esc(a.nombre||"Imagen")}"></button>`).join("")}</div>`:""}
+      ${m.texto?`<div class="b">${esc(m.texto)}</div>`:""}
       ${m.pedido?`<div class="tag">${m.resuelto?`<span style="color:var(--accent)">✓ Resuelto</span>`:`<span style="color:var(--warn)">Pedido pendiente</span><button class="btn sm ghost" onclick="resolver('${m.id}')">Marcar resuelto</button>`}</div>`:""}
     </div>`;
   });
   const dk="d-"+ch;
-  return `<div class="thread"><div class="top"><b>${esc(title)}</b>${ch!=="general"&&S.view==="chat"?`<a class="btn sm" href="#cliente-${ch}">Ver cliente</a>`:""}</div>
-    <div class="msgs">${html||`<div class="empty" style="align-self:center">Todavía no hay mensajes. Escribí el primero.</div>`}</div>
+  return `<div class="thread"><div class="top"><b>${esc(title)}</b>${ch!=="general"&&!isTask&&S.view==="chat"?`<a class="btn sm" href="#cliente-${ch}">Ver cliente</a>`:""}</div>
+    <div class="msgs">${html||`<div class="empty" style="align-self:center">${isTask?"Dejá acá las referencias, fotos y comentarios de esta tarea.":"Todavía no hay mensajes. Escribí el primero."}</div>`}</div>
+    ${(S.pendAtt[ch]||[]).length?`<div class="pend">${S.pendAtt[ch].map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" onclick="quitarAdj('${ch}',${i})" aria-label="Quitar">✕</button></div>`).join("")}</div>`:""}
     <form class="composer" onsubmit="sendMsg(event,'${ch}')">
-      <textarea id="msg-${ch}" placeholder="Escribí un mensaje o un pedido…" rows="1" oninput="S.drafts['${dk}']=this.value" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.requestSubmit();}">${esc(S.drafts[dk]||"")}</textarea>
-      <label class="opt"><input type="checkbox" id="ped-${ch}" ${S.pedido?"checked":""} onchange="S.pedido=this.checked"> Es un pedido</label>
-      <button class="btn pri">Enviar</button></form></div>`;
+      <label class="btn attach" title="Adjuntar fotos" aria-label="Adjuntar fotos">${icon("image")}<input type="file" hidden accept="image/*" multiple onchange="agregarAdj('${ch}',this.files);this.value=''"></label>
+      <textarea id="msg-${ch}" placeholder="${isTask?"Escribí una indicación o pegá una foto…":"Escribí un mensaje o pegá una foto…"}" rows="1" oninput="S.drafts['${dk}']=this.value" onpaste="pegarAdj(event,'${ch}')" onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!S.mobile){event.preventDefault();this.form.requestSubmit();}">${esc(S.drafts[dk]||"")}</textarea>
+      ${isTask?"":`<label class="opt"><input type="checkbox" id="ped-${ch}" ${S.pedido?"checked":""} onchange="S.pedido=this.checked"> Pedido</label>`}
+      <button class="btn pri" ${S.sending?"disabled":""}>${S.sending?"…":"Enviar"}</button></form></div>`;
 }
 async function sendMsg(e, ch){
   e.preventDefault();
-  const el=document.getElementById("msg-"+ch), txt=el.value.trim(); if(!txt) return;
-  const row={texto:txt,autor:S.me.id,cliente_id:ch==="general"?null:ch,pedido:!!S.pedido};
-  S.drafts["d-"+ch]=""; S.pedido=false; el.value="";
+  if(S.sending) return;
+  const el=document.getElementById("msg-"+ch), txt=el.value.trim(), pend=S.pendAtt[ch]||[];
+  if(!txt && !pend.length) return;
+  const isTask=ch.startsWith("t-");
+  const row={texto:txt,autor:S.me.id,cliente_id:(ch==="general"||isTask)?null:ch,tarea_id:isTask?ch.slice(2):null,pedido:!isTask&&!!S.pedido,adjuntos:[]};
+  S.sending=true; render();
+  for(const p of pend){
+    try{
+      const blob=await comprimirImagen(p.file);
+      const path=`${ch}/${Date.now()}_${Math.random().toString(36).slice(2,7)}.${blob.type==="image/png"?"png":blob.type==="image/gif"?"gif":"jpg"}`;
+      const up=await sb.storage.from("chat").upload(path, blob, {contentType:blob.type});
+      if(up.error) throw up.error;
+      row.adjuntos.push({path,nombre:p.file.name,tipo:blob.type,tam:blob.size});
+    }catch(err){ toast("No se pudo subir una imagen: "+(err.message||err)); S.sending=false; render(); return; }
+  }
+  pend.forEach(p=>URL.revokeObjectURL(p.url));
+  S.pendAtt[ch]=[]; S.drafts["d-"+ch]=""; S.pedido=false; el.value="";
   const tmp=Object.assign({id:"tmp-"+Date.now(),creado:new Date().toISOString(),resuelto:false},row);
-  S.mensajes.push(tmp); render();
+  S.mensajes.push(tmp); S.sending=false; render();
   if(!await run(sb.from("mensajes").insert(row))){ S.mensajes=S.mensajes.filter(m=>m!==tmp); S.drafts["d-"+ch]=txt; render(); }
+}
+/* ---------- Imágenes del chat ---------- */
+function agregarAdj(ch, files){
+  const imgs=[...(files||[])].filter(f=>/^image\//.test(f.type));
+  if(!imgs.length) return;
+  const big=imgs.find(f=>f.size>25*1048576); if(big){ toast("La imagen "+big.name+" es demasiado pesada."); return; }
+  S.pendAtt[ch]=(S.pendAtt[ch]||[]).concat(imgs.map(f=>({file:f,url:URL.createObjectURL(f)}))).slice(0,10);
+  render();
+}
+function pegarAdj(e, ch){
+  const files=[...(e.clipboardData?.files||[])].filter(f=>/^image\//.test(f.type));
+  if(files.length){ e.preventDefault(); agregarAdj(ch, files); }
+}
+function quitarAdj(ch,i){ const p=(S.pendAtt[ch]||[])[i]; if(p) URL.revokeObjectURL(p.url); S.pendAtt[ch].splice(i,1); render(); }
+async function comprimirImagen(file){
+  if(file.type==="image/gif" || file.size<350*1024) return file;
+  try{
+    const bmp=await createImageBitmap(file);
+    const max=1800, k=Math.min(1, max/Math.max(bmp.width,bmp.height));
+    const c=document.createElement("canvas"); c.width=Math.round(bmp.width*k); c.height=Math.round(bmp.height*k);
+    const ctx=c.getContext("2d"); ctx.fillStyle="#fff"; ctx.fillRect(0,0,c.width,c.height); ctx.drawImage(bmp,0,0,c.width,c.height);
+    const blob=await new Promise(r=>c.toBlob(r,"image/jpeg",0.86));
+    return blob && blob.size<file.size ? blob : file;
+  }catch(e){ return file; }
+}
+const urlCache={};
+async function hidratarImagenes(){
+  const imgs=[...document.querySelectorAll("img[data-path]:not([src])")];
+  if(!imgs.length) return;
+  const now=Date.now(), falta=[...new Set(imgs.map(i=>i.dataset.path))].filter(p=>!(urlCache[p]&&urlCache[p].exp>now));
+  if(falta.length){
+    const { data } = await sb.storage.from("chat").createSignedUrls(falta, 3600);
+    (data||[]).forEach(d=>{ if(d.signedUrl) urlCache[d.path]={url:d.signedUrl,exp:now+3300*1000}; });
+  }
+  document.querySelectorAll("img[data-path]:not([src])").forEach(i=>{ const c=urlCache[i.dataset.path]; if(c) i.src=c.url; });
+}
+async function verImagen(mid, i){
+  const m=S.mensajes.find(x=>x.id===mid); const a=m&&(m.adjuntos||[])[i]; if(!a) return;
+  openModal(`<div class="lightbox"><img data-path="${esc(a.path)}" alt="${esc(a.nombre||"Imagen")}"><div class="actions" style="display:flex;justify-content:space-between;gap:8px;margin-top:12px"><span class="s">${esc(memName(m.autor))} · ${esc(a.nombre||"")}</span><div style="display:flex;gap:8px"><button class="btn" onclick="descargarImagen('${mid}',${i})">${icon("download")}Descargar</button><button class="btn pri" onclick="closeModal()">Cerrar</button></div></div></div>`);
+  hidratarImagenes();
+}
+async function descargarImagen(mid,i){
+  const m=S.mensajes.find(x=>x.id===mid); const a=m&&(m.adjuntos||[])[i]; if(!a) return;
+  const { data, error } = await sb.storage.from("chat").createSignedUrl(a.path, 600, {download:a.nombre||true});
+  if(error){ toast("No se pudo descargar."); return; }
+  window.location.href=data.signedUrl;
 }
 async function resolver(id){ await run(sb.from("mensajes").update({resuelto:true}).eq("id",id),"Pedido resuelto"); }
 
 /* ---------- Tareas ---------- */
 function vTareas(){
+  if(S.tareaId){ const t=S.tareas.find(x=>x.id===S.tareaId); if(t) return vTarea(t); }
   let list=S.tareas.slice();
   if(S.f.tScope==="mias") list=list.filter(t=>t.asignado===S.me.id);
   if(S.f.tArea) list=list.filter(t=>t.area===S.f.tArea);
@@ -622,9 +694,11 @@ function vTareas(){
 }
 function taskCard(t){
   const late=t.vence&&t.vence<today()&&t.estado!=="hecha";
-  return `<div class="task p-${esc(t.prioridad)}"><div class="t" onclick="formTarea('${t.id}')">${esc(t.titulo)}</div>
+  const nCom=S.mensajes.filter(m=>m.tarea_id===t.id).length, nImg=S.mensajes.filter(m=>m.tarea_id===t.id).reduce((a,m)=>a+(m.adjuntos||[]).length,0), un=unread("t-"+t.id);
+  return `<div class="task p-${esc(t.prioridad)}"><a class="t" href="#tarea-${t.id}" style="color:inherit;text-decoration:none;display:block">${esc(t.titulo)}</a>
   ${t.detalle?`<div class="s" style="white-space:pre-wrap">${esc(t.detalle.length>140?t.detalle.slice(0,140)+"…":t.detalle)}</div>`:""}
   <div class="meta"><span>${esc(memName(t.asignado))}</span>${t.cliente_id?`<span>· ${esc(cliName(t.cliente_id))}</span>`:""}${t.area?`<span>· ${esc(t.area)}</span>`:""}</div>
+  ${nCom?`<div class="meta"><span class="pill ${un?"bad":""}">${icon("chat")}${nCom} mensaje${nCom>1?"s":""}${un?" · "+un+" sin leer":""}</span>${nImg?`<span class="pill">${icon("image")}${nImg}</span>`:""}</div>`:""}
   <div class="acts">${t.vence?`<span class="pill ${late?"bad":t.vence===today()?"warn":""}">${esc(late?"Venció "+fmtDate(t.vence):"Vence "+fmtDate(t.vence))}</span>`:""}<button class="btn sm" onclick="advance('${t.id}')">${t.estado==="hecha"?"Reabrir":t.estado==="curso"?"Terminar":"Empezar"}</button></div></div>`;
 }
 async function advance(id){
@@ -632,6 +706,36 @@ async function advance(id){
   const nx = t.estado==="pendiente"?"curso":t.estado==="curso"?"hecha":"pendiente";
   await run(sb.from("tareas").update({estado:nx,hecha_el:nx==="hecha"?new Date().toISOString():null}).eq("id",id), nx==="hecha"?"Tarea terminada":null);
 }
+
+function vTarea(t){
+  const late=t.vence&&t.vence<today()&&t.estado!=="hecha";
+  const PR={alta:"Alta",media:"Media",baja:"Baja"}, ES={pendiente:"Por hacer",curso:"En curso",hecha:"Hecha"};
+  return `<div class="head"><div><div class="eyebrow"><a href="#tareas" style="text-decoration:none">← Tareas</a></div><h1>${esc(t.titulo)}</h1>
+    <p>${esc([t.cliente_id?cliName(t.cliente_id):"", t.area].filter(Boolean).join(" · "))}</p></div>
+    <div class="acts"><button class="btn" onclick="formTarea('${t.id}')">${icon("edit")}Editar</button><button class="btn pri" onclick="advance('${t.id}')">${t.estado==="hecha"?"Reabrir":t.estado==="curso"?"Marcar terminada":"Empezar"}</button></div></div>
+  <div class="split">
+    <section class="card" style="padding:0;overflow:hidden">${thread("t-"+t.id)}</section>
+    <section class="card"><h2 style="margin-bottom:12px">Detalle</h2><dl class="ficha">
+      <div><dt>Estado</dt><dd><span class="pill ${t.estado==="hecha"?"ok":t.estado==="curso"?"info":""}">${ES[t.estado]}</span></dd></div>
+      <div><dt>Prioridad</dt><dd><span class="pill ${t.prioridad==="alta"?"bad":t.prioridad==="media"?"warn":"ok"}">${PR[t.prioridad]||"—"}</span></dd></div>
+      <div><dt>Responsable</dt><dd>${esc(memName(t.asignado))}</dd></div>
+      <div><dt>Vence</dt><dd>${t.vence?`<span class="pill ${late?"bad":""}">${esc(late?"Venció "+fmtDate(t.vence):fmtDate(t.vence))}</span>`:"—"}</dd></div>
+      <div><dt>Creada por</dt><dd>${esc(memName(t.creado_por))}</dd></div>
+      ${t.cliente_id?`<div><dt>Cliente</dt><dd><a href="#cliente-${t.cliente_id}">${esc(cliName(t.cliente_id))}</a></dd></div>`:""}</dl>
+      ${t.detalle?`<h3 style="margin:16px 0 6px">Brief</h3><p style="white-space:pre-wrap;margin:0">${esc(t.detalle)}</p>`:""}
+    </section></div>`;
+}
+
+/* ---------- Botón flotante (celular) ---------- */
+function renderFab(){
+  const f=$("#fab"); if(!f) return;
+  const map={inicio:["Agendar","formEvento()"],agenda:["Agendar","formEvento()"],tareas:S.tareaId?null:["Nueva tarea","formTarea()"],prospectos:["Nuevo prospecto","formProspecto()"],clientes:S.cliId?null:["Nuevo cliente","formCliente()"],publicados:["Cargar link","formPublicado()"],material:isAdmin()?["Subir material","formMaterial()"]:null,novedades:null,equipo:isAdmin()?["Sumar integrante","formMiembro()"]:null};
+  const a=map[S.view];
+  document.body.classList.toggle("has-fab",!!a);
+  if(!a){ f.hidden=true; return; }
+  f.hidden=false; f.innerHTML=icon("plus")+`<span>${a[0]}</span>`; f.setAttribute("onclick",a[1]); f.setAttribute("aria-label",a[0]);
+}
+window.matchMedia('(max-width:900px)').addEventListener("change",e=>{ S.mobile=e.matches; render(); });
 
 /* ---------- Novedades ---------- */
 function vNovedades(){
@@ -704,6 +808,18 @@ function vProspectos(){
     it = activeProsp({etapa:e}) ? it.sort((a,b)=>String(a.proximo||"9999").localeCompare(String(b.proximo||"9999"))) : it.sort((a,b)=>String(b.actualizado).localeCompare(String(a.actualizado))).slice(0,15);
     return `<div class="col" style="--c:${ETAPA_C[e]}"><h3><span><span class="dot"></span>${e}</span><span class="count">${list.filter(p=>p.etapa===e).length}</span></h3>${it.map(pCard).join("")||`<div class="empty" style="font-size:13px">Sin prospectos</div>`}</div>`;
   };
+  if(S.mobile){
+    const et = S.pEtM || ETAPAS.find(e=>list.some(p=>p.etapa===e&&activeProsp(p))) || "Nuevo";
+    let it=list.filter(p=>p.etapa===et);
+    it = activeProsp({etapa:et}) ? it.sort((a,b)=>String(a.proximo||"9999").localeCompare(String(b.proximo||"9999"))) : it.sort((a,b)=>String(b.actualizado).localeCompare(String(a.actualizado))).slice(0,30);
+    return `<div class="m-head"><div><div class="eyebrow">Ventas</div><h1>Prospectos</h1></div><a class="btn sm" href="#plantillas">${icon("message")}Plantillas</a></div>
+    <div class="m-kpis"><div><b>${act.length}</b><span>En seguimiento</span></div><div class="${hoy.length?"warn":""}"><b>${hoy.length}</b><span>Hoy</span></div><div class="${atr.length?"bad":""}"><b>${atr.length}</b><span>Atrasados</span></div><div class="ok"><b>${ganMes}</b><span>Ganados mes</span></div></div>
+    <div class="m-filters"><div class="seg"><button class="${S.f.pScope==="todos"?"on":""}" onclick="S.f.pScope='todos';render()">Todos</button><button class="${S.f.pScope==="mios"?"on":""}" onclick="S.f.pScope='mios';render()">Míos</button></div>
+      <select id="pSedeM" aria-label="Sede" onchange="S.f.pSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.slice(0,3).map(x=>`<option ${S.f.pSede===x?"selected":""}>${x}</option>`).join("")}</select></div>
+    <input type="search" id="pQ" placeholder="Buscar prospecto…" value="${esc(S.f.pQ)}" oninput="S.f.pQ=this.value;render()" style="margin-bottom:10px">
+    <div class="etabs">${ETAPAS.map(e=>`<button class="${e===et?"on":""}" style="--c:${ETAPA_C[e]}" onclick="S.pEtM='${e}';render()"><span class="dot"></span>${e}<b>${list.filter(p=>p.etapa===e).length}</b></button>`).join("")}</div>
+    <div>${it.map(pCard).join("")||`<div class="card">${emptyMsg("No hay prospectos en "+et+".","target")}</div>`}</div>`;
+  }
   return `${pageHead("Ventas","Prospectos","Seguimiento de cada prospecto, de sede en sede. Lo atrasado se marca en rojo.",`<a class="btn" href="#plantillas">${icon("message")}Plantillas</a><button class="btn pri" onclick="formProspecto()">${icon("plus")}Nuevo prospecto</button>`)}
   <div class="kpis" style="margin-bottom:16px">
     <div class="kpi"><div class="v">${act.length}</div><div class="l">En seguimiento</div></div>
