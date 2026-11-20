@@ -61,7 +61,7 @@ const ROLES = {admin:"Dirección",cm:"Community Manager",setter:"Setter",diseno:
 const AREAS = ["General","Ventas / Setter","Community","Diseño","Ads","Web","Administración"];
 const ESTADOS_CLI = ["Activo","Onboarding","En pausa","Baja"];
 const PLANES = ["Plan base","Plan expansión","Solo gestión de ads","Desarrollo web","Otro"];
-const TIPOS_EV = ["Reunión","Llamada","Videollamada","Feriado"];
+const TIPOS_EV = ["Reunión","Llamada","Videollamada","Visita","Feriado"];
 const esFer = e => e.tipo==="Feriado";
 const feriadosDe = (fecha, sede) => S.eventos.filter(e=>esFer(e)&&e.fecha===fecha&&(!sede||!e.sede||e.sede===sede));
 const FORMATOS = ["Feed","Reel","Carrusel","Historia"];
@@ -438,7 +438,7 @@ function vInicio(){
     [paraRevisar.length,"warn","eye","Piezas esperando revisión","#clientes"],
     [isAdmin()?S.publicados.filter(p=>!p.enviado).length:0,"warn","send","Links publicados sin enviar al cliente","#publicados"],
     [pend.length,"info","grid","Publicaciones para hoy","#contenido"],
-    [evHoy.length,"info","cal","Reuniones y llamadas hoy","#agenda"],
+    [evHoy.length,"info","cal","Reuniones, llamadas y visitas hoy","#agenda"],
     [pHoy.length,"info","phone","Prospectos para contactar hoy","#prospectos"]
   ].filter(a=>a[0]);
 
@@ -489,27 +489,28 @@ function vAgenda(){
   let cells=DIAS.map(d=>`<div class="dow">${d}</div>`).join("");
   for(let i=0;i<42;i++){
     const d=new Date(start); d.setDate(start.getDate()+i); const k=ymd(d), it=by[k]||{e:[],t:[]}, fer=it.e.filter(esFer);
-    const list=[...it.e.filter(e=>!esFer(e)).sort((a,b)=>String(a.hora||"").localeCompare(String(b.hora||""))).map(e=>`<div class="ev" style="--sc:${sedeColor(e.sede)}" title="${esc(e.tipo+": "+e.titulo)}">${esc((hhmm(e.hora)?hhmm(e.hora)+" ":"")+e.titulo)}</div>`), ...it.t.map(x=>`<div class="ev task" title="${esc(x.titulo)}">${esc(x.titulo)}</div>`)];
+    const list=[...it.e.filter(e=>!esFer(e)).sort((a,b)=>String(a.hora||"").localeCompare(String(b.hora||""))).map(e=>`<div class="ev ${e.tipo==="Visita"?"visita":""}" style="--sc:${sedeColor(e.sede)}" title="${esc(e.tipo+": "+e.titulo)}">${esc((hhmm(e.hora)?hhmm(e.hora)+" ":"")+e.titulo)}</div>`), ...it.t.map(x=>`<div class="ev task" title="${esc(x.titulo)}">${esc(x.titulo)}</div>`)];
     cells+=`<div class="day ${d.getMonth()!==m?"out":""} ${k===t?"today":""} ${S.f.calSel===k?"sel":""} ${fer.length?"feriado":""}" tabindex="0" onclick="abrirDia('${k}')" onkeydown="if(event.key==='Enter')abrirDia('${k}')"><div class="num">${d.getDate()}</div>${fer.length?`<div class="fer" title="${esc(fer.map(f=>f.titulo+(f.sede?" ("+f.sede+")":"")).join(" · "))}">${esc(fer[0].titulo||"Feriado")}</div>`:""}${list.slice(0,3).join("")}${list.length>3?`<div class="ev more">+${list.length-3} más</div>`:""}</div>`;
   }
   const sel=S.f.calSel||t, si=by[sel]||{e:[],t:[]};
   return `
-  <div class="head"><div><div class="eyebrow">Operación</div><h1>Agenda Furor</h1><p>Reuniones, llamadas y videollamadas de Tucumán, Salta y Santiago del Estero</p></div>
+  <div class="head"><div><div class="eyebrow">Operación</div><h1>Agenda Furor</h1><p>Reuniones, llamadas, visitas de producción y feriados de Tucumán, Salta y Santiago del Estero</p></div>
     <div class="acts"><button class="btn" onclick="calMove(-1)" aria-label="Mes anterior">‹</button><h2 style="min-width:150px;text-align:center;text-transform:capitalize">${MESES[m]} ${y}</h2><button class="btn" onclick="calMove(1)" aria-label="Mes siguiente">›</button><button class="btn" onclick="calToday()">Hoy</button><button class="btn" onclick="toggleFeriado('${sel}')">${(by[sel]||{e:[]}).e.some(esFer)?"Quitar feriado":"Marcar feriado"}</button><button class="btn pri" onclick="formEvento(null,'${sel}')">${icon("plus")}Agendar</button></div></div>
   <div class="toolbar"><div class="seg">${["",...SEDES.slice(0,3)].map(s=>`<button class="${S.f.agSede===s?"on":""}" onclick="S.f.agSede='${s}';render()">${s||"Todas las sedes"}</button>`).join("")}</div>
     <div class="legend">${SEDES.slice(0,3).map(s=>`<span><span class="sede-dot" style="--sc:${sedeColor(s)}"></span>${s}</span>`).join("")}<span><span class="sede-dot" style="border:1px solid var(--warn)"></span>Vence tarea</span><span><span class="sede-dot" style="background:var(--danger)"></span>Feriado</span></div></div>
   <div class="cal-layout"><div class="cal">${cells}</div>
     ${S.mobile?(S.diaSheet?`<div class="daysheet-bg" onclick="if(event.target===this){S.diaSheet=false;render()}"><section class="card daypanel sheet">${dayPanel(sel,si)}</section></div>`:""):`<section class="card daypanel">${dayPanel(sel,si)}</section>`}</div>`;
 }
-const QA_TIPOS=[["Reunión","users"],["Llamada","phone"],["Videollamada","eye"],["Tarea","check"]];
+const QA_TIPOS=[["Reunión","users"],["Llamada","phone"],["Videollamada","eye"],["Visita","image"],["Tarea","check"]];
 function dayPanel(sel, si){
   if(S.qa==="Feriado") S.qa="Reunión";
   const tp=S.qa||"Reunión", conHora=tp!=="Tarea", esF=si.e.some(esFer);
-  const ph={Reunión:"Ej: Reunión con Cálido",Llamada:"Ej: Llamar a prospecto de Salta",Videollamada:"Ej: Presentación de propuesta",Tarea:"Ej: Diseñar placas de DG Service",Feriado:"Ej: Día de la Soberanía Nacional"}[tp];
+  const ph={Reunión:"Ej: Reunión con Cálido",Llamada:"Ej: Llamar a prospecto de Salta",Videollamada:"Ej: Presentación de propuesta",Tarea:"Ej: Diseñar placas de DG Service",Visita:"Qué se produce (opcional)",Feriado:"Ej: Día de la Soberanía Nacional"}[tp];
   return `<div class="dp-h"><h2>${esc(fmtDayLong(sel))}</h2>${S.mobile?`<button class="btn sm ghost" onclick="S.diaSheet=false;render()" aria-label="Cerrar">✕</button>`:""}</div>
   <form class="qadd" onsubmit="quickAdd(event,'${sel}')">
     <div class="qtipos">${QA_TIPOS.map(([t,ic])=>`<button type="button" class="${tp===t?"on":""}" onclick="S.qa='${t}';render();setTimeout(()=>{const i=document.getElementById('qaTit');if(i&&!S.mobile)i.focus()})">${icon(ic)}${t}</button>`).join("")}<button type="button" class="fer-t ${esF?"on":""}" onclick="toggleFeriado('${sel}')" title="${esF?"Quitar el feriado de este día":"Marcar este día como feriado"}">${icon("cal")}${esF?"Es feriado · quitar":"Feriado"}</button></div>
-    <div class="qrow"><input type="text" id="qaTit" required autocomplete="off" placeholder="${esc(ph)}" value="${esc(S.qaTxt||"")}" oninput="S.qaTxt=this.value">
+    ${tp==="Visita"?`<div class="qrow" style="margin-bottom:6px"><select id="qaCli" aria-label="Cliente" onchange="S.qaCli=this.value">${cliOptions(S.qaCli||"").replace("Ninguno / interno","Elegí el cliente…")}</select></div>`:""}
+    <div class="qrow"><input type="text" id="qaTit" ${tp==="Visita"?"":"required"} autocomplete="off" placeholder="${esc(ph)}" value="${esc(S.qaTxt||"")}" oninput="S.qaTxt=this.value">
       ${conHora?`<input type="time" id="qaHora" aria-label="Hora" value="${esc(S.qaHora||"")}" oninput="S.qaHora=this.value">`:""}
       <button class="btn pri" id="qaBtn">${icon("plus")}Agregar</button></div>
     <button type="button" class="qmas" onclick="qaMas('${sel}')">Más detalles (cliente, sede, participantes…)</button>
@@ -540,20 +541,23 @@ function abrirDia(k){
 function qaMas(fecha){
   const tp=S.qa||"Reunión", tit=S.qaTxt||"";
   if(tp==="Tarea"){ formTarea(null,null,fecha); }
-  else { formEvento(null,fecha); const sel=document.getElementById("eTipo"); if(sel){ sel.value=tp; } const h=document.getElementById("eHora"); if(h&&S.qaHora) h.value=S.qaHora; }
+  else { formEvento(null,fecha); const sel=document.getElementById("eTipo"); if(sel){ sel.value=tp; } const ec=document.getElementById("eCli"); if(ec&&S.qaCli) ec.value=S.qaCli; const h=document.getElementById("eHora"); if(h&&S.qaHora) h.value=S.qaHora; }
   const ti=document.getElementById(tp==="Tarea"?"tTit":"eTit"); if(ti&&tit) ti.value=tit;
 }
 async function quickAdd(e, fecha){
   e.preventDefault();
-  const tp=S.qa||"Reunión", titulo=(S.qaTxt||"").trim(); if(!titulo) return;
+  const tp=S.qa||"Reunión"; let titulo=(S.qaTxt||"").trim();
+  const cliV = tp==="Visita" ? (S.qaCli||"") : "";
+  if(tp==="Visita"){ if(!cliV){ toast("Elegí el cliente de la visita"); return; } const cn=cliName(cliV); titulo = titulo ? `Visita ${cn} · ${titulo}` : `Visita a ${cn}`; }
+  if(!titulo) return;
   const btn=document.getElementById("qaBtn"); if(btn) btn.disabled=true;
   let res;
   if(tp==="Tarea") res=await sb.from("tareas").insert({titulo,vence:fecha,asignado:S.me.id,prioridad:"media",estado:"pendiente",area:"General",creado_por:S.me.id}).select().single();
-  else res=await sb.from("eventos").insert({titulo,tipo:tp,fecha,hora:nz(S.qaHora||""),sede:S.me.sede||"",participantes:[S.me.id],creado_por:S.me.id}).select().single();
+  else res=await sb.from("eventos").insert({titulo,tipo:tp,fecha,hora:nz(S.qaHora||""),cliente_id:cliV||null,sede:(cliV&&cli(cliV)?.sede)||S.me.sede||"",participantes:[S.me.id],creado_por:S.me.id}).select().single();
   if(btn) btn.disabled=false;
   if(res.error){ toast("No se pudo guardar: "+res.error.message); return; }
   applyChange(tp==="Tarea"?"tareas":"eventos",{eventType:"INSERT",new:res.data});
-  S.qaTxt=""; S.qaHora=""; render(); toast(tp==="Tarea"?"Tarea agregada":"Agendado");
+  S.qaTxt=""; S.qaHora=""; S.qaCli=""; render(); toast(tp==="Tarea"?"Tarea agregada":tp==="Visita"?"Visita agendada":"Agendado");
   if(!S.mobile) setTimeout(()=>{ const i=document.getElementById("qaTit"); if(i) i.focus(); });
 }
 function calMove(n){ let {y,m}=S.cal; m+=n; if(m<0){m=11;y--;} if(m>11){m=0;y++;} S.cal={y,m}; render(); }

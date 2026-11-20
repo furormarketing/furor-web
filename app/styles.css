@@ -656,3 +656,6 @@ tr.cli-tr td:first-child{box-shadow:inset 5px 0 0 var(--sc)}
 }
 .qtipos button.fer-t{border-color:color-mix(in srgb,var(--danger) 40%,transparent);color:var(--danger)}
 .qtipos button.fer-t.on{background:var(--danger);border-color:var(--danger);color:#fff}
+.ev.visita{background:repeating-linear-gradient(135deg,var(--sc,var(--s-otra)) 0 7px,color-mix(in srgb,var(--sc,var(--s-otra)) 80%,#000) 7px 14px);font-weight:700}
+.qrow select{flex:1 1 100%;min-width:0}
+@media (max-width:900px){ .qrow select{font-size:16px} }
