@@ -38,6 +38,8 @@ const ICONS = {
   download:'<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
   copy:'<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  play:'<path d="M7 4.5v15l12-7.5z" fill="currentColor"/>',
+  pause:'<rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/>',
   mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
   image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
@@ -124,12 +126,39 @@ function scheduleReload(t){
   reloadTimers[t]=setTimeout(async()=>{ await loadTable(t); if(t==="miembros") S.me = S.miembros.find(m=>m.user_id===S.session?.user?.id) || S.me; render(); }, 250);
 }
 let channel=null;
+const PK = { lecturas:r=>r.miembro_id+"|"+r.canal, config:r=>r.clave };
+const keyOf = (t,r) => (PK[t]||(x=>x.id))(r);
+let _rf=0;
+function renderSoon(){ if(_rf) return; _rf=requestAnimationFrame(()=>{ _rf=0; render(); }); }
+function applyChange(t, p){
+  const arr=S[t]; if(!Array.isArray(arr)) return scheduleReload(t);
+  const ev=p.eventType, nw=p.new, old=p.old;
+  if(ev==="DELETE"){ const k=keyOf(t,old); S[t]=arr.filter(r=>keyOf(t,r)!==k); }
+  else {
+    if(!nw || Object.keys(nw).length===0) return scheduleReload(t);
+    const k=keyOf(t,nw), i=arr.findIndex(r=>keyOf(t,r)===k);
+    // reemplaza el mensaje "enviando…" propio por el definitivo
+    if(ev==="INSERT" && t==="mensajes") S.mensajes=arr.filter(r=>!(String(r.id).startsWith("tmp")&&r.autor===nw.autor&&(r.texto||"")===(nw.texto||"")&&(r.adjuntos||[]).length===(nw.adjuntos||[]).length));
+    if(ev==="INSERT" && t==="publicaciones") S.publicaciones=arr.filter(r=>!(r.id==="tmp"&&r.cliente_id===nw.cliente_id&&r.fecha===nw.fecha&&r.formato===nw.formato));
+    const cur=S[t], j=cur.findIndex(r=>keyOf(t,r)===k);
+    if(j>=0) cur[j]=nw; else cur.push(nw);
+    if(t==="mensajes") S.mensajes.sort((a,b)=>String(a.creado).localeCompare(String(b.creado)));
+  }
+  if(t==="miembros") S.me = S.miembros.find(m=>m.user_id===S.session?.user?.id) || S.me;
+  renderSoon();
+}
 function subscribe(){
   if(channel) sb.removeChannel(channel);
   channel = sb.channel("furor-db");
-  TABLES.forEach(t=>channel.on("postgres_changes",{event:"*",schema:"public",table:t},()=>scheduleReload(t)));
-  channel.subscribe();
+  TABLES.forEach(t=>channel.on("postgres_changes",{event:"*",schema:"public",table:t},p=>applyChange(t,p)));
+  channel.subscribe(st=>{ if(st==="CHANNEL_ERROR"||st==="TIMED_OUT") setTimeout(subscribe,3000); });
 }
+// Al volver a la app después de un rato, se trae todo de nuevo (por si se cortó la conexión)
+let _hiddenAt=0;
+document.addEventListener("visibilitychange",async()=>{
+  if(document.hidden){ _hiddenAt=Date.now(); return; }
+  if(S.me && _hiddenAt && Date.now()-_hiddenAt>30000){ await Promise.all(TABLES.map(loadTable)); subscribe(); render(); }
+});
 async function run(promise, okMsg){
   const { error } = await promise;
   if(error){
@@ -275,8 +304,6 @@ function render(){
       <nav class="bottom-nav" id="bnav"></nav><button class="fab" id="fab" hidden></button><div class="more-sheet" id="more" onclick="if(event.target.id==='more'){S.more=false;render()}"></div>`;
   }
   renderNav();
-  if([...document.querySelectorAll("#main audio")].some(a=>!a.paused)){ S.pendingRender=true; renderNav(); return; }
-  S.pendingRender=false;
   const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,publicados:vPublicados};
   $("#main").innerHTML = views[S.view]();
   if(aid){ const el=document.getElementById(aid); if(el){ el.focus(); try{ if(sel!=null) el.setSelectionRange(sel,sel); }catch(e){} } }
@@ -470,7 +497,6 @@ async function togglePub(cid,fecha,formato){
   const ex=S.publicaciones.find(p=>p.cliente_id===cid&&p.fecha===fecha&&p.formato===formato);
   if(ex){ S.publicaciones=S.publicaciones.filter(p=>p!==ex); render(); await run(sb.from("publicaciones").delete().eq("id",ex.id)); }
   else { const row={cliente_id:cid,fecha,formato,hecho_por:S.me.id}; S.publicaciones.push(Object.assign({id:"tmp"},row)); render(); if(await run(sb.from("publicaciones").insert(row))) formPublicado(null,cid,fecha,formato,true); }
-  scheduleReload("publicaciones");
 }
 
 /* ---------- Clientes ---------- */
@@ -622,7 +648,7 @@ function attHtml(m){
   const auds=adj.map((a,i)=>[a,i]).filter(([a])=>/^audio\//.test(a.tipo||""));
   const imgs=adj.map((a,i)=>[a,i]).filter(([a])=>!/^audio\//.test(a.tipo||""));
   return (imgs.length?`<div class="atts">${imgs.map(([a,i])=>`<button type="button" class="att" onclick="verImagen('${m.id}',${i})" aria-label="Ver imagen"><img data-path="${esc(a.path)}" alt="${esc(a.nombre||"Imagen")}"></button>`).join("")}</div>`:"")
-   + auds.map(([a])=>`<div class="audio">${icon("mic")}<audio controls preload="metadata" data-path="${esc(a.path)}"></audio>${a.dur?`<span class="s">${fmtDur(a.dur)}</span>`:""}</div>`).join("");
+   + auds.map(([a])=>{ const pl=AUD.path===a.path; return `<div class="audio ${pl&&AUD.playing?"playing":""}" data-ap="${esc(a.path)}"><button type="button" class="aplay" onclick="toggleAudio(this.parentElement.dataset.ap,${Number(a.dur)||0})" aria-label="Reproducir audio">${pl&&AUD.loading?'<span class="spin"></span>':pl&&AUD.playing?icon("pause"):icon("play")}</button><div class="abar" onclick="seekAudio(event,this.parentElement.dataset.ap)"><div class="afill" style="width:${pl&&AUD.dur?Math.min(100,AUD.t/AUD.dur*100):0}%"></div></div><span class="atime">${fmtDur(pl&&AUD.t?AUD.t:(a.dur||0))}</span></div>`; }).join("");
 }
 const msgPreview = m => m.texto || (String((m.adjuntos||[])[0]?.tipo||"").startsWith("audio") ? "🎤 Audio" : (m.adjuntos||[]).length ? "📷 Foto" : "");
 const fmtDur = sec => { sec=Math.round(sec||0); return Math.floor(sec/60)+":"+pad(sec%60); };
@@ -663,13 +689,53 @@ function thread(ch){
       <button class="btn pri" ${S.sending?"disabled":""}>${S.sending?"…":"Enviar"}</button></form>`}</div>`;
 }
 
+/* ---------- Reproductor de audios ---------- */
+// Un solo reproductor fuera de la pantalla: los cambios de la app no lo cortan.
+const AUD={el:new Audio(),path:null,playing:false,loading:false,t:0,dur:0,blobs:{}};
+AUD.el.preload="auto";
+AUD.el.addEventListener("timeupdate",()=>{ AUD.t=AUD.el.currentTime; if(isFinite(AUD.el.duration)) AUD.dur=AUD.el.duration; pintarAudio(); });
+AUD.el.addEventListener("ended",()=>{ AUD.playing=false; AUD.t=0; pintarAudio(true); });
+AUD.el.addEventListener("pause",()=>{ AUD.playing=false; pintarAudio(true); });
+AUD.el.addEventListener("play",()=>{ AUD.playing=true; pintarAudio(true); });
+AUD.el.addEventListener("error",()=>{ if(AUD.path){ AUD.loading=false; AUD.playing=false; pintarAudio(true); toast("Este audio no se puede reproducir en este dispositivo."); } });
+function pintarAudio(full){
+  document.querySelectorAll(".audio[data-ap]").forEach(box=>{
+    const me=box.dataset.ap===AUD.path;
+    if(!me){ if(box.classList.contains("playing")){ box.classList.remove("playing"); box.querySelector(".aplay").innerHTML=icon("play"); box.querySelector(".afill").style.width="0%"; } return; }
+    box.classList.toggle("playing",AUD.playing);
+    box.querySelector(".afill").style.width=(AUD.dur?Math.min(100,AUD.t/AUD.dur*100):0)+"%";
+    box.querySelector(".atime").textContent=fmtDur(AUD.t||AUD.dur);
+    if(full) box.querySelector(".aplay").innerHTML = AUD.loading?'<span class="spin"></span>':AUD.playing?icon("pause"):icon("play");
+  });
+}
+async function cargarAudio(path){
+  if(AUD.blobs[path]) return AUD.blobs[path];
+  const { data, error } = await sb.storage.from("chat").download(path);
+  if(error) throw error;
+  const url=URL.createObjectURL(data); AUD.blobs[path]=url; return url;
+}
+async function toggleAudio(path, durHint){
+  if(AUD.path===path && !AUD.loading){ if(AUD.playing) AUD.el.pause(); else AUD.el.play().catch(()=>{}); return; }
+  AUD.el.pause(); AUD.path=path; AUD.t=0; AUD.dur=durHint||0; AUD.loading=true; pintarAudio(true);
+  try{
+    const url=await cargarAudio(path);
+    if(AUD.path!==path) return;
+    AUD.el.src=url; AUD.loading=false;
+    await AUD.el.play();
+  }catch(e){ AUD.loading=false; AUD.playing=false; pintarAudio(true); if(e?.name!=="AbortError") toast("No se pudo reproducir el audio."); }
+}
+function seekAudio(ev, path){
+  if(AUD.path!==path || !AUD.dur) return;
+  const r=ev.currentTarget.getBoundingClientRect(); AUD.el.currentTime=Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width))*AUD.dur;
+}
+
 /* ---------- Audios ---------- */
 let _mr=null, _chunks=[], _recTimer=null, _stream=null;
 async function grabarAudio(ch){
   if(!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder){ toast("Este navegador no permite grabar audio."); return; }
   try{ _stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
   catch(e){ toast("Necesitamos permiso para usar el micrófono."); return; }
-  const tipo=["audio/webm;codecs=opus","audio/mp4","audio/webm","audio/ogg"].find(t=>MediaRecorder.isTypeSupported(t))||"";
+  const tipo=(esIOS?["audio/mp4","audio/webm;codecs=opus","audio/webm"]:["audio/webm;codecs=opus","audio/webm","audio/ogg","audio/mp4"]).find(t=>MediaRecorder.isTypeSupported(t))||"";
   _mr=new MediaRecorder(_stream, tipo?{mimeType:tipo}:undefined); _chunks=[];
   _mr.ondataavailable=e=>{ if(e.data.size) _chunks.push(e.data); };
   _mr.start(250);
@@ -686,14 +752,30 @@ function detenerAudio(enviar){
     const tipo=(_mr.mimeType||"audio/webm").split(";")[0];
     const blob=new Blob(_chunks,{type:tipo});
     if(!enviar || dur<0.8 || !blob.size){ render(); if(dur<0.8) toast("Mantené la grabación un poco más."); return; }
-    await enviarAudio(ch, blob, tipo, dur);
+    let out=blob, outTipo=tipo;
+    // AAC (iPhone) se escucha en todos lados; webm/ogg no se escucha en iPhone: lo pasamos a WAV
+    if(!/mp4|aac|m4a/.test(tipo)){ try{ out=await aWav(blob); outTipo="audio/wav"; }catch(e){ console.warn("No se pudo convertir a WAV",e); } }
+    await enviarAudio(ch, out, outTipo, dur);
   };
   _mr.stop();
+}
+async function aWav(blob){
+  const ab=await blob.arrayBuffer();
+  const AC=window.AudioContext||window.webkitAudioContext; const ctx=new AC();
+  const buf=await ctx.decodeAudioData(ab); ctx.close&&ctx.close();
+  const rate=16000, len=Math.ceil(buf.duration*rate);
+  const off=new OfflineAudioContext(1,len,rate); const src=off.createBufferSource(); src.buffer=buf; src.connect(off.destination); src.start();
+  const r=await off.startRendering(); const d=r.getChannelData(0);
+  const out=new DataView(new ArrayBuffer(44+d.length*2)); const w=(o,s)=>[...s].forEach((c,i)=>out.setUint8(o+i,c.charCodeAt(0)));
+  w(0,"RIFF"); out.setUint32(4,36+d.length*2,true); w(8,"WAVE"); w(12,"fmt "); out.setUint32(16,16,true); out.setUint16(20,1,true); out.setUint16(22,1,true);
+  out.setUint32(24,rate,true); out.setUint32(28,rate*2,true); out.setUint16(32,2,true); out.setUint16(34,16,true); w(36,"data"); out.setUint32(40,d.length*2,true);
+  for(let i=0;i<d.length;i++){ const v=Math.max(-1,Math.min(1,d[i])); out.setInt16(44+i*2, v<0?v*0x8000:v*0x7FFF, true); }
+  return new Blob([out],{type:"audio/wav"});
 }
 async function enviarAudio(ch, blob, tipo, dur){
   const isTask=ch.startsWith("t-");
   S.sending=true; render();
-  const ext=tipo.includes("mp4")?"m4a":tipo.includes("ogg")?"ogg":"webm";
+  const ext=tipo.includes("wav")?"wav":tipo.includes("mp4")?"m4a":tipo.includes("ogg")?"ogg":"webm";
   const path=`${ch}/audio_${Date.now()}_${Math.random().toString(36).slice(2,6)}.${ext}`;
   const up=await sb.storage.from("chat").upload(path, blob, {contentType:tipo});
   if(up.error){ S.sending=false; render(); toast("No se pudo enviar el audio: "+up.error.message); return; }
@@ -751,14 +833,14 @@ async function comprimirImagen(file){
 }
 const urlCache={};
 async function hidratarImagenes(){
-  const imgs=[...document.querySelectorAll("img[data-path]:not([src]), audio[data-path]:not([src])")];
+  const imgs=[...document.querySelectorAll("img[data-path]:not([src])")];
   if(!imgs.length) return;
   const now=Date.now(), falta=[...new Set(imgs.map(i=>i.dataset.path))].filter(p=>!(urlCache[p]&&urlCache[p].exp>now));
   if(falta.length){
     const { data } = await sb.storage.from("chat").createSignedUrls(falta, 3600);
     (data||[]).forEach(d=>{ if(d.signedUrl) urlCache[d.path]={url:d.signedUrl,exp:now+3300*1000}; });
   }
-  document.querySelectorAll("img[data-path]:not([src]), audio[data-path]:not([src])").forEach(i=>{ const c=urlCache[i.dataset.path]; if(c) i.src=c.url; });
+  document.querySelectorAll("img[data-path]:not([src])").forEach(i=>{ const c=urlCache[i.dataset.path]; if(c) i.src=c.url; });
 }
 async function verImagen(mid, i){
   const m=S.mensajes.find(x=>x.id===mid); const a=m&&(m.adjuntos||[])[i]; if(!a) return;
@@ -1465,6 +1547,3 @@ async function toggleObj(i){
 
 /* ---------- Arranque ---------- */
 boot().then(handleRecovery);
-
-document.addEventListener("pause", e=>{ if(e.target.tagName==="AUDIO" && S.pendingRender) setTimeout(render,50); }, true);
-document.addEventListener("ended", e=>{ if(e.target.tagName==="AUDIO" && S.pendingRender) setTimeout(render,50); }, true);
