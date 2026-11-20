@@ -673,3 +673,41 @@ td.estcell{white-space:nowrap}
 .ch-est{display:flex;flex-direction:column;gap:4px}
 .ch-est .s{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
 @media (max-width:900px){ .ch-est{width:100%} .ch-est .estsel{display:flex;width:100%} .ch-est .estsel button{flex:1;padding:7px 4px} }
+/* Prospectos: lista compacta con etapas como celdas */
+.etcells{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.etcells button{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:13px;font-weight:600;padding:6px 10px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.etcells button .dot{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.etcells button b{font-size:12px;background:var(--surface-2);border-radius:6px;padding:1px 6px;color:var(--ink)}
+.etcells button.on{background:var(--c);border-color:var(--c);color:#fff}
+.etcells button.on .dot{background:#fff}
+.etcells button.on b{background:rgba(255,255,255,.22);color:#fff}
+.plist{display:grid;gap:8px}
+.prow2{display:grid;grid-template-columns:minmax(190px,1.2fr) auto minmax(170px,1fr) auto;gap:10px 16px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--c);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.prow2.late{border-color:var(--danger);border-left-color:var(--danger);box-shadow:0 0 0 1px var(--danger)}
+.pr-main{cursor:pointer;min-width:0}
+.pr-nom{font-family:var(--font-display);font-size:17px;font-weight:800;line-height:1.2;color:var(--ink)}
+.pr-neg{font-size:14.5px;font-weight:600;color:var(--ink-2);margin-top:2px}
+.pr-tel{display:flex;align-items:center;gap:4px;min-width:0}
+.pr-tel .tel{display:inline-flex;align-items:center;gap:7px;font-size:15.5px;font-weight:700;color:var(--ink);text-decoration:none;font-variant-numeric:tabular-nums;padding:6px 10px;border-radius:9px;background:var(--ok-soft);white-space:nowrap}
+.pr-tel .tel .ico{width:17px;height:17px;color:#1fa855}
+.pr-tel .tel:hover{background:color-mix(in srgb,var(--ok) 18%,var(--surface))}
+.btn.ic{padding:6px}
+.pr-meta{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.pr-meta .s{font-size:12.5px}
+.pr-steps{display:flex;gap:2px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:2px}
+.pr-steps button{font:inherit;font-size:11.5px;font-weight:700;border:0;background:none;color:var(--muted);padding:5px 7px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.pr-steps button:hover{background:var(--surface);color:var(--ink)}
+.pr-steps button.done{color:color-mix(in srgb,var(--c) 85%,var(--ink));background:color-mix(in srgb,var(--c) 12%,transparent)}
+.pr-steps button.on{background:var(--c);color:#fff}
+.pr-steps button.lost:not(.on){color:color-mix(in srgb,var(--danger) 70%,var(--muted))}
+.kpis.pk .kpi{padding:10px 14px} .kpis.pk .kpi .v{font-size:22px}
+@media (max-width:1250px){ .prow2{grid-template-columns:minmax(190px,1fr) auto minmax(150px,1fr)} .pr-steps{grid-column:1/-1;justify-self:start} }
+@media (max-width:900px){
+  .etcells{flex-wrap:nowrap;overflow-x:auto;margin:0 -16px 12px;padding:0 16px 2px;scrollbar-width:none}
+  .prow2{grid-template-columns:1fr;gap:8px;padding:12px}
+  .pr-tel .tel{flex:1;justify-content:center;font-size:16px;padding:9px 10px}
+  .pr-tel .btn.ic{padding:9px}
+  .pr-meta{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px}
+  .pr-steps{grid-column:auto;justify-self:stretch;display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+  .pr-steps button{padding:8px 4px;font-size:12.5px}
+}
