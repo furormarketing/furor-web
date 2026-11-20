@@ -654,3 +654,5 @@ tr.cli-tr td:first-child{box-shadow:inset 5px 0 0 var(--sc)}
   .dir-kpis .kpi.big .l{font-size:11.5px}
   .dir-sub .kpi .v{font-size:22px}
 }
+.qtipos button.fer-t{border-color:color-mix(in srgb,var(--danger) 40%,transparent);color:var(--danger)}
+.qtipos button.fer-t.on{background:var(--danger);border-color:var(--danger);color:#fff}

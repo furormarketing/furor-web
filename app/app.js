@@ -388,7 +388,7 @@ const emptyMsg = (txt, ic) => `<div class="empty">${icon(ic||"ok")}<span>${txt}<
 /* ---------- Piezas comunes ---------- */
 function evRow(e){
   if(esFer(e)){ const d=parseYmd(e.fecha); return `<div class="row ferrow"><div class="when" style="--sc:var(--danger)"><b>${d.getDate()}</b><span>${MES_C[d.getMonth()]}</span></div>
-  <div class="main"><div class="t">${esc(e.titulo||"Feriado")} <span class="pill bad">Feriado</span></div><div class="s">${esc([e.sede||"Todas las sedes", relDays(e.fecha), e.notas].filter(Boolean).join(" · "))}</div></div>
+  <div class="main"><div class="t">${!e.titulo||e.titulo==="Feriado"?`<span class="pill bad">Feriado</span>`:`${esc(e.titulo)} <span class="pill bad">Feriado</span>`}</div><div class="s">${esc([e.sede||"Todas las sedes", relDays(e.fecha), e.notas].filter(Boolean).join(" · "))}</div></div>
   <button class="btn sm ghost" onclick="formEvento('${e.id}')">Editar</button></div>`; }
   const d=parseYmd(e.fecha), parts=(e.participantes||[]).map(memName).join(", "), link=safeUrl(e.link);
   return `<div class="row"><div class="when" style="--sc:${sedeColor(e.sede)}"><b>${d.getDate()}</b><span>${MES_C[d.getMonth()]}</span></div>
@@ -430,7 +430,7 @@ function vInicio(){
   const first=(S.me.nombre||"").split(" ")[0];
 
   const alerts=[
-    [ferHoy.length?"Hoy":0,"bad","cal","Feriado: "+ferHoy.map(f=>f.titulo+(f.sede?" ("+f.sede+")":"")).join(" · "),"#agenda"],
+    [ferHoy.length?"Hoy":0,"bad","cal","Feriado"+(ferHoy.some(f=>f.titulo&&f.titulo!=="Feriado")?": "+ferHoy.map(f=>f.titulo+(f.sede?" ("+f.sede+")":"")).join(" · "):""),"#agenda"],
     [lateW,"bad","alert","Publicaciones atrasadas esta semana","#contenido"],
     [venc.length,"bad","clock",S.me.rol==="admin"?"Tareas vencidas del equipo":"Tareas tuyas vencidas","#tareas"],
     [pAtr.length,"bad","target","Prospectos con seguimiento atrasado","#prospectos"],
@@ -495,19 +495,20 @@ function vAgenda(){
   const sel=S.f.calSel||t, si=by[sel]||{e:[],t:[]};
   return `
   <div class="head"><div><div class="eyebrow">Operación</div><h1>Agenda Furor</h1><p>Reuniones, llamadas y videollamadas de Tucumán, Salta y Santiago del Estero</p></div>
-    <div class="acts"><button class="btn" onclick="calMove(-1)" aria-label="Mes anterior">‹</button><h2 style="min-width:150px;text-align:center;text-transform:capitalize">${MESES[m]} ${y}</h2><button class="btn" onclick="calMove(1)" aria-label="Mes siguiente">›</button><button class="btn" onclick="calToday()">Hoy</button><button class="btn" onclick="formEvento(null,'${sel}',null,true)">Marcar feriado</button><button class="btn pri" onclick="formEvento(null,'${sel}')">${icon("plus")}Agendar</button></div></div>
+    <div class="acts"><button class="btn" onclick="calMove(-1)" aria-label="Mes anterior">‹</button><h2 style="min-width:150px;text-align:center;text-transform:capitalize">${MESES[m]} ${y}</h2><button class="btn" onclick="calMove(1)" aria-label="Mes siguiente">›</button><button class="btn" onclick="calToday()">Hoy</button><button class="btn" onclick="toggleFeriado('${sel}')">${(by[sel]||{e:[]}).e.some(esFer)?"Quitar feriado":"Marcar feriado"}</button><button class="btn pri" onclick="formEvento(null,'${sel}')">${icon("plus")}Agendar</button></div></div>
   <div class="toolbar"><div class="seg">${["",...SEDES.slice(0,3)].map(s=>`<button class="${S.f.agSede===s?"on":""}" onclick="S.f.agSede='${s}';render()">${s||"Todas las sedes"}</button>`).join("")}</div>
     <div class="legend">${SEDES.slice(0,3).map(s=>`<span><span class="sede-dot" style="--sc:${sedeColor(s)}"></span>${s}</span>`).join("")}<span><span class="sede-dot" style="border:1px solid var(--warn)"></span>Vence tarea</span><span><span class="sede-dot" style="background:var(--danger)"></span>Feriado</span></div></div>
   <div class="cal-layout"><div class="cal">${cells}</div>
     ${S.mobile?(S.diaSheet?`<div class="daysheet-bg" onclick="if(event.target===this){S.diaSheet=false;render()}"><section class="card daypanel sheet">${dayPanel(sel,si)}</section></div>`:""):`<section class="card daypanel">${dayPanel(sel,si)}</section>`}</div>`;
 }
-const QA_TIPOS=[["Reunión","users"],["Llamada","phone"],["Videollamada","eye"],["Tarea","check"],["Feriado","cal"]];
+const QA_TIPOS=[["Reunión","users"],["Llamada","phone"],["Videollamada","eye"],["Tarea","check"]];
 function dayPanel(sel, si){
-  const tp=S.qa||"Reunión", conHora=!["Tarea","Feriado"].includes(tp);
+  if(S.qa==="Feriado") S.qa="Reunión";
+  const tp=S.qa||"Reunión", conHora=tp!=="Tarea", esF=si.e.some(esFer);
   const ph={Reunión:"Ej: Reunión con Cálido",Llamada:"Ej: Llamar a prospecto de Salta",Videollamada:"Ej: Presentación de propuesta",Tarea:"Ej: Diseñar placas de DG Service",Feriado:"Ej: Día de la Soberanía Nacional"}[tp];
   return `<div class="dp-h"><h2>${esc(fmtDayLong(sel))}</h2>${S.mobile?`<button class="btn sm ghost" onclick="S.diaSheet=false;render()" aria-label="Cerrar">✕</button>`:""}</div>
   <form class="qadd" onsubmit="quickAdd(event,'${sel}')">
-    <div class="qtipos">${QA_TIPOS.map(([t,ic])=>`<button type="button" class="${tp===t?"on":""} ${t==="Feriado"?"fer-t":""}" onclick="S.qa='${t}';render();setTimeout(()=>{const i=document.getElementById('qaTit');if(i&&!S.mobile)i.focus()})">${icon(ic)}${t}</button>`).join("")}</div>
+    <div class="qtipos">${QA_TIPOS.map(([t,ic])=>`<button type="button" class="${tp===t?"on":""}" onclick="S.qa='${t}';render();setTimeout(()=>{const i=document.getElementById('qaTit');if(i&&!S.mobile)i.focus()})">${icon(ic)}${t}</button>`).join("")}<button type="button" class="fer-t ${esF?"on":""}" onclick="toggleFeriado('${sel}')" title="${esF?"Quitar el feriado de este día":"Marcar este día como feriado"}">${icon("cal")}${esF?"Es feriado · quitar":"Feriado"}</button></div>
     <div class="qrow"><input type="text" id="qaTit" required autocomplete="off" placeholder="${esc(ph)}" value="${esc(S.qaTxt||"")}" oninput="S.qaTxt=this.value">
       ${conHora?`<input type="time" id="qaHora" aria-label="Hora" value="${esc(S.qaHora||"")}" oninput="S.qaHora=this.value">`:""}
       <button class="btn pri" id="qaBtn">${icon("plus")}Agregar</button></div>
@@ -518,6 +519,19 @@ function dayPanel(sel, si){
   ${si.e.length?`<div class="list">${si.e.map(evRow).join("")}</div>`:""}
   ${si.t.length?`<h3 style="margin:14px 0 4px">Vencen</h3><div class="list">${si.t.map(taskRow).join("")}</div>`:""}</div>`;
 }
+async function toggleFeriado(fecha){
+  const ex=S.eventos.filter(e=>esFer(e)&&e.fecha===fecha);
+  if(ex.length){
+    S.eventos=S.eventos.filter(e=>!ex.includes(e)); render();
+    const { error } = await sb.from("eventos").delete().in("id",ex.map(e=>e.id));
+    if(error){ S.eventos.push(...ex); render(); toast("No se pudo quitar."); } else toast("Feriado quitado");
+    return;
+  }
+  const { data, error } = await sb.from("eventos").insert({titulo:"Feriado",tipo:"Feriado",fecha,sede:"",participantes:[],creado_por:S.me.id}).select().single();
+  if(error){ toast("No se pudo guardar: "+error.message); return; }
+  if(data && !Array.isArray(data)) applyChange("eventos",{eventType:"INSERT",new:data});
+  toast("Marcado como feriado");
+}
 function abrirDia(k){
   if(S.f.calSel!==k){ S.qaTxt=""; S.qaHora=""; }
   S.f.calSel=k; if(S.mobile) S.diaSheet=true; render();
@@ -526,7 +540,7 @@ function abrirDia(k){
 function qaMas(fecha){
   const tp=S.qa||"Reunión", tit=S.qaTxt||"";
   if(tp==="Tarea"){ formTarea(null,null,fecha); }
-  else { formEvento(null,fecha,null,tp==="Feriado"); const sel=document.getElementById("eTipo"); if(sel&&tp!=="Feriado"){ sel.value=tp; } const h=document.getElementById("eHora"); if(h&&S.qaHora) h.value=S.qaHora; }
+  else { formEvento(null,fecha); const sel=document.getElementById("eTipo"); if(sel){ sel.value=tp; } const h=document.getElementById("eHora"); if(h&&S.qaHora) h.value=S.qaHora; }
   const ti=document.getElementById(tp==="Tarea"?"tTit":"eTit"); if(ti&&tit) ti.value=tit;
 }
 async function quickAdd(e, fecha){
@@ -535,12 +549,11 @@ async function quickAdd(e, fecha){
   const btn=document.getElementById("qaBtn"); if(btn) btn.disabled=true;
   let res;
   if(tp==="Tarea") res=await sb.from("tareas").insert({titulo,vence:fecha,asignado:S.me.id,prioridad:"media",estado:"pendiente",area:"General",creado_por:S.me.id}).select().single();
-  else res=await sb.from("eventos").insert(tp==="Feriado"?{titulo,tipo:"Feriado",fecha,sede:"",participantes:[],creado_por:S.me.id}
-    :{titulo,tipo:tp,fecha,hora:nz(S.qaHora||""),sede:S.me.sede||"",participantes:[S.me.id],creado_por:S.me.id}).select().single();
+  else res=await sb.from("eventos").insert({titulo,tipo:tp,fecha,hora:nz(S.qaHora||""),sede:S.me.sede||"",participantes:[S.me.id],creado_por:S.me.id}).select().single();
   if(btn) btn.disabled=false;
   if(res.error){ toast("No se pudo guardar: "+res.error.message); return; }
   applyChange(tp==="Tarea"?"tareas":"eventos",{eventType:"INSERT",new:res.data});
-  S.qaTxt=""; S.qaHora=""; render(); toast(tp==="Tarea"?"Tarea agregada":tp==="Feriado"?"Feriado marcado":"Agendado");
+  S.qaTxt=""; S.qaHora=""; render(); toast(tp==="Tarea"?"Tarea agregada":"Agendado");
   if(!S.mobile) setTimeout(()=>{ const i=document.getElementById("qaTit"); if(i) i.focus(); });
 }
 function calMove(n){ let {y,m}=S.cal; m+=n; if(m<0){m=11;y--;} if(m>11){m=0;y++;} S.cal={y,m}; render(); }
@@ -1583,7 +1596,7 @@ function formEvento(id, fecha, cliId, fer){
   const ev=id?S.eventos.find(x=>x.id===id)||{}:fer?{fecha:fecha||today(),tipo:"Feriado",titulo:"Feriado",sede:"",participantes:[]}:{fecha:fecha||today(),cliente_id:cliId||"",participantes:[S.me.id],tipo:"Reunión",sede:S.me.sede||""};
   const parts=ev.participantes||[];
   openModal(`<h2>${id?"Editar":esFer(ev)?"Marcar feriado":"Agendar"}</h2><form class="form ${esFer(ev)?"es-fer":""}" id="evForm" onsubmit="saveEvento(event,'${id||""}')">
-    <label class="f full" for="eTit">Título<input type="text" id="eTit" required value="${esc(ev.titulo)}" placeholder="Ej: Presentación de propuesta a prospecto"></label>
+    <label class="f full" for="eTit">Título<input type="text" id="eTit" ${esFer(ev)?"":"required"} value="${esc(ev.titulo)}" placeholder="Ej: Presentación de propuesta a prospecto"></label>
     <label class="f" for="eTipo">Tipo<select id="eTipo" onchange="document.getElementById('evForm').classList.toggle('es-fer',this.value==='Feriado')">${opts(TIPOS_EV,ev.tipo)}</select></label>
     <label class="f" for="eSede">Sede<select id="eSede"><option value="">Todas las sedes</option>${opts(SEDES,ev.sede)}</select></label>
     <label class="f" for="eFecha">Fecha<input type="date" id="eFecha" required value="${esc(ev.fecha)}"></label>
@@ -1599,7 +1612,7 @@ function formEvento(id, fecha, cliId, fer){
 async function saveEvento(e,id){
   e.preventDefault();
   const data={titulo:v("eTit"),tipo:v("eTipo"),sede:v("eSede"),fecha:v("eFecha"),hora:nz(v("eHora")),cliente_id:nz(v("eCli")),contacto:v("eCont"),lugar:v("eLugar"),link:v("eLink"),notas:v("eNotas"),participantes:[...document.querySelectorAll(".eP:checked")].map(x=>x.value)};
-  if(data.tipo==="Feriado") Object.assign(data,{hora:null,cliente_id:null,contacto:"",lugar:"",link:"",participantes:[]});
+  if(data.tipo==="Feriado") Object.assign(data,{titulo:data.titulo||"Feriado",hora:null,cliente_id:null,contacto:"",lugar:"",link:"",participantes:[]});
   const ok = id ? await run(sb.from("eventos").update(data).eq("id",id),"Actualizado") : await run(sb.from("eventos").insert(Object.assign({creado_por:S.me.id},data)),"Agendado");
   if(ok) closeModal();
 }
