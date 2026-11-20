@@ -50,11 +50,18 @@ function totalesMes(m){
   const retiro=eq.filter(e=>e.concepto==="Retiro").reduce((a,e)=>a+Number(e.monto),0);
   return {cobrado,pendientes,gastos,equipo,retiro,resultado:cobrado-gastos-equipo};
 }
-function ultimoMonto(cid){ const c=D.fin_cobros.filter(x=>x.cuenta_id===cid).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)))[0]; return c?Number(c.monto):null; }
+function ultimoMonto(cid){ const c=D.fin_cobros.filter(x=>x.cuenta_id===cid&&x.estado!=="Parcial").sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)))[0]; return c?Number(c.monto):null; }
+function inicioCuenta(c){
+  // desde cuándo cobra: fecha de alta o, si no hay, el primer cobro registrado
+  if(c.alta) return String(c.alta).slice(0,7);
+  const f=D.fin_cobros.filter(x=>x.cuenta_id===c.id).map(x=>String(x.fecha)).sort()[0];
+  return f?f.slice(0,7):"0000-00";
+}
 function porCobrar(m){
-  // cuentas activas sin cobro pagado en el mes + cobros pendientes del mes
-  const out=[];
-  D.fin_cuentas.filter(c=>c.activo && !c.cobro_con).forEach(c=>{
+  // Meses pasados: solo lo que figura como pendiente en el registro (como la planilla).
+  // Mes actual y siguientes: además, los clientes activos que ya estaban dados de alta y todavía no pagaron.
+  const out=[], actual=today().slice(0,7);
+  if(m>=actual) D.fin_cuentas.filter(c=>c.activo && !c.cobro_con && inicioCuenta(c)<=m).forEach(c=>{
     const cob=D.fin_cobros.filter(x=>x.cuenta_id===c.id&&ym(x.fecha)===m);
     if(cob.some(x=>x.estado!=="Pendiente")) return;
     const pend=cob.find(x=>x.estado==="Pendiente");
@@ -91,7 +98,7 @@ function vResumen(){
   return `
   <div class="kpis dir-kpis">
     <div class="kpi big ok"><div class="l">Cobrado</div><div class="v">${money(t.cobrado)}</div>${delta(t.cobrado,prev.cobrado)}</div>
-    <div class="kpi big warn"><div class="l">Por cobrar</div><div class="v">${money(totPC)}</div><div class="s">${pc.length} cliente${pc.length!==1?"s":""}${venc.length?` · <b style="color:var(--danger)">${venc.length} vencido${venc.length>1?"s":""}</b>`:""}</div></div>
+    <div class="kpi big warn"><div class="l">${m<today().slice(0,7)?"Quedó sin cobrar":"Por cobrar"}</div><div class="v">${money(totPC)}</div><div class="s">${pc.length} cliente${pc.length!==1?"s":""}${venc.length?` · <b style="color:var(--danger)">${venc.length} vencido${venc.length>1?"s":""}</b>`:""}</div></div>
     <div class="kpi big gas"><div class="l">Gastos + equipo</div><div class="v">${money(t.gastos+t.equipo)}</div><div class="s">Operativos ${moneyK(t.gastos)} · Equipo ${moneyK(t.equipo)}</div></div>
     <div class="kpi big ${t.resultado>=0?"res":"bad"}"><div class="l">Sueldo Marcelo</div><div class="v">${money(t.resultado)}</div><div class="s">${t.retiro?`Retiraste ${moneyK(t.retiro)} · queda en caja ${moneyK(t.resultado-t.retiro)}`:`Lo que queda después de gastos y equipo · margen ${margen}%`}</div></div>
   </div>
@@ -103,7 +110,7 @@ function vResumen(){
   </div>
   <div class="split" style="margin-top:16px">
     <section class="card">${cardH("Ingresos y egresos · últimos 12 meses", `<span class="legend"><span><span class="sede-dot" style="--sc:var(--ok)"></span>Cobrado</span><span><span class="sede-dot" style="--sc:var(--danger)"></span>Gastos + equipo</span></span>`)}${grafico(m)}</section>
-    <section class="card">${cardH(`Por cobrar en ${MES_L[Number(m.slice(5))-1].toLowerCase()} <span class="count">${pc.length}</span>`, `<a href="#direccion" onclick="DIR.tab('cobros');return false;">Cobros →</a>`)}
+    <section class="card">${cardH(`${m<today().slice(0,7)?"Sin cobrar en":"Por cobrar en"} ${MES_L[Number(m.slice(5))-1].toLowerCase()} <span class="count">${pc.length}</span>`, `<a href="#direccion" onclick="DIR.tab('cobros');return false;">Cobros →</a>`)}
       <div class="list">${pc.length?pc.slice(0,8).map(filaCobrar).join("")+(pc.length>8?`<div class="row"><a href="#direccion" onclick="DIR.tab('cobros');return false;">Ver los ${pc.length} pendientes →</a></div>`:"")+[].map(filaCobrar).join(""):emptyMsg("Todo cobrado este mes.","ok")}</div></section>
   </div>
   <div class="grid g2" style="margin-top:16px">
