@@ -166,11 +166,11 @@ function vCobros(){
     ${sinGen?`<button class="btn" onclick="DIR.generar()">${icon("plus")}Generar ${sinGen} cobro${sinGen>1?"s":""} pendiente${sinGen>1?"s":""}</button>`:""}
     <button class="btn pri" onclick="DIR.formCobro()">${icon("plus")}Registrar cobro</button></div>
   <div class="kpis" style="margin-bottom:14px"><div class="kpi"><div class="v" style="color:var(--ok)">${money(t.cobrado)}</div><div class="l">Cobrado</div></div><div class="kpi"><div class="v" style="color:var(--warn)">${money(pc.reduce((a,x)=>a+x.monto,0))}</div><div class="l">Falta cobrar</div></div><div class="kpi"><div class="v">${list.filter(c=>c.estado!=="Pendiente").length} / ${list.length+pc.filter(x=>!x.cobro).length}</div><div class="l">Pagos recibidos</div></div></div>
-  <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Monto</th><th>Estado</th><th>Observaciones</th><th></th></tr></thead><tbody>
+  <div class="table-wrap"><table class="rtable"><thead><tr><th>Fecha</th><th>Cliente</th><th>Monto</th><th>Estado</th><th>Observaciones</th><th></th></tr></thead><tbody>
   ${list.map(c=>{ const cu=cuenta(c.cuenta_id); const late=c.estado==="Pendiente"&&c.fecha<today(); return `<tr>
-    <td>${fmtDate(c.fecha)}</td><td><b>${esc(cu?cu.negocio:c.titular)}</b><div class="s">${esc(c.titular||cu?.titular||"")}${cu&&incluyeTxt(cu)?" · "+esc(incluyeTxt(cu)):""}</div></td><td class="num">${money(c.monto)}</td>
-    <td><span class="pill ${c.estado==="Pagado"?"ok":c.estado==="Parcial"?"info":late?"bad":"warn"}">${late?"Vencido":c.estado}</span></td><td class="s">${esc(c.obs||"")}</td>
-    <td class="acts-td">${c.estado!=="Pagado"?`<button class="btn sm pri" onclick="DIR.marcarPagado('${c.id}')">Cobrado</button>`:""}${c.estado!=="Pagado"&&cu?`<button class="btn sm wa" onclick="DIR.recordar('${cu.id}','${c.fecha}',${c.monto})" aria-label="Recordar por WhatsApp">${icon("wa")}</button>`:""}<button class="btn sm ghost" onclick="DIR.formCobro('${c.id}')">Editar</button></td></tr>`; }).join("")
+    <td class="rt-fecha">${fmtDate(c.fecha)}</td><td class="rt-cli"><b>${esc(cu?cu.negocio:c.titular)}</b><div class="s">${esc(c.titular||cu?.titular||"")}${cu&&incluyeTxt(cu)?" · "+esc(incluyeTxt(cu)):""}</div></td><td class="num" data-l="Monto">${inlMonto("fin_cobros",c.id,"monto",c.monto)}</td>
+    <td data-l="Estado" class="rt-full">${segEstado(c.id,c.estado,late)}</td><td class="rt-full"><input class="inl obs" type="text" value="${esc(c.obs||"")}" placeholder="Agregar nota…" onchange="DIR.campo('fin_cobros','${c.id}','obs',this.value)"></td>
+    <td class="acts-td">${c.estado!=="Pagado"&&cu?`<button class="btn sm wa" onclick="DIR.recordar('${cu.id}','${c.fecha}',${c.monto})" aria-label="Recordar por WhatsApp" title="Recordar por WhatsApp">${icon("wa")}</button>`:""}<button class="btn sm ghost ic" onclick="DIR.formCobro('${c.id}')" title="Más opciones" aria-label="Editar">${icon("edit")}</button></td></tr>`; }).join("")
    || `<tr><td colspan="6">${emptyMsg("Sin cobros registrados en este mes.","file")}</td></tr>`}
   </tbody></table></div>`;
 }
@@ -179,12 +179,12 @@ function vCuentas(seg){
   const list=D.fin_cuentas.filter(c=>!q||[c.negocio,c.titular,c.sede].join(" ").toLowerCase().includes(q)).sort((a,b)=>(b.activo-a.activo)||a.negocio.localeCompare(b.negocio));
   return `<div class="toolbar">${seg}<input type="search" id="dirQ" placeholder="Buscar cliente…" value="${esc(D.q)}" oninput="DIR.buscar(this.value)"><span style="flex:1"></span><button class="btn pri" onclick="DIR.formCuenta()">${icon("plus")}Nuevo cliente</button></div>
   <div class="kpis" style="margin-bottom:14px"><div class="kpi"><div class="v">${D.fin_cuentas.filter(c=>c.activo).length}</div><div class="l">Activos</div></div><div class="kpi"><div class="v">${money(mrr())}</div><div class="l">Facturación mensual</div></div></div>
-  <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Sede</th><th>Pack</th><th>Último pago</th><th>Día de cobro</th><th>Alta</th><th>Estado</th><th></th></tr></thead><tbody>
+  <div class="table-wrap"><table class="rtable"><thead><tr><th>Cliente</th><th>Sede</th><th>Pack</th><th>Último pago</th><th>Día de cobro</th><th>Alta</th><th>Estado</th><th></th></tr></thead><tbody>
   ${list.map(c=>{ const u=D.fin_cobros.filter(x=>x.cuenta_id===c.id&&x.estado!=="Pendiente").sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)))[0];
     const con=c.cobro_con?cuenta(c.cobro_con):null;
-    return `<tr class="${c.activo?"":"dim"}"><td><b>${esc(c.negocio)}</b><div class="s">${esc(c.titular||"")}</div>${con?`<div class="s" style="color:var(--info)">Se cobra junto con ${esc(con.negocio)}</div>`:incluyeTxt(c)?`<div class="s" style="color:var(--info)">Cobro unificado: ${esc(incluyeTxt(c))}</div>`:""}</td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td class="num">${money(c.pack)}</td>
-    <td>${u?`${money(u.monto)}<div class="s">${fmtDate(u.fecha)}</div>`:con?`<span class="s">con ${esc(con.negocio)}</span>`:"—"}</td><td>${c.dia_cobro||"—"}</td><td>${c.alta?fmtDate(c.alta)+" "+c.alta.slice(2,4):"—"}</td>
-    <td><span class="pill ${c.activo?"ok":""}">${c.activo?"Activo":"Inactivo"}</span></td><td><button class="btn sm ghost" onclick="DIR.formCuenta('${c.id}')">Editar</button></td></tr>`; }).join("")}
+    return `<tr class="${c.activo?"":"dim"}"><td class="rt-cli"><b>${esc(c.negocio)}</b><div class="s">${esc(c.titular||"")}</div>${con?`<div class="s" style="color:var(--info)">Se cobra junto con ${esc(con.negocio)}</div>`:incluyeTxt(c)?`<div class="s" style="color:var(--info)">Cobro unificado: ${esc(incluyeTxt(c))}</div>`:""}</td><td data-l="Sede"><select class="inl" style="--sc:${sedeColor(c.sede)}" onchange="DIR.campo('fin_cuentas','${c.id}','sede',this.value)"><option value="">—</option>${SEDES.slice(0,3).map(x=>`<option ${c.sede===x?"selected":""}>${x}</option>`).join("")}</select></td><td class="num" data-l="Pack">${inlMonto("fin_cuentas",c.id,"pack",c.pack)}</td>
+    <td data-l="Último pago">${u?`${money(u.monto)}<div class="s">${fmtDate(u.fecha)}</div>`:con?`<span class="s">con ${esc(con.negocio)}</span>`:"—"}</td><td data-l="Día de cobro"><input class="inl dia" type="number" min="1" max="31" inputmode="numeric" value="${c.dia_cobro||""}" placeholder="—" onchange="DIR.campo('fin_cuentas','${c.id}','dia_cobro',this.value?Math.min(31,Math.max(1,+this.value)):null)"></td><td data-l="Alta">${c.alta?fmtDate(c.alta)+" "+c.alta.slice(2,4):"—"}</td>
+    <td class="rt-full" data-l="Estado"><div class="estsel"><button type="button" class="ok ${c.activo?"on":""}" onclick="DIR.campo('fin_cuentas','${c.id}','activo',true)">Activo</button><button type="button" class="bad ${!c.activo?"on":""}" onclick="DIR.campo('fin_cuentas','${c.id}','activo',false)">Inactivo</button></div></td><td><button class="btn sm ghost ic" onclick="DIR.formCuenta('${c.id}')" title="Más opciones" aria-label="Editar">${icon("edit")}</button></td></tr>`; }).join("")}
   </tbody></table></div>`;
 }
 
@@ -252,6 +252,19 @@ async function cobrar(cid, cobroId, monto){
   if(cobroId) return marcarPagado(cobroId);
   const c=cuenta(cid); if(!c) return;
   await run(sb.from("fin_cobros").insert({cuenta_id:c.id,titular:c.titular,fecha:today().slice(0,7)===D.mes?today():`${D.mes}-${pad(Math.min(c.dia_cobro||1,28))}`,monto,estado:"Pagado"}),"Cobro registrado");
+}
+function inlMonto(t,id,campo,val){ return `<label class="inl-m"><span>$</span><input class="inl num" type="number" min="0" step="1000" inputmode="numeric" value="${Number(val)||0}" onchange="DIR.campo('${t}','${id}','${campo}',Number(this.value)||0)" onfocus="this.select()"></label>`; }
+function segEstado(id,estado,late){
+  const ops=[["Pagado","ok","Pagado"],["Parcial","info","Parcial"],["Pendiente",late?"bad":"warn",late?"Vencido":"Pendiente"]];
+  return `<div class="estsel">${ops.map(([v,cl,l])=>`<button type="button" class="${cl} ${estado===v?"on":""}" onclick="DIR.campo('fin_cobros','${id}','estado','${v}')">${l}</button>`).join("")}</div>`;
+}
+async function campo(t,id,k,val){
+  const row=(D[t]||[]).find(r=>r.id===id); if(!row) return;
+  if(row[k]===val) return;
+  const prev=row[k]; row[k]=val; render();
+  const { error } = await sb.from(t).update({[k]:val}).eq("id",id);
+  if(error){ row[k]=prev; render(); toast("No se pudo guardar: "+error.message); return; }
+  toast(k==="estado"?(val==="Pagado"?"Marcado como cobrado":"Estado: "+val):k==="activo"?(val?"Cliente activo":"Cliente inactivo"):"Guardado");
 }
 async function marcarPagado(id){ await run(sb.from("fin_cobros").update({estado:"Pagado"}).eq("id",id),"Marcado como cobrado"); }
 async function generar(){
@@ -391,7 +404,7 @@ window.DIR = {
   vista,
   tab(k){ D.tab=k; render(); window.scrollTo(0,0); }, sub(k){ D.sub=k; render(); }, anual(b){ D.anual=b; render(); },
   mes(k){ D.mes=addMes(D.mes,k); render(); }, buscar(q){ D.q=q; render(); },
-  cobrar, marcarPagado, generar, recordar, formCobro, saveCobro, formCuenta, saveCuenta, formGasto, saveGasto, copiarGastos,
+  cobrar, marcarPagado, campo, generar, recordar, formCobro, saveCobro, formCuenta, saveCuenta, formGasto, saveGasto, copiarGastos,
   formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar,
   async _del(t,id){ if(await run(sb.from(t).delete().eq("id",id),"Borrado")) closeModal(); },
   _c(id){ return ultimoMonto(id)??cuenta(id)?.pack; }
