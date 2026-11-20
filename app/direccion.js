@@ -5,9 +5,9 @@
    La base de datos rechaza estas tablas para cualquier otro usuario.
    ========================================================= */
 (function(){
-const FT = ["fin_cuentas","fin_cobros","fin_gastos","fin_equipo","fin_campanas"];
+const FT = ["fin_cuentas","fin_cobros","fin_gastos","fin_equipo","fin_campanas","fin_visitas"];
 const D = { loaded:false, loading:false, tab:"resumen", sub:"mes", mes:today().slice(0,7), anual:false,
-  fin_cuentas:[], fin_cobros:[], fin_gastos:[], fin_equipo:[], fin_campanas:[], q:"" };
+  fin_cuentas:[], fin_cobros:[], fin_gastos:[], fin_equipo:[], fin_campanas:[], fin_visitas:[], q:"", nv:{cuenta:"",n:1} };
 const CAT_G = ["Publicidad","Software","Producción","Marketing","Oficina","Impuestos","Otros"];
 const CONC_E = ["Sueldo","Comisión","Pago por trabajo","Adelanto","Bono","Retiro"];
 const MES_L = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -77,8 +77,8 @@ const mrr = () => D.fin_cuentas.filter(c=>c.activo && !c.cobro_con).reduce((a,c)
 function vista(){
   if(!isAdmin()) return `<div class="card">${emptyMsg("Esta sección es privada.","alert")}</div>`;
   if(!D.loaded){ cargar(); return `<div class="card">${emptyMsg("Cargando Dirección…","clock")}</div>`; }
-  const tabs=[["resumen","Resumen"],["cobros","Cobros"],["gastos","Gastos"],["equipo","Equipo"],["comercial","Comercial"]];
-  const body={resumen:vResumen,cobros:vCobros,gastos:vGastos,equipo:vEquipo,comercial:vComercial}[D.tab]();
+  const tabs=[["resumen","Resumen"],["cobros","Cobros"],["visitas","Visitas"],["gastos","Gastos"],["equipo","Equipo"],["comercial","Comercial"]];
+  const body={resumen:vResumen,cobros:vCobros,gastos:vGastos,equipo:vEquipo,comercial:vComercial,visitas:vVisitas}[D.tab]();
   return `<div class="dir">
     <div class="dir-head"><div><div class="eyebrow">${icon("lock")} Privado · solo vos</div><h1>Dirección</h1></div>
       <div class="mes-sel"><button class="btn" onclick="DIR.mes(-1)" aria-label="Mes anterior">‹</button><b>${mesLabel(D.mes)}</b><button class="btn" onclick="DIR.mes(1)" aria-label="Mes siguiente">›</button></div></div>
@@ -233,6 +233,69 @@ function vEquipo(){
   <section class="card">${cardH("Acumulado "+y)}<div class="hbars">${anual.map(a=>`<div class="hb"><span>${esc(a.p)}</span><div><i style="width:${a.tot/Math.max(1,anual[0]?.tot||1)*100}%"></i></div><b>${moneyK(a.tot)}</b></div>`).join("")}</div></section></div>`;
 }
 
+/* ---------- Visitas (producciones con clientes) ---------- */
+function vVisitas(){
+  const m=D.mes, list=D.fin_visitas.filter(v=>ym(v.mes)===m).sort((a,b)=>String(a.fecha||"9999").localeCompare(String(b.fecha||"9999")));
+  const tot=list.reduce((a,v)=>a+v.visitas,0), hechas=list.reduce((a,v)=>a+Math.min(v.hechas,v.visitas),0);
+  const film=list.reduce((a,v)=>a+Number(v.pago_filmaker||0),0), hook=list.reduce((a,v)=>a+Number(v.pago_hook||0),0);
+  const deuda=list.filter(v=>!v.pagado).reduce((a,v)=>a+Number(v.pago_filmaker||0)+Number(v.pago_hook||0),0);
+  const nombres=[...new Set(D.fin_visitas.map(v=>v.filmaker).filter(Boolean))];
+  const activos=D.fin_cuentas.filter(c=>c.activo).sort((a,b)=>a.negocio.localeCompare(b.negocio));
+  // visitas que el equipo agendó en la Agenda este mes y todavía no están acá
+  const ag=(S.eventos||[]).filter(e=>e.tipo==="Visita"&&ym(e.fecha)===m&&!list.some(v=>v.evento_id===e.id||(v.fecha===e.fecha&&cuentaDeCliente(e.cliente_id)&&v.cuenta_id===cuentaDeCliente(e.cliente_id)?.id)));
+  return `<div class="toolbar"><span class="s">Producciones con clientes: cuántas visitas, cuándo, y cuánto se le paga al filmaker y al hook.</span></div>
+  <div class="kpis" style="margin-bottom:14px">
+    <div class="kpi"><div class="v">${hechas} / ${tot}</div><div class="l">Visitas hechas</div></div>
+    <div class="kpi"><div class="v">${money(film)}</div><div class="l">Pago filmaker</div></div>
+    <div class="kpi"><div class="v">${money(hook)}</div><div class="l">Pago hook</div></div>
+    <div class="kpi"><div class="v" style="color:${deuda?"var(--warn)":"var(--ok)"}">${money(deuda)}</div><div class="l">Falta pagar</div></div>
+  </div>
+  <form class="vadd card" onsubmit="DIR.nuevaVisita(event)">
+    <b>Agregar visita</b>
+    <select id="nvCu" aria-label="Cliente" onchange="DIR._nv('cuenta',this.value)"><option value="">Elegí el cliente…</option>${activos.map(c=>`<option value="${c.id}" ${D.nv.cuenta===c.id?"selected":""}>${esc(c.negocio)}</option>`).join("")}<option value="otro" ${D.nv.cuenta==="otro"?"selected":""}>Otro (escribir)…</option></select>
+    ${D.nv.cuenta==="otro"?`<input id="nvTxt" type="text" placeholder="Nombre del negocio" required>`:""}
+    <label class="s" style="display:flex;align-items:center;gap:6px">Visitas <input id="nvN" class="inl dia" type="number" min="1" max="12" value="${D.nv.n||1}" onchange="DIR._nv('n',+this.value)"></label>
+    <button class="btn pri">${icon("plus")}Agregar</button>
+  </form>
+  ${ag.length?`<div class="card vag"><b>${icon("cal")} Agendadas por el equipo en la Agenda</b>${ag.map(e=>`<div class="row"><div class="main"><div class="t">${esc(e.titulo)}</div><div class="s">${fmtDate(e.fecha)}${e.hora?" · "+String(e.hora).slice(0,5)+" hs":""}</div></div><button class="btn sm pri" onclick="DIR.desdeAgenda('${e.id}')">${icon("plus")}Sumar</button></div>`).join("")}</div>`:""}
+  <datalist id="dlFilm">${nombres.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
+  <div class="table-wrap"><table class="rtable"><thead><tr><th>Cliente</th><th>Visitas</th><th>Fecha</th><th>Filmaker</th><th class="num">Pago filmaker</th><th class="num">Pago hook</th><th>Pago</th><th></th></tr></thead><tbody>
+  ${list.map(v=>`<tr>
+    <td class="rt-cli"><b>${esc(v.negocio)}</b>${v.fechas_txt?`<div class="s">${esc(v.fechas_txt)}</div>`:""}${v.notas?`<div class="s">${esc(v.notas)}</div>`:""}</td>
+    <td data-l="Visitas hechas"><div class="vchecks">${[...Array(v.visitas)].map((_,i)=>`<button type="button" class="${i<v.hechas?"on":""}" title="Visita ${i+1}: ${i<v.hechas?"hecha":"pendiente"}" onclick="DIR.hecha('${v.id}',${i+1})">${i<v.hechas?icon("ok"):""}</button>`).join("")}</div></td>
+    <td data-l="Fecha"><input class="inl" type="date" value="${esc(v.fecha||"")}" onchange="DIR.campo('fin_visitas','${v.id}','fecha',this.value||null)"></td>
+    <td data-l="Filmaker"><input class="inl" type="text" list="dlFilm" value="${esc(v.filmaker||"")}" placeholder="Nombre…" onchange="DIR.campo('fin_visitas','${v.id}','filmaker',this.value)"></td>
+    <td class="num" data-l="Pago filmaker">${inlMonto("fin_visitas",v.id,"pago_filmaker",v.pago_filmaker)}</td>
+    <td class="num" data-l="Pago hook">${inlMonto("fin_visitas",v.id,"pago_hook",v.pago_hook)}</td>
+    <td class="rt-full" data-l="Pago"><div class="estsel"><button type="button" class="ok ${v.pagado?"on":""}" onclick="DIR.campo('fin_visitas','${v.id}','pagado',true)">Pagado</button><button type="button" class="warn ${!v.pagado?"on":""}" onclick="DIR.campo('fin_visitas','${v.id}','pagado',false)">Pendiente</button></div></td>
+    <td><button class="btn sm ghost ic" onclick="DIR.borrar('fin_visitas','${v.id}')" title="Borrar" aria-label="Borrar">✕</button></td></tr>`).join("")
+   || `<tr><td colspan="8">${emptyMsg("Sin visitas cargadas en "+mesLabel(m).toLowerCase()+".","cal")}</td></tr>`}
+  </tbody></table></div>`;
+}
+const cuentaDeCliente = cid => cid ? D.fin_cuentas.find(c=>c.cliente_id===cid) : null;
+async function nuevaVisita(e){
+  e.preventDefault();
+  const sel=D.nv.cuenta; if(!sel){ toast("Elegí el cliente"); return; }
+  const cu=sel==="otro"?null:cuenta(sel), negocio=cu?cu.negocio:(document.getElementById("nvTxt")?.value||"").trim(); if(!negocio) return;
+  const prev=[...D.fin_visitas].sort((a,b)=>String(b.creado).localeCompare(String(a.creado))).find(v=>Number(v.pago_filmaker)>0)||{};
+  const row={mes:D.mes+"-01",cuenta_id:cu?cu.id:null,negocio,visitas:Math.max(1,Math.min(12,D.nv.n||1)),hechas:0,pago_filmaker:prev.pago_filmaker||0,filmaker:prev.filmaker||""};
+  const { data, error } = await sb.from("fin_visitas").insert(row).select().single();
+  if(error){ toast("No se pudo guardar: "+error.message); return; }
+  if(data && !D.fin_visitas.some(v=>v.id===data.id)) D.fin_visitas.push(data);
+  D.nv={cuenta:"",n:1}; render(); toast("Visita agregada");
+}
+async function desdeAgenda(eid){
+  const ev=(S.eventos||[]).find(x=>x.id===eid); if(!ev) return;
+  const cu=cuentaDeCliente(ev.cliente_id);
+  const prev=[...D.fin_visitas].sort((a,b)=>String(b.creado).localeCompare(String(a.creado))).find(v=>Number(v.pago_filmaker)>0)||{};
+  const row={mes:ym(ev.fecha)+"-01",cuenta_id:cu?cu.id:null,negocio:cu?cu.negocio:(cliName(ev.cliente_id)||ev.titulo),visitas:1,hechas:ev.fecha<=today()?1:0,fecha:ev.fecha,evento_id:ev.id,pago_filmaker:prev.pago_filmaker||0,filmaker:prev.filmaker||""};
+  const { data, error } = await sb.from("fin_visitas").insert(row).select().single();
+  if(error){ toast("No se pudo guardar: "+error.message); return; }
+  if(data && !D.fin_visitas.some(v=>v.id===data.id)) D.fin_visitas.push(data);
+  render(); toast("Visita sumada");
+}
+function hecha(id,n){ const v=D.fin_visitas.find(x=>x.id===id); if(!v) return; campo("fin_visitas",id,"hechas", v.hechas>=n ? n-1 : n); }
+
 /* ---------- Comercial ---------- */
 function vComercial(){
   const y=D.mes.slice(0,4);
@@ -271,7 +334,7 @@ async function campo(t,id,k,val){
   const prev=row[k]; row[k]=val; render();
   const { error } = await sb.from(t).update({[k]:val}).eq("id",id);
   if(error){ row[k]=prev; render(); toast("No se pudo guardar: "+error.message); return; }
-  toast(k==="estado"?(val==="Pagado"?"Marcado como cobrado":"Estado: "+val):k==="activo"?(val?"Cliente activo":"Cliente inactivo"):"Guardado");
+  toast(k==="estado"?(val==="Pagado"?"Marcado como cobrado":"Estado: "+val):k==="activo"?(val?"Cliente activo":"Cliente inactivo"):k==="pagado"?(val?"Marcado como pagado":"Marcado como pendiente"):k==="hechas"?"Visitas hechas: "+val:"Guardado");
 }
 async function marcarPagado(id){ await run(sb.from("fin_cobros").update({estado:"Pagado"}).eq("id",id),"Marcado como cobrado"); }
 async function generar(){
@@ -412,7 +475,8 @@ window.DIR = {
   tab(k){ D.tab=k; render(); window.scrollTo(0,0); }, sub(k){ D.sub=k; render(); }, anual(b){ D.anual=b; render(); },
   mes(k){ D.mes=addMes(D.mes,k); render(); }, buscar(q){ D.q=q; render(); },
   cobrar, marcarPagado, campo, generar, recordar, formCobro, saveCobro, formCuenta, saveCuenta, formGasto, saveGasto, copiarGastos,
-  formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar,
+  formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar, nuevaVisita, desdeAgenda, hecha,
+  _nv(k,v){ D.nv[k]=v; if(k==="cuenta") render(); },
   async _del(t,id){ if(await run(sb.from(t).delete().eq("id",id),"Borrado")) closeModal(); },
   _c(id){ return ultimoMonto(id)??cuenta(id)?.pack; }
 };

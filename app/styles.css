@@ -754,3 +754,23 @@ table.rtable td[data-l="Alta"]{white-space:nowrap}
 table.rtable td.rt-cli{min-width:170px}
 table.rtable select.inl{width:118px!important;max-width:118px}
 @media (max-width:900px){ table.rtable select.inl{width:100%!important;max-width:none} }
+/* Dirección · Visitas */
+.vadd{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px;padding:12px 16px}
+.vadd select{min-width:220px;flex:1 1 220px}
+.vadd input[type=text]{flex:1 1 200px}
+.vag{margin-bottom:14px;padding:12px 16px;border-left:5px solid var(--info)}
+.vag > b{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.vchecks{display:flex;gap:4px;flex-wrap:wrap}
+.vchecks button{width:28px;height:28px;border-radius:7px;border:2px solid var(--line);background:var(--surface);cursor:pointer;display:grid;place-items:center;padding:0;color:#fff}
+.vchecks button.on{background:var(--ok);border-color:var(--ok)}
+.vchecks button .ico{width:16px;height:16px}
+table.rtable input.inl[type=text]{width:150px}
+table.rtable input.inl[type=date]{width:140px}
+@media (max-width:900px){ table.rtable input.inl[type=text],table.rtable input.inl[type=date]{width:100%;font-size:16px} .vadd select{min-width:0} }
+.vchecks{flex-wrap:nowrap}
+@media (min-width:901px){
+  table.rtable input.inl[type=text]{width:128px}
+  table.rtable input.inl[type=date]{width:132px}
+  table.rtable .inl.num{width:92px}
+  table.rtable td,table.rtable th{padding-left:10px;padding-right:10px}
+}
