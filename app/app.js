@@ -1178,6 +1178,9 @@ function vProspectos(){
   if(S.f.pScope==="mios") list=list.filter(p=>p.setter===S.me.id);
   if(S.f.pSede) list=list.filter(p=>p.sede===S.f.pSede);
   if(q) list=list.filter(p=>[p.nombre,p.negocio,p.rubro,p.whatsapp,p.instagram].join(" ").toLowerCase().includes(q));
+  const mesDe = p => String(p.creado||p.actualizado||"").slice(0,7);
+  const meses=[...new Set(S.prospectos.map(mesDe).filter(Boolean))].sort().reverse();
+  if(S.f.pMes) list=list.filter(p=>mesDe(p)===S.f.pMes);
   const act=list.filter(activeProsp), atr=act.filter(p=>p.proximo&&p.proximo<t), hoy=act.filter(p=>p.proximo===t);
   const mes=t.slice(0,7), ganMes=list.filter(p=>p.etapa==="Ganado"&&String(p.actualizado).slice(0,7)===mes).length;
   const cerrados=list.filter(p=>!activeProsp(p)).length, ganTot=list.filter(p=>p.etapa==="Ganado").length;
@@ -1188,12 +1191,17 @@ function vProspectos(){
     <button class="${et===""?"on":""}" style="--c:var(--brand)" onclick="S.f.pEt='';render()">En seguimiento<b>${act.length}</b></button>
     ${ETAPAS.map(e=>`<button class="${et===e?"on":""}" style="--c:${ETAPA_C[e]}" onclick="S.f.pEt='${e}';render()"><span class="dot"></span>${ETAPA_CORTA[e]}<b>${list.filter(p=>p.etapa===e).length}</b></button>`).join("")}
     <button class="${et==="todos"?"on":""}" style="--c:var(--ink-2)" onclick="S.f.pEt='todos';render()">Todos<b>${list.length}</b></button></div>`;
-  const body = rows.length ? `<div class="plist">${rows.map(pRow).join("")}</div>` : `<div class="card">${emptyMsg(et===""?"No hay prospectos en seguimiento. Cargá el primero con “Nuevo prospecto”.":"No hay prospectos en esta etapa.","target")}</div>`;
+  const mesNom = m => { const [y,mm]=m.split("-"), n=MESES[+mm-1]||mm; return `${n[0].toUpperCase()+n.slice(1)} ${y}`; };
+  const grupos = meses.filter(m=>rows.some(p=>mesDe(p)===m)).map(m=>{ const all=list.filter(p=>mesDe(p)===m), r=rows.filter(p=>mesDe(p)===m), g=all.filter(p=>p.etapa==="Ganado").length;
+    return `<div class="pmes"><div class="pmes-h"><h2>${mesNom(m)}</h2><span class="pill">${all.length} prospecto${all.length!==1?"s":""}</span>${g?`<span class="pill ok">${g} ganado${g>1?"s":""} · ${Math.round(g/all.length*100)}%</span>`:""}${r.length!==all.length?`<span class="s">Mostrando ${r.length}</span>`:""}</div><div class="plist">${r.map(pRow).join("")}</div></div>`; }).join("");
+  const mesSel = `<select id="pMes" aria-label="Mes" onchange="S.f.pMes=this.value;render()"><option value="">Todos los meses</option>${meses.map(m=>`<option value="${m}" ${S.f.pMes===m?"selected":""}>${mesNom(m)}</option>`).join("")}</select>`;
+  const body = rows.length ? grupos : `<div class="card">${emptyMsg(et===""?"No hay prospectos en seguimiento. Cargá el primero con “Nuevo prospecto”.":"No hay prospectos en esta etapa.","target")}</div>`;
   if(S.mobile){
     return `<div class="m-head"><div><div class="eyebrow">Ventas</div><h1>Prospectos</h1></div><a class="btn sm" href="#plantillas">${icon("message")}Plantillas</a></div>
     <div class="m-kpis"><div><b>${act.length}</b><span>En seguimiento</span></div><div class="${hoy.length?"warn":""}"><b>${hoy.length}</b><span>Hoy</span></div><div class="${atr.length?"bad":""}"><b>${atr.length}</b><span>Atrasados</span></div><div class="ok"><b>${ganMes}</b><span>Ganados mes</span></div></div>
     <div class="m-filters"><div class="seg"><button class="${S.f.pScope==="todos"?"on":""}" onclick="S.f.pScope='todos';render()">Todos</button><button class="${S.f.pScope==="mios"?"on":""}" onclick="S.f.pScope='mios';render()">Míos</button></div>
       <select id="pSedeM" aria-label="Sede" onchange="S.f.pSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.slice(0,3).map(x=>`<option ${S.f.pSede===x?"selected":""}>${x}</option>`).join("")}</select></div>
+    <div style="margin-bottom:8px">${mesSel}</div>
     <input type="search" id="pQ" placeholder="Buscar por nombre, negocio o número…" value="${esc(S.f.pQ)}" oninput="S.f.pQ=this.value;render()" style="margin-bottom:10px">
     ${cells}${body}`;
   }
@@ -1208,6 +1216,7 @@ function vProspectos(){
   <div class="toolbar">
     <div class="seg"><button class="${S.f.pScope==="todos"?"on":""}" onclick="S.f.pScope='todos';render()">Todos</button><button class="${S.f.pScope==="mios"?"on":""}" onclick="S.f.pScope='mios';render()">Míos</button></div>
     <div class="seg">${["",...SEDES.slice(0,3)].map(s=>`<button class="${S.f.pSede===s?"on":""}" onclick="S.f.pSede='${s}';render()">${s||"Todas las sedes"}</button>`).join("")}</div>
+    ${mesSel}
     <input type="search" id="pQ" placeholder="Buscar por nombre, negocio o número…" value="${esc(S.f.pQ)}" oninput="S.f.pQ=this.value;render()">
   </div>
   ${cells}${body}`;
