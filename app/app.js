@@ -38,6 +38,7 @@ const ICONS = {
   download:'<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
   copy:'<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
   image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
   edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
   link:'<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/>',
@@ -62,13 +63,13 @@ const DKEYS = ["lun","mar","mie","jue","vie","sab","dom"];
 const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const MES_C = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-const TABLES = ["miembros","clientes","tareas","eventos","entregas","publicaciones","mensajes","novedades","config","material","plantillas","prospectos","publicados"];
+const TABLES = ["miembros","clientes","tareas","eventos","entregas","publicaciones","mensajes","novedades","config","material","plantillas","prospectos","publicados","lecturas"];
 const MAX_MB = 50;
 
 /* ---------- Estado ---------- */
 const S = {
   session:null, me:null, loading:true, authMode:"entrar", authErr:"", authBusy:false,
-  miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[], material:[], plantillas:[], prospectos:[], publicados:[], selPub:{},
+  miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[], material:[], plantillas:[], prospectos:[], publicados:[], selPub:{}, lecturas:[], rec:null,
   more:false, pendAtt:{}, sending:false, tareaId:null, mobile:window.matchMedia('(max-width:900px)').matches, pEtM:'',
   view:"inicio", cliId:null, cliTab:"resumen",
   f:{ cliQ:"", cliSede:"", cliEstado:"Activo", tScope:"todas", tArea:"", agSede:"", calSel:null, ctScope:"todas", chatQ:"", pScope:"todos", pSede:"", pQ:"", matCat:"", tplEt:"", pubEst:"pendientes", pubCli:"", pubQ:"" },
@@ -98,6 +99,8 @@ const mem = id => S.miembros.find(m=>m.id===id);
 const memName = id => { const m=mem(id); return m ? (m.nombre||m.email) : (id?"Ex integrante":"Sin asignar"); };
 const memLabel = id => { const m=mem(id); return m ? (m.nombre||m.email)+" · "+(ROLES[m.rol]||m.rol)+(m.sede?" "+m.sede:"") : "Sin asignar"; };
 const cli = id => S.clientes.find(c=>c.id===id);
+const MEM_COLORS=["#185638","#1f5fa6","#c2570c","#8e3fb0","#b8326b","#0f7c80","#7a5a10","#4b5bd6","#a33a2a","#2f7d32"];
+function memColor(id){ const i=S.miembros.findIndex(m=>m.id===id); if(i>=0) return MEM_COLORS[i%MEM_COLORS.length]; let h=0; for(const c of String(id)) h=(h*31+c.charCodeAt(0))>>>0; return MEM_COLORS[h%MEM_COLORS.length]; }
 const cliName = id => cli(id)?.nombre || "";
 const cfg = k => (S.config.find(c=>c.clave===k)||{}).valor || null;
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"),3000); }
@@ -230,12 +233,27 @@ function lateThisWeek(){
   return n;
 }
 const chKey = m => m.tarea_id ? "t-"+m.tarea_id : (m.cliente_id||"general");
+function vistoHasta(ch, mid){
+  const r=S.lecturas.find(l=>l.miembro_id===(mid||S.me?.id)&&l.canal===ch);
+  return r ? r.visto_hasta : (mid ? "" : ls.get("furor-seen-"+ch,""));
+}
 function unread(ch){
-  const seen=ls.get("furor-seen-"+ch, "");
+  const seen=vistoHasta(ch);
   return S.mensajes.filter(m=>chKey(m)===ch && m.autor!==S.me?.id && m.creado>seen).length;
 }
 function unreadTotal(){ const chs=new Set(S.mensajes.filter(m=>!m.tarea_id).map(chKey)); let n=0; chs.forEach(c=>n+=unread(c)); return n; }
-function markSeen(ch){ const last=S.mensajes.filter(m=>chKey(m)===ch).slice(-1)[0]; if(last) ls.set("furor-seen-"+ch,last.creado); }
+const _seenQ={};
+function markSeen(ch){
+  const last=S.mensajes.filter(m=>chKey(m)===ch && !String(m.id).startsWith("tmp")).slice(-1)[0]; if(!last) return;
+  ls.set("furor-seen-"+ch,last.creado);
+  if(document.hidden) return;
+  const cur=S.lecturas.find(l=>l.miembro_id===S.me.id&&l.canal===ch);
+  if(cur && cur.visto_hasta>=last.creado) return;
+  if(_seenQ[ch]===last.creado) return; _seenQ[ch]=last.creado;
+  if(cur) cur.visto_hasta=last.creado; else S.lecturas.push({miembro_id:S.me.id,canal:ch,visto_hasta:last.creado});
+  sb.from("lecturas").upsert({miembro_id:S.me.id,canal:ch,visto_hasta:last.creado},{onConflict:"miembro_id,canal"}).then(({error})=>{ if(error) console.error(error); });
+}
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && S.me) render(); });
 const openPedidos = () => S.mensajes.filter(m=>m.pedido && !m.resuelto);
 
 /* ---------- Render ---------- */
@@ -257,6 +275,8 @@ function render(){
       <nav class="bottom-nav" id="bnav"></nav><button class="fab" id="fab" hidden></button><div class="more-sheet" id="more" onclick="if(event.target.id==='more'){S.more=false;render()}"></div>`;
   }
   renderNav();
+  if([...document.querySelectorAll("#main audio")].some(a=>!a.paused)){ S.pendingRender=true; renderNav(); return; }
+  S.pendingRender=false;
   const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,publicados:vPublicados};
   $("#main").innerHTML = views[S.view]();
   if(aid){ const el=document.getElementById(aid); if(el){ el.focus(); try{ if(sel!=null) el.setSelectionRange(sel,sel); }catch(e){} } }
@@ -580,35 +600,107 @@ function vChat(){
   return `<div class="head"><div><div class="eyebrow">Operación</div><h1>Chat</h1><p>Pedidos y conversaciones del equipo, por cliente o generales</p></div>
     <span class="pill ${openPedidos().length?"warn":"ok"}">${openPedidos().length} pedidos abiertos</span></div>
   <div class="chat"><div class="channels"><input type="search" id="chatQ" placeholder="Buscar cliente…" value="${esc(S.f.chatQ)}" oninput="S.f.chatQ=this.value;render()">
-    ${sorted.map(c=>{const u=unread(c.id);return `<button class="${S.chatCh===c.id?"on":""}" onclick="S.chatCh='${c.id}';render()"><span>${esc(c.n)}</span>${u?`<span class="badge">${u}</span>`:""}</button>`;}).join("")}</div>
+    ${sorted.map(c=>{const u=unread(c.id), g=c.id==="general", lm=S.mensajes.filter(m=>chKey(m)===c.id).slice(-1)[0];
+      return `<button class="${S.chatCh===c.id?"on":""} ${g?"ch-gen":""}" onclick="S.chatCh='${c.id}';render()">${g?`<span class="gen-ic sm">${icon("users")}</span>`:`<span class="ch-av">${esc(initials(c.n))}</span>`}<span class="ch-txt"><span class="ch-n">${esc(c.n)}</span>${lm?`<span class="ch-l">${esc((lm.autor===S.me.id?"Vos":memName(lm.autor).split(" ")[0])+": "+msgPreview(lm))}</span>`:""}</span>${u?`<span class="badge">${u}</span>`:""}</button>`;}).join("")}</div>
     ${thread(S.chatCh)}</div>`;
 }
 function chatBox(ch){ return `<div class="chat solo">${thread(ch)}</div>`; }
+function lectoresDe(ch){
+  // Quiénes deberían leer este canal
+  if(ch.startsWith("t-")){ const t=S.tareas.find(x=>x.id===ch.slice(2)); const ids=new Set([t?.asignado,t?.creado_por,...S.mensajes.filter(m=>m.tarea_id===ch.slice(2)).map(m=>m.autor)]); return [...ids].filter(Boolean); }
+  return S.miembros.filter(m=>m.activo&&m.user_id).map(m=>m.id);
+}
+function ticks(m, ch){
+  if(String(m.id).startsWith("tmp")) return `<span class="tk" title="Enviando">🕓</span>`;
+  const otros=lectoresDe(ch).filter(id=>id!==m.autor);
+  const vieron=otros.filter(id=>vistoHasta(ch,id)>=m.creado);
+  const cls = otros.length && vieron.length===otros.length ? "all" : vieron.length ? "some" : "";
+  return `<span class="tk ${cls}" title="${vieron.length?"Visto por "+esc(vieron.map(memName).join(", ")):"Enviado"}">${vieron.length?"✓✓":"✓"}</span>`;
+}
+function attHtml(m){
+  const adj=m.adjuntos||[]; if(!adj.length) return "";
+  const auds=adj.map((a,i)=>[a,i]).filter(([a])=>/^audio\//.test(a.tipo||""));
+  const imgs=adj.map((a,i)=>[a,i]).filter(([a])=>!/^audio\//.test(a.tipo||""));
+  return (imgs.length?`<div class="atts">${imgs.map(([a,i])=>`<button type="button" class="att" onclick="verImagen('${m.id}',${i})" aria-label="Ver imagen"><img data-path="${esc(a.path)}" alt="${esc(a.nombre||"Imagen")}"></button>`).join("")}</div>`:"")
+   + auds.map(([a])=>`<div class="audio">${icon("mic")}<audio controls preload="metadata" data-path="${esc(a.path)}"></audio>${a.dur?`<span class="s">${fmtDur(a.dur)}</span>`:""}</div>`).join("");
+}
+const msgPreview = m => m.texto || (String((m.adjuntos||[])[0]?.tipo||"").startsWith("audio") ? "🎤 Audio" : (m.adjuntos||[]).length ? "📷 Foto" : "");
+const fmtDur = sec => { sec=Math.round(sec||0); return Math.floor(sec/60)+":"+pad(sec%60); };
 function thread(ch){
   const msgs=S.mensajes.filter(m=>chKey(m)===ch);
-  const isTask=ch.startsWith("t-");
-  const title= ch==="general" ? "General del equipo" : isTask ? "Conversación de la tarea" : cliName(ch);
-  let lastDay="", html="";
+  const isTask=ch.startsWith("t-"), isGen=ch==="general";
+  const title= isGen ? "General del equipo" : isTask ? "Conversación de la tarea" : cliName(ch);
+  let lastDay="", lastAut="", lastT=0, html="";
+  const myLast=[...msgs].reverse().find(m=>m.autor===S.me.id);
   msgs.forEach(m=>{
     const d=new Date(m.creado), day=ymd(d);
-    if(day!==lastDay){ html+=`<div class="daysep">${day===today()?"Hoy":fmtDayLong(day)}</div>`; lastDay=day; }
-    const me=m.autor===S.me.id;
-    html+=`<div class="msg ${me?"me":""} ${m.pedido?"pedido":""} ${m.resuelto?"ok":""}">
-      <div class="who">${me?"Vos":esc(memName(m.autor))} · ${pad(d.getHours())}:${pad(d.getMinutes())}</div>
-      ${(m.adjuntos||[]).length?`<div class="atts">${m.adjuntos.map((a,i)=>`<button type="button" class="att" onclick="verImagen('${m.id}',${i})" aria-label="Ver imagen"><img data-path="${esc(a.path)}" alt="${esc(a.nombre||"Imagen")}"></button>`).join("")}</div>`:""}
-      ${m.texto?`<div class="b">${esc(m.texto)}</div>`:""}
-      ${m.pedido?`<div class="tag">${m.resuelto?`<span style="color:var(--accent)">✓ Resuelto</span>`:`<span style="color:var(--warn)">Pedido pendiente</span><button class="btn sm ghost" onclick="resolver('${m.id}')">Marcar resuelto</button>`}</div>`:""}
-    </div>`;
+    if(day!==lastDay){ html+=`<div class="daysep">${day===today()?"Hoy":fmtDayLong(day)}</div>`; lastDay=day; lastAut=""; }
+    const me=m.autor===S.me.id, col=memColor(m.autor), nm=memName(m.autor);
+    const cont = m.autor===lastAut && (d-lastT)<5*60000;
+    lastAut=m.autor; lastT=d;
+    const vistoPor = (myLast && m===myLast) ? lectoresDe(ch).filter(id=>id!==m.autor && vistoHasta(ch,id)>=m.creado) : [];
+    html+=`<div class="mrow ${me?"me":""} ${cont?"cont":""}">
+      ${me?"":`<div class="mav" style="--mc:${col}" title="${esc(nm)}">${cont?"":esc(initials(nm))}</div>`}
+      <div class="msg ${me?"me":""} ${m.pedido?"pedido":""} ${m.resuelto?"ok":""}" style="--mc:${col}">
+        ${!me&&!cont?`<div class="who"><b style="color:${col}">${esc(nm)}</b>${mem(m.autor)?` <span>${esc(ROLES[mem(m.autor).rol]||"")}${mem(m.autor).sede?" · "+esc(mem(m.autor).sede):""}</span>`:""}</div>`:""}
+        ${attHtml(m)}
+        ${m.texto?`<div class="b">${esc(m.texto)}</div>`:""}
+        <div class="meta-m">${pad(d.getHours())}:${pad(d.getMinutes())}${me?" "+ticks(m,ch):""}</div>
+        ${m.pedido?`<div class="tag">${m.resuelto?`<span style="color:var(--ok)">✓ Resuelto</span>`:`<span style="color:var(--warn)">Pedido pendiente</span><button class="btn sm ghost" onclick="resolver('${m.id}')">Marcar resuelto</button>`}</div>`:""}
+        ${vistoPor.length?`<div class="visto">Visto por ${esc(vistoPor.map(id=>memName(id).split(" ")[0]).join(", "))}</div>`:""}
+      </div></div>`;
   });
-  const dk="d-"+ch;
-  return `<div class="thread"><div class="top"><b>${esc(title)}</b>${ch!=="general"&&!isTask&&S.view==="chat"?`<a class="btn sm" href="#cliente-${ch}">Ver cliente</a>`:""}</div>
+  const dk="d-"+ch, rec=S.rec&&S.rec.ch===ch;
+  return `<div class="thread ${isGen?"gen":""}"><div class="top">${isGen?`<div class="gen-ic">${icon("users")}</div>`:""}<div style="flex:1;min-width:0"><b>${esc(title)}</b>${isGen?`<div class="s">${S.miembros.filter(m=>m.activo).length} integrantes</div>`:""}</div>${!isGen&&!isTask&&S.view==="chat"?`<a class="btn sm" href="#cliente-${ch}">Ver cliente</a>`:""}</div>
     <div class="msgs">${html||`<div class="empty" style="align-self:center">${isTask?"Dejá acá las referencias, fotos y comentarios de esta tarea.":"Todavía no hay mensajes. Escribí el primero."}</div>`}</div>
     ${(S.pendAtt[ch]||[]).length?`<div class="pend">${S.pendAtt[ch].map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" onclick="quitarAdj('${ch}',${i})" aria-label="Quitar">✕</button></div>`).join("")}</div>`:""}
-    <form class="composer" onsubmit="sendMsg(event,'${ch}')">
+    ${rec?`<div class="recbar"><span class="dotrec"></span><b>Grabando</b><span id="recT">${fmtDur(S.rec.seg||0)}</span><span style="flex:1"></span><button type="button" class="btn sm ghost" onclick="cancelarAudio()">Cancelar</button><button type="button" class="btn sm pri" onclick="detenerAudio(true)">${icon("send")}Enviar audio</button></div>`
+    :`<form class="composer" onsubmit="sendMsg(event,'${ch}')">
       <label class="btn attach" title="Adjuntar fotos" aria-label="Adjuntar fotos">${icon("image")}<input type="file" hidden accept="image/*" multiple onchange="agregarAdj('${ch}',this.files);this.value=''"></label>
-      <textarea id="msg-${ch}" placeholder="${isTask?"Escribí una indicación o pegá una foto…":"Escribí un mensaje o pegá una foto…"}" rows="1" oninput="S.drafts['${dk}']=this.value" onpaste="pegarAdj(event,'${ch}')" onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!S.mobile){event.preventDefault();this.form.requestSubmit();}">${esc(S.drafts[dk]||"")}</textarea>
+      <textarea id="msg-${ch}" placeholder="${isTask?"Escribí una indicación o pegá una foto…":"Escribí un mensaje…"}" rows="1" oninput="S.drafts['${dk}']=this.value" onpaste="pegarAdj(event,'${ch}')" onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!S.mobile){event.preventDefault();this.form.requestSubmit();}">${esc(S.drafts[dk]||"")}</textarea>
       ${isTask?"":`<label class="opt"><input type="checkbox" id="ped-${ch}" ${S.pedido?"checked":""} onchange="S.pedido=this.checked"> Pedido</label>`}
-      <button class="btn pri" ${S.sending?"disabled":""}>${S.sending?"…":"Enviar"}</button></form></div>`;
+      <button type="button" class="btn attach mic" onclick="grabarAudio('${ch}')" title="Grabar audio" aria-label="Grabar audio" ${S.sending?"disabled":""}>${icon("mic")}</button>
+      <button class="btn pri" ${S.sending?"disabled":""}>${S.sending?"…":"Enviar"}</button></form>`}</div>`;
+}
+
+/* ---------- Audios ---------- */
+let _mr=null, _chunks=[], _recTimer=null, _stream=null;
+async function grabarAudio(ch){
+  if(!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder){ toast("Este navegador no permite grabar audio."); return; }
+  try{ _stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ toast("Necesitamos permiso para usar el micrófono."); return; }
+  const tipo=["audio/webm;codecs=opus","audio/mp4","audio/webm","audio/ogg"].find(t=>MediaRecorder.isTypeSupported(t))||"";
+  _mr=new MediaRecorder(_stream, tipo?{mimeType:tipo}:undefined); _chunks=[];
+  _mr.ondataavailable=e=>{ if(e.data.size) _chunks.push(e.data); };
+  _mr.start(250);
+  S.rec={ch,inicio:Date.now(),seg:0,enviar:false}; render();
+  _recTimer=setInterval(()=>{ if(!S.rec) return; S.rec.seg=(Date.now()-S.rec.inicio)/1000; const el=$("#recT"); if(el) el.textContent=fmtDur(S.rec.seg); if(S.rec.seg>=300) detenerAudio(true); },500);
+}
+function _limpiarRec(){ clearInterval(_recTimer); if(_stream) _stream.getTracks().forEach(t=>t.stop()); _stream=null; }
+function cancelarAudio(){ if(_mr&&_mr.state!=="inactive"){ _mr.onstop=null; _mr.stop(); } _limpiarRec(); S.rec=null; render(); }
+function detenerAudio(enviar){
+  if(!_mr||!S.rec) return;
+  const ch=S.rec.ch, dur=(Date.now()-S.rec.inicio)/1000;
+  _mr.onstop=async ()=>{
+    _limpiarRec(); S.rec=null;
+    const tipo=(_mr.mimeType||"audio/webm").split(";")[0];
+    const blob=new Blob(_chunks,{type:tipo});
+    if(!enviar || dur<0.8 || !blob.size){ render(); if(dur<0.8) toast("Mantené la grabación un poco más."); return; }
+    await enviarAudio(ch, blob, tipo, dur);
+  };
+  _mr.stop();
+}
+async function enviarAudio(ch, blob, tipo, dur){
+  const isTask=ch.startsWith("t-");
+  S.sending=true; render();
+  const ext=tipo.includes("mp4")?"m4a":tipo.includes("ogg")?"ogg":"webm";
+  const path=`${ch}/audio_${Date.now()}_${Math.random().toString(36).slice(2,6)}.${ext}`;
+  const up=await sb.storage.from("chat").upload(path, blob, {contentType:tipo});
+  if(up.error){ S.sending=false; render(); toast("No se pudo enviar el audio: "+up.error.message); return; }
+  const row={texto:"",autor:S.me.id,cliente_id:(ch==="general"||isTask)?null:ch,tarea_id:isTask?ch.slice(2):null,pedido:false,adjuntos:[{path,nombre:"Audio",tipo,tam:blob.size,dur:Math.round(dur)}]};
+  const tmp=Object.assign({id:"tmp-"+Date.now(),creado:new Date().toISOString(),resuelto:false},row);
+  S.mensajes.push(tmp); S.sending=false; render();
+  if(!await run(sb.from("mensajes").insert(row))){ S.mensajes=S.mensajes.filter(m=>m!==tmp); render(); }
 }
 async function sendMsg(e, ch){
   e.preventDefault();
@@ -659,14 +751,14 @@ async function comprimirImagen(file){
 }
 const urlCache={};
 async function hidratarImagenes(){
-  const imgs=[...document.querySelectorAll("img[data-path]:not([src])")];
+  const imgs=[...document.querySelectorAll("img[data-path]:not([src]), audio[data-path]:not([src])")];
   if(!imgs.length) return;
   const now=Date.now(), falta=[...new Set(imgs.map(i=>i.dataset.path))].filter(p=>!(urlCache[p]&&urlCache[p].exp>now));
   if(falta.length){
     const { data } = await sb.storage.from("chat").createSignedUrls(falta, 3600);
     (data||[]).forEach(d=>{ if(d.signedUrl) urlCache[d.path]={url:d.signedUrl,exp:now+3300*1000}; });
   }
-  document.querySelectorAll("img[data-path]:not([src])").forEach(i=>{ const c=urlCache[i.dataset.path]; if(c) i.src=c.url; });
+  document.querySelectorAll("img[data-path]:not([src]), audio[data-path]:not([src])").forEach(i=>{ const c=urlCache[i.dataset.path]; if(c) i.src=c.url; });
 }
 async function verImagen(mid, i){
   const m=S.mensajes.find(x=>x.id===mid); const a=m&&(m.adjuntos||[])[i]; if(!a) return;
@@ -1373,3 +1465,6 @@ async function toggleObj(i){
 
 /* ---------- Arranque ---------- */
 boot().then(handleRecovery);
+
+document.addEventListener("pause", e=>{ if(e.target.tagName==="AUDIO" && S.pendingRender) setTimeout(render,50); }, true);
+document.addEventListener("ended", e=>{ if(e.target.tagName==="AUDIO" && S.pendingRender) setTimeout(render,50); }, true);
