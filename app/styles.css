@@ -540,3 +540,12 @@ table.anual td,table.anual th{padding:9px 10px;font-size:13px}
 .envbtn.on{border-color:transparent;color:var(--ok);background:var(--ok-soft)}
 .envbtn .ico{width:14px;height:14px}
 @media (max-width:900px){ .prow > .envbtn{margin-left:29px} }
+/* Feriados */
+.cal .day.feriado{background:color-mix(in srgb,var(--danger) 7%,var(--surface))}
+.cal .day.feriado .num{color:var(--danger);font-weight:800}
+.cal .day.feriado.today .num{background:var(--danger);color:#fff}
+.fer{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--danger);border:1px solid color-mix(in srgb,var(--danger) 45%,transparent);background:var(--danger-soft);border-radius:5px;padding:1px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.week th.ferth{color:var(--danger);background:color-mix(in srgb,var(--danger) 7%,var(--surface-2))}
+.week th.ferth .pill{display:block;width:max-content;margin:4px auto 0;font-size:10px}
+.form.es-fer .nofer{display:none}
+@media (max-width:900px){ .fer{font-size:0;height:6px;padding:0;border:0;background:var(--danger);border-radius:3px} }
