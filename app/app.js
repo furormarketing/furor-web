@@ -413,6 +413,15 @@ function postHtml(n,compact){
   ${!compact&&(isAdmin()||n.autor===S.me.id)?`<div><button class="btn sm ghost" onclick="pinNov('${n.id}')">${n.fijada?"Desfijar":"Fijar"}</button><button class="btn sm ghost danger" onclick="askDel('novedades','${n.id}','esta novedad')">Borrar</button></div>`:""}</div>`;
 }
 const sortNov = () => S.novedades.slice().sort((a,b)=>(b.fijada?1:0)-(a.fijada?1:0) || String(b.creado).localeCompare(String(a.creado)));
+const EST_CLS = {"Activo":"ok","Onboarding":"info","En pausa":"warn","Baja":"bad"};
+const estSel = c => `<div class="estsel" role="group" aria-label="Estado de ${esc(c.nombre)}" onclick="event.preventDefault();event.stopPropagation()">${ESTADOS_CLI.map(e=>`<button type="button" class="${EST_CLS[e]} ${c.estado===e?"on":""}" ${c.estado===e?'aria-pressed="true"':""} onclick="event.preventDefault();event.stopPropagation();setEstadoCli('${c.id}','${e}')">${esc(e)}</button>`).join("")}</div>`;
+async function setEstadoCli(id, estado){
+  const c=cli(id); if(!c||c.estado===estado) return;
+  const prev=c.estado; c.estado=estado; render();
+  const { error } = await sb.from("clientes").update({estado}).eq("id",id);
+  if(error){ c.estado=prev; render(); toast("No se pudo cambiar el estado."); }
+  else toast(`${c.nombre}: ${estado}`+(S.f.cliEstado&&S.f.cliEstado!==estado&&S.view==="clientes"&&!S.cliId?` · ya no se muestra con el filtro "${S.f.cliEstado}"`:""));
+}
 const estPill = e => `<span class="pill ${e==="Activo"?"ok":e==="Onboarding"?"info":e==="En pausa"?"warn":"bad"}">${esc(e||"—")}</span>`;
 const entPill = e => `<span class="pill ${e==="Publicada"?"ok":e==="Aprobada"||e==="Programada"?"info":e==="Para revisar"?"warn":""}">${esc(e)}</span>`;
 
@@ -606,11 +615,11 @@ function vClientes(){
     <select id="cliEstado" aria-label="Estado" onchange="S.f.cliEstado=this.value;render()"><option value="">Todos los estados</option>${ESTADOS_CLI.map(s=>`<option ${S.f.cliEstado===s?"selected":""}>${s}</option>`).join("")}</select>
     <span class="pill">${list.length} de ${S.clientes.length}</span></div>
   ${S.mobile&&list.length?`<div class="mcards">${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id);
-    return `<a class="mcard cli" href="#cliente-${c.id}" style="--sc:${sedeColor(c.sede)}"><div class="mc-top">${cliAv(c)}<b class="cn">${esc(c.nombre)}</b>${estPill(c.estado)}</div>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:""}
+    return `<a class="mcard cli" href="#cliente-${c.id}" style="--sc:${sedeColor(c.sede)}"><div class="mc-top">${cliAv(c)}<b class="cn">${esc(c.nombre)}</b></div>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:""}
     <div class="s">${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"Sin sede"}${c.rubro?" · "+esc(c.rubro):""}${c.responsable?" · "+esc(memName(c.responsable)):""}</div>
-    ${ents||un?`<div style="display:flex;gap:6px;margin-top:6px">${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span>`:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</div>`:""}</a>`; }).join("")}</div>`
+    ${ents||un?`<div style="display:flex;gap:6px;margin-top:6px">${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span>`:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</div>`:""}${estSel(c)}</a>`; }).join("")}</div>`
   :list.length?`<div class="table-wrap"><table><thead><tr><th>Negocio · Titular</th><th>Sede</th><th>Servicio</th><th>Responsable</th><th>Estado</th><th>Pendiente</th></tr></thead><tbody>
-  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click cli-tr" style="--sc:${sedeColor(c.sede)}" onclick="location.hash='cliente-${c.id}'"><td><div class="cli-cell">${cliAv(c)}<div><b class="cn">${esc(c.nombre)}</b>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:c.contacto===c.nombre?`<div class="s" style="color:var(--warn)">Falta el nombre del negocio</div>`:""}${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</div></div></td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td>${estPill(c.estado)}</td><td>${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
+  ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click cli-tr" style="--sc:${sedeColor(c.sede)}" onclick="location.hash='cliente-${c.id}'"><td><div class="cli-cell">${cliAv(c)}<div><b class="cn">${esc(c.nombre)}</b>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:c.contacto===c.nombre?`<div class="s" style="color:var(--warn)">Falta el nombre del negocio</div>`:""}${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</div></div></td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td class="estcell">${estSel(c)}</td><td>${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
   </tbody></table></div>`:`<div class="card"><div class="empty">${S.clientes.length?"No hay clientes con esos filtros.":"Todavía no hay clientes. Cargá el primero."}</div></div>`}`;
 }
 function cliAv(c){ const ini=String(c.nombre||"?").replace(/[^\p{L}\p{N} ]/gu,"").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"?"; return `<span class="cav" style="--sc:${sedeColor(c.sede)}">${esc(ini)}</span>`; }
@@ -621,8 +630,9 @@ function fichaCliente(c){
   return `
   <div class="eyebrow" style="margin-bottom:10px"><a href="#clientes" style="text-decoration:none">← Clientes</a></div>
   <div class="cli-hero" style="--sc:${sedeColor(c.sede)}"><div class="ch-main">${cliAv(c)}<div style="min-width:0"><h1>${esc(c.nombre)}</h1>
-    <div class="ch-meta">${c.contacto&&c.contacto!==c.nombre?`<span class="titular">${icon("users")}<b>${esc(c.contacto)}</b></span>`:""}${c.sede?`<span class="sede-tag">${esc(c.sede)}</span>`:""}${c.rubro?`<span class="pill">${esc(c.rubro)}</span>`:""}${c.plan?`<span class="pill info">${esc(c.plan)}</span>`:""}${estPill(c.estado)}</div>${hermanos(c).length?`<div class="hermanos">${icon("briefcase")}<span>Otros negocios de ${esc(c.contacto.split(" ")[0])}:</span>${hermanos(c).map(h=>`<a class="pill info" href="#cliente-${h.id}">${esc(h.nombre)}</a>`).join("")}</div>`:""}</div>
+    <div class="ch-meta">${c.contacto&&c.contacto!==c.nombre?`<span class="titular">${icon("users")}<b>${esc(c.contacto)}</b></span>`:""}${c.sede?`<span class="sede-tag">${esc(c.sede)}</span>`:""}${c.rubro?`<span class="pill">${esc(c.rubro)}</span>`:""}${c.plan?`<span class="pill info">${esc(c.plan)}</span>`:""}</div>${hermanos(c).length?`<div class="hermanos">${icon("briefcase")}<span>Otros negocios de ${esc(c.contacto.split(" ")[0])}:</span>${hermanos(c).map(h=>`<a class="pill info" href="#cliente-${h.id}">${esc(h.nombre)}</a>`).join("")}</div>`:""}</div>
     </div>
+    <div class="ch-est"><span class="s">Estado</span>${estSel(c)}</div>
     <div class="ch-acts">${cliAcciones(c)}<button class="btn" onclick="formCliente('${c.id}')">${icon("edit")}Editar ficha</button></div></div>
   <div class="tabs">${tabs.map(([k,l])=>`<button class="${S.cliTab===k?"on":""}" onclick="S.cliTab='${k}';render()">${l}${k==="chat"&&un?` <span class="badge">${un}</span>`:""}</button>`).join("")}</div>
   ${body(c)}`;

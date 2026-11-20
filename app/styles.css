@@ -659,3 +659,17 @@ tr.cli-tr td:first-child{box-shadow:inset 5px 0 0 var(--sc)}
 .ev.visita{background:repeating-linear-gradient(135deg,var(--sc,var(--s-otra)) 0 7px,color-mix(in srgb,var(--sc,var(--s-otra)) 80%,#000) 7px 14px);font-weight:700}
 .qrow select{flex:1 1 100%;min-width:0}
 @media (max-width:900px){ .qrow select{font-size:16px} }
+/* Estado del cliente: se cambia con un toque */
+.estsel{display:inline-flex;gap:3px;padding:3px;background:var(--surface-2);border:1px solid var(--line);border-radius:999px;flex-wrap:nowrap;max-width:100%}
+.estsel button{font:inherit;font-size:12px;font-weight:700;border:0;background:none;color:var(--muted);padding:5px 10px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.estsel button:hover{background:var(--surface)}
+.estsel button.on.ok{background:var(--ok);color:#fff}
+.estsel button.on.info{background:var(--info);color:#fff}
+.estsel button.on.warn{background:var(--warn);color:#fff}
+.estsel button.on.bad{background:var(--danger);color:#fff}
+td.estcell{white-space:nowrap}
+.mcard .estsel{margin-top:10px;display:flex;width:100%}
+.mcard .estsel button{flex:1;padding:7px 4px;font-size:12px}
+.ch-est{display:flex;flex-direction:column;gap:4px}
+.ch-est .s{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+@media (max-width:900px){ .ch-est{width:100%} .ch-est .estsel{display:flex;width:100%} .ch-est .estsel button{flex:1;padding:7px 4px} }
