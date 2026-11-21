@@ -1992,3 +1992,21 @@ function verReporte(id){
     <div class="form"><label class="f full" for="rVer">Mensaje<textarea id="rVer" readonly style="min-height:240px">${esc(r.mensaje||"")}</textarea></label>
     <div class="actions full"><div><button type="button" class="btn danger" onclick="askDel('ads_reportes','${r.id}','este reporte')">Borrar</button></div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="navigator.clipboard.writeText(document.getElementById('rVer').value).then(()=>toast('Mensaje copiado'))">${icon("copy")}Copiar</button><button type="button" class="btn" onclick="closeModal()">Cerrar</button></div></div></div>`);
 }
+
+/* ---------- Aviso de versión nueva ---------- */
+const APP_V = ((document.querySelector('script[src*="app.js?v="]')||{}).src||"").match(/v=(\d+)/)?.[1]||"";
+async function chequearVersion(){
+  if(!APP_V || document.getElementById("nuevaVersion")) return;
+  try{
+    const r=await fetch("./index.html?_="+Date.now(),{cache:"no-store"}); const h=await r.text();
+    const v=(h.match(/app\.js\?v=(\d+)/)||[])[1];
+    if(v && v!==APP_V){
+      const d=document.createElement("div"); d.id="nuevaVersion"; d.className="nueva-v";
+      d.innerHTML=`<span>Hay una versión nueva de la app.</span><button class="btn sm pri" onclick="location.reload()">Actualizar</button>`;
+      document.body.appendChild(d);
+    }
+  }catch(_){}
+}
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") chequearVersion(); });
+setInterval(chequearVersion, 3*60*1000);
+setTimeout(chequearVersion, 15000);
