@@ -1436,7 +1436,6 @@ function docCard(m){
   const a=m.archivo, ext=a?(a.nombre.split(".").pop()||"").slice(0,4).toUpperCase():"LINK", link=safeUrl(m.link);
   return `<div class="doc"><div class="fic ${a?"":"link"}">${esc(ext)}</div><div class="main">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">${esc(m.titulo)}</span></div>
-    <div class="s">${esc([servMat(m),m.categoria,m.sede||"Todas las sedes","actualizado "+fmtDate(String(m.actualizado).slice(0,10))].join(" · "))}</div>
     ${m.descripcion?`<div style="font-size:14px;white-space:pre-wrap">${esc(m.descripcion)}</div>`:""}
     <div class="acts">${a?`<button class="btn sm pri" onclick="abrirMaterial('${m.id}',false)">${icon("eye")}Ver</button><button class="btn sm" onclick="abrirMaterial('${m.id}',true)">${icon("download")}Descargar</button>`:""}${link?`<a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Abrir link</a>`:""}${isAdmin()?`<button class="btn sm ghost" onclick="formMaterial('${m.id}')">Editar</button>`:""}</div>
   </div></div>`;
