@@ -1956,6 +1956,7 @@ function pintarReporte(){
       <div class="rep-mets">${(MET_ADS[k.objetivo]||[]).map(([m,l])=>`<label class="f">${l}<input type="number" min="0" inputmode="numeric" value="${esc(r.vals[k.id][m]??"")}" oninput="repVal('${k.id}','${m}',this.value)"></label>`).join("")}
       <label class="f">Inversión por día<input ${MONTO_IN} value="${esc(montoVal(r.vals[k.id].inv??""))}" oninput="repVal('${k.id}','inv',parseMonto(this.value))"></label></div></div>`).join("")
       :`<div class="full s">No hay campañas en ese período.</div>`}
+    ${waNumber(c?.whatsapp||"")?"":`<label class="f full" for="rWa">WhatsApp del cliente <span class="s">(no está cargado; se guarda en su ficha)</span><input type="tel" id="rWa" inputmode="tel" placeholder="381 555 1234"></label>`}
     <label class="f full" for="rMsg">Mensaje <span class="s" id="rMsgNota">${r.manual?"(editado a mano · <a href='#' onclick='S.rep.manual=false;refreshRepMsg();return false'>volver a armar</a>)":"(se arma solo; podés editarlo)"}</span><textarea id="rMsg" style="min-height:240px;font-family:inherit" oninput="S.rep.manual=true;S.rep.texto=this.value">${esc(r.manual?r.texto:armarMsg())}</textarea></label>
     <div class="actions full"><div><button type="button" class="btn" onclick="copiarReporte()">${icon("copy")}Copiar</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" onclick="guardarReporte(false)">Guardar</button><button type="button" class="btn wa" onclick="guardarReporte(true)">${icon("wa")}Enviar por WhatsApp</button></div></div>
   </div>`);
@@ -1980,6 +1981,8 @@ async function copiarReporte(){ try{ await navigator.clipboard.writeText(textoRe
 async function guardarReporte(enviar){
   const r=S.rep, c=cli(r.cid), msg=textoReporte();
   if(r.hasta<r.desde){ toast("Revisá las fechas"); return; }
+  const nuevoWa=(document.getElementById("rWa")?.value||"").trim();
+  if(nuevoWa && c){ c.whatsapp=nuevoWa; sb.from("clientes").update({whatsapp:nuevoWa}).eq("id",c.id).then(({error})=>{ if(error) toast("No se pudo guardar el WhatsApp en la ficha."); }); }
   let w=null; if(enviar){ const n=waNumber(c?.whatsapp||""); w=window.open(`https://wa.me/${n}?text=${encodeURIComponent(msg)}`,"_blank"); }
   const { data, error } = await sb.from("ads_reportes").insert({cliente_id:r.cid,desde:r.desde,hasta:r.hasta,datos:r.vals,mensaje:msg,enviado_el:enviar?new Date().toISOString():null,creado_por:S.me.id}).select().single();
   if(error){ toast("No se pudo guardar el reporte: "+error.message); return; }
