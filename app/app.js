@@ -280,7 +280,8 @@ const prio = {alta:0,media:1,baja:2};
 const sortTasks = l => l.slice().sort((a,b)=>(prio[a.prioridad]??1)-(prio[b.prioridad]??1) || String(a.vence||"9999").localeCompare(String(b.vence||"9999")));
 const evFrom = from => S.eventos.filter(e=>e.fecha>=from).sort((a,b)=>(a.fecha+(a.hora||"")).localeCompare(b.fecha+(b.hora||"")));
 const pubDone = (cid,fecha,f) => S.publicaciones.some(p=>p.cliente_id===cid&&p.fecha===fecha&&p.formato===f);
-function expected(c, fecha){ const p=c.pauta||{}; return Array.isArray(p[dayKey(fecha)]) ? p[dayKey(fecha)] : []; }
+const proxLunes = () => { const d=parseYmd(today()), w=d.getDay(); return addDays(today(), w===1?0:((8-w)%7||7)); };
+function expected(c, fecha){ if(c.pauta_desde && fecha<c.pauta_desde) return []; const p=c.pauta||{}; return Array.isArray(p[dayKey(fecha)]) ? p[dayKey(fecha)] : []; }
 const pautaClients = () => S.clientes.filter(c=>c.estado!=="Baja" && c.estado!=="En pausa" && DKEYS.some(k=>(c.pauta||{})[k]?.length));
 function pendingToday(onlyMine){
   const t=today(); const out=[];
@@ -691,6 +692,7 @@ function tabPauta(c){
   return `<section class="card"><h2>${icon("cal")}Pauta de publicación</h2>
     <p class="s" style="margin:0 0 12px">Tocá lo que se publica cada día. <b>Se guarda solo.</b> Con esto se arma el <a href="#contenido">Calendario de contenido</a> de la CM: cuando lo marca como publicado, le pide el link y queda en <b>Publicados</b> para mandárselo al cliente.</p>
     <div class="pauta2">${DKEYS.map((k,i)=>`<div class="pd ${(p[k]||[]).length?"has":""}"><b>${DIAS[i]}</b>${FORMATOS.map(f=>{ const on=(p[k]||[]).includes(f); return `<button type="button" class="pz-b fmt-${f.toLowerCase()} ${on?"on":""}" aria-pressed="${on}" onclick="togglePauta('${c.id}','${k}','${f}')">${on?icon("ok"):""}${f}</button>`; }).join("")}</div>`).join("")}</div>
+    ${total||c.pauta_desde?`<div class="pz-desde">${icon("clock")}<span>Cuenta para el calendario desde</span><input type="date" class="inl" value="${esc(c.pauta_desde||"")}" onchange="setPautaDesde('${c.id}',this.value)">${c.pauta_desde&&c.pauta_desde>today()?`<span class="s">· antes de esa fecha no figura nada como pendiente ni atrasado</span>`:""}</div>`:""}
     <div class="pauta-foot">
       <div class="pz-sum">${total?`<b>${total} ${total>1?"publicaciones":"publicación"} por semana</b><span class="s">${porFmt.map(([f,n])=>n+" "+f.toLowerCase()+(n>1?(f==="Reel"?"s":f==="Historia"?"s":f==="Carrusel"?"es":"s"):"")).join(" · ")}</span>`:`<span class="s">Todavía no hay nada marcado.</span>`}</div>
       ${total?`<button class="btn sm ghost" onclick="limpiarPauta('${c.id}')">Borrar pauta</button>`:""}
@@ -699,9 +701,11 @@ function tabPauta(c){
   </section>`;
 }
 async function guardarPautaCli(c, pauta, msg){
-  const prev=c.pauta; c.pauta=pauta; render();
-  const { error } = await sb.from("clientes").update({pauta,actualizado:new Date().toISOString()}).eq("id",c.id);
-  if(error){ c.pauta=prev; render(); toast("No se pudo guardar la pauta."); } else if(msg) toast(msg);
+  const prev=c.pauta, prevD=c.pauta_desde, data={pauta,actualizado:new Date().toISOString()};
+  if(!c.pauta_desde) data.pauta_desde=proxLunes();
+  Object.assign(c,data); render();
+  const { error } = await sb.from("clientes").update(data).eq("id",c.id);
+  if(error){ c.pauta=prev; c.pauta_desde=prevD; render(); toast("No se pudo guardar la pauta."); } else if(msg) toast(msg);
 }
 function togglePauta(id, d, f){
   const c=cli(id); if(!c) return;
@@ -710,6 +714,11 @@ function togglePauta(id, d, f){
   guardarPautaCli(c, pauta);
 }
 function limpiarPauta(id){ const c=cli(id); if(!c) return; const pauta={}; DKEYS.forEach(k=>pauta[k]=[]); guardarPautaCli(c,pauta,"Pauta borrada"); }
+async function setPautaDesde(id, v){
+  const c=cli(id); if(!c) return; const prev=c.pauta_desde; c.pauta_desde=v||null; render();
+  const { error } = await sb.from("clientes").update({pauta_desde:v||null}).eq("id",id);
+  if(error){ c.pauta_desde=prev; render(); toast("No se pudo guardar."); } else toast(v?"La pauta cuenta desde el "+fmtDate(v):"La pauta cuenta desde siempre");
+}
 async function setResponsable(id, v){
   const c=cli(id); if(!c) return; const prev=c.responsable; c.responsable=v||null;
   const { error } = await sb.from("clientes").update({responsable:v||null,actualizado:new Date().toISOString()}).eq("id",id);

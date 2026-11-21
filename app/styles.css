@@ -796,3 +796,6 @@ table.rtable input.inl[type=date]{width:140px}
   .pz-b .ico{display:none}
 }
 @media (max-width:900px){ .pauta-foot label.f{flex-direction:column!important;align-items:stretch!important;width:100%} .pauta-foot select{width:100%!important} }
+.pz-desde{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;padding:8px 12px;border-radius:10px;background:var(--info-soft,var(--surface-2));font-size:13.5px;font-weight:600}
+.pz-desde .ico{width:16px;height:16px;color:var(--info)}
+.pz-desde input.inl{width:150px;border-color:var(--line);background:var(--surface)}
