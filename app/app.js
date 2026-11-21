@@ -686,17 +686,34 @@ function entCard(e){
   </div>`;
 }
 function tabPauta(c){
-  const p=c.pauta||{};
-  return `<section class="card"><h2>Pauta de publicación</h2>
-    <p class="s" style="margin:0 0 12px">Marcá qué se publica cada día en esta cuenta. Con esto se arma el calendario de contenido de la CM.</p>
-    <div class="pauta">${DKEYS.map((k,i)=>`<div class="d"><b>${DIAS[i]}</b>${FORMATOS.map(f=>`<label><input type="checkbox" class="pz" data-d="${k}" value="${f}" ${(p[k]||[]).includes(f)?"checked":""}> ${f}</label>`).join("")}</div>`).join("")}</div>
-    <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn pri" onclick="savePauta('${c.id}')">Guardar pauta</button><label class="f" style="flex-direction:row;align-items:center;gap:8px">Responsable de la cuenta <select id="pzResp" style="width:auto">${memOptions(c.responsable)}</select></label></div>
+  const p=c.pauta||{}, total=DKEYS.reduce((a,k)=>a+(p[k]||[]).length,0);
+  const porFmt=FORMATOS.map(f=>[f,DKEYS.filter(k=>(p[k]||[]).includes(f)).length]).filter(x=>x[1]);
+  return `<section class="card"><h2>${icon("cal")}Pauta de publicación</h2>
+    <p class="s" style="margin:0 0 12px">Tocá lo que se publica cada día. <b>Se guarda solo.</b> Con esto se arma el <a href="#contenido">Calendario de contenido</a> de la CM: cuando lo marca como publicado, le pide el link y queda en <b>Publicados</b> para mandárselo al cliente.</p>
+    <div class="pauta2">${DKEYS.map((k,i)=>`<div class="pd ${(p[k]||[]).length?"has":""}"><b>${DIAS[i]}</b>${FORMATOS.map(f=>{ const on=(p[k]||[]).includes(f); return `<button type="button" class="pz-b fmt-${f.toLowerCase()} ${on?"on":""}" aria-pressed="${on}" onclick="togglePauta('${c.id}','${k}','${f}')">${on?icon("ok"):""}${f}</button>`; }).join("")}</div>`).join("")}</div>
+    <div class="pauta-foot">
+      <div class="pz-sum">${total?`<b>${total} ${total>1?"publicaciones":"publicación"} por semana</b><span class="s">${porFmt.map(([f,n])=>n+" "+f.toLowerCase()+(n>1?(f==="Reel"?"s":f==="Historia"?"s":f==="Carrusel"?"es":"s"):"")).join(" · ")}</span>`:`<span class="s">Todavía no hay nada marcado.</span>`}</div>
+      ${total?`<button class="btn sm ghost" onclick="limpiarPauta('${c.id}')">Borrar pauta</button>`:""}
+      <label class="f" style="flex-direction:row;align-items:center;gap:8px;margin:0">Responsable de la cuenta <select id="pzResp" style="width:auto" onchange="setResponsable('${c.id}',this.value)">${memOptions(c.responsable)}</select></label>
+    </div>
   </section>`;
 }
-async function savePauta(id){
-  const pauta={}; DKEYS.forEach(k=>pauta[k]=[]);
-  document.querySelectorAll(".pz:checked").forEach(x=>pauta[x.dataset.d].push(x.value));
-  await run(sb.from("clientes").update({pauta,responsable:$("#pzResp").value||null,actualizado:new Date().toISOString()}).eq("id",id),"Pauta guardada");
+async function guardarPautaCli(c, pauta, msg){
+  const prev=c.pauta; c.pauta=pauta; render();
+  const { error } = await sb.from("clientes").update({pauta,actualizado:new Date().toISOString()}).eq("id",c.id);
+  if(error){ c.pauta=prev; render(); toast("No se pudo guardar la pauta."); } else if(msg) toast(msg);
+}
+function togglePauta(id, d, f){
+  const c=cli(id); if(!c) return;
+  const pauta={}; DKEYS.forEach(k=>pauta[k]=[...((c.pauta||{})[k]||[])]);
+  pauta[d] = pauta[d].includes(f) ? pauta[d].filter(x=>x!==f) : FORMATOS.filter(x=>x===f||pauta[d].includes(x));
+  guardarPautaCli(c, pauta);
+}
+function limpiarPauta(id){ const c=cli(id); if(!c) return; const pauta={}; DKEYS.forEach(k=>pauta[k]=[]); guardarPautaCli(c,pauta,"Pauta borrada"); }
+async function setResponsable(id, v){
+  const c=cli(id); if(!c) return; const prev=c.responsable; c.responsable=v||null;
+  const { error } = await sb.from("clientes").update({responsable:v||null,actualizado:new Date().toISOString()}).eq("id",id);
+  if(error){ c.responsable=prev; render(); toast("No se pudo guardar."); } else toast(v?"Responsable: "+memName(v):"Sin responsable");
 }
 function tabAgenda(c){
   const ts=sortTasks(S.tareas.filter(t=>t.cliente_id===c.id&&t.estado!=="hecha"));
