@@ -799,3 +799,44 @@ table.rtable input.inl[type=date]{width:140px}
 .pz-desde{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px;padding:8px 12px;border-radius:10px;background:var(--info-soft,var(--surface-2));font-size:13.5px;font-weight:600}
 .pz-desde .ico{width:16px;height:16px;color:var(--info)}
 .pz-desde input.inl{width:150px;border-color:var(--line);background:var(--surface)}
+/* Ads clientes */
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--brand);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-align:left}
+.linkbtn .ico{width:15px;height:15px}
+.adsc{border-left:5px solid var(--sc,var(--brand));margin-bottom:14px}
+.adsc-h{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.adsc-cli{display:flex;gap:12px;align-items:center;text-decoration:none;color:inherit;min-width:0}
+.adsc-cli b{font-size:17px;font-family:var(--font-display)}
+.adsc-acts{display:flex;flex-wrap:wrap;gap:8px}
+.adsc-camps{display:grid;gap:8px}
+.camp{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+.camp-n{font-weight:700;font-size:15px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.camp-inv{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+.camp-inv b{font-family:var(--font-display);font-size:17px;font-variant-numeric:tabular-nums}
+.adsc-saldo{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+.sal-h{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;margin-bottom:8px}
+.sal-disp{font-size:13.5px;color:var(--ink-2)}
+.sal-disp b{color:var(--ok)}
+.sal-list{display:flex;flex-wrap:wrap;gap:8px}
+.sal{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.sal > div{display:flex;flex-direction:column;line-height:1.2}
+.sal > div b{font-variant-numeric:tabular-nums}
+.sal.used{opacity:.6}
+.sal.used > div b{text-decoration:line-through}
+.sal-tg{font:inherit;font-size:12px;font-weight:700;border-radius:999px;padding:5px 10px;border:1px solid var(--ok);color:var(--ok);background:var(--ok-soft);cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.sal-tg.on{border-color:var(--line);color:var(--muted);background:var(--surface-2)}
+.sal-tg .ico{width:13px;height:13px}
+.adsc-reps{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);font-size:13.5px}
+.rep-list{display:grid;gap:6px;margin-top:8px}
+.rep{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:var(--surface-2)}
+.rep > div{display:flex;flex-direction:column}
+.dur-q{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:-4px}
+.rep-camp{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface-2)}
+.rep-camp-h{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.rep-mets{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+@media (max-width:900px){
+  .adsc-acts{width:100%} .adsc-acts .btn{flex:1 1 auto;justify-content:center}
+  .camp{grid-template-columns:1fr auto;gap:8px}
+  .camp .estsel{grid-column:1/-1;display:flex;width:100%} .camp .estsel button{flex:1}
+  .camp > .btn{grid-column:2;grid-row:1;align-self:start}
+  .camp-inv{grid-column:1;align-items:flex-start;flex-direction:row;gap:6px;align-items:baseline}
+}

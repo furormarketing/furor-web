@@ -11,7 +11,7 @@ const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY,
 });
 const NAV = [
   ["inicio","Inicio","home","Operación"],["agenda","Agenda","cal","Operación"],["tareas","Tareas","check","Operación"],["chat","Chat","chat","Operación"],
-  ["clientes","Clientes","briefcase","Cuentas"],["contenido","Contenido","grid","Cuentas"],["publicados","Publicados","link","Cuentas"],
+  ["clientes","Clientes","briefcase","Cuentas"],["contenido","Contenido","grid","Cuentas"],["publicados","Publicados","link","Cuentas"],["ads","Ads clientes","mega","Cuentas"],
   ["prospectos","Prospectos","target","Ventas"],["plantillas","Plantillas","message","Ventas"],["material","Material","file","Ventas"],
   ["novedades","Novedades","bell","Equipo"],["equipo","Equipo","users","Equipo"],
   ["direccion","Dirección","lock","Privado"]
@@ -19,6 +19,7 @@ const NAV = [
 const navItems = () => NAV.filter(n=>n[0]!=="direccion"||isAdmin());
 const MOBILE_NAV = ["inicio","agenda","prospectos","chat"];
 const ICONS = {
+  mega:'<path d="M3 10v4a1 1 0 0 0 1 1h3l6 4.5v-15L7 9H4a1 1 0 0 0-1 1z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 5.5a9 9 0 0 1 0 13"/>',
   home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
   cal:'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>',
   check:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/>',
@@ -72,13 +73,13 @@ const DKEYS = ["lun","mar","mie","jue","vie","sab","dom"];
 const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const MES_C = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-const TABLES = ["miembros","clientes","tareas","eventos","entregas","publicaciones","mensajes","novedades","config","material","plantillas","prospectos","publicados","lecturas"];
+const TABLES = ["miembros","clientes","tareas","eventos","entregas","publicaciones","mensajes","novedades","config","material","plantillas","prospectos","publicados","lecturas","ads_campanas","ads_saldos","ads_reportes"];
 const MAX_MB = 50;
 
 /* ---------- Estado ---------- */
 const S = {
   session:null, me:null, loading:true, authMode:"entrar", authErr:"", authBusy:false,
-  miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[], material:[], plantillas:[], prospectos:[], publicados:[], selPub:{}, lecturas:[], rec:null,
+  miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[], material:[], plantillas:[], prospectos:[], publicados:[], ads_campanas:[], ads_saldos:[], ads_reportes:[], adsAll:false, adsQ:"", rep:null, adsHist:{}, selPub:{}, lecturas:[], rec:null,
   more:false, chatOpen:false, tEstM:'pendiente', pendAtt:{}, sending:false, tareaId:null, mobile:window.matchMedia('(max-width:900px)').matches, pEtM:'',
   view:"inicio", cliId:null, cliTab:"resumen",
   f:{ cliQ:"", cliSede:"", cliEstado:"Activo", tScope:"todas", tArea:"", agSede:"", calSel:null, ctScope:"todas", chatQ:"", pScope:"todos", pSede:"", pQ:"", matCat:"", tplEt:"", pubEst:"pendientes", pubCli:"", pubQ:"" },
@@ -118,7 +119,7 @@ function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("sh
 const ls = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
 
 /* ---------- Datos ---------- */
-const ORDER = { mensajes:["creado",true], novedades:["creado",false], miembros:["nombre",true], clientes:["nombre",true], material:["creado",false], plantillas:["orden",true], prospectos:["actualizado",false], publicados:["fecha",false] };
+const ORDER = { mensajes:["creado",true], novedades:["creado",false], miembros:["nombre",true], clientes:["nombre",true], material:["creado",false], plantillas:["orden",true], prospectos:["actualizado",false], publicados:["fecha",false], ads_campanas:["inicio",false], ads_saldos:["fecha",false], ads_reportes:["hasta",false] };
 async function loadTable(t){
   let q = sb.from(t).select("*");
   if(ORDER[t]) q = q.order(ORDER[t][0], {ascending:ORDER[t][1]});
@@ -336,7 +337,7 @@ function render(){
       <nav class="bottom-nav" id="bnav"></nav><button class="fab" id="fab" hidden></button><div class="more-sheet" id="more" onclick="if(event.target.id==='more'){S.more=false;render()}"></div>`;
   }
   renderNav();
-  const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,publicados:vPublicados,direccion:vDireccion};
+  const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,publicados:vPublicados,ads:vAds,direccion:vDireccion};
   $("#main").innerHTML = views[S.view]();
   document.querySelectorAll("body > .daysheet-bg").forEach(x=>x.remove());
   const ds=$("#main .daysheet-bg"); if(ds) document.body.appendChild(ds);
@@ -624,9 +625,9 @@ function vClientes(){
 }
 function cliAv(c){ const ini=String(c.nombre||"?").replace(/[^\p{L}\p{N} ]/gu,"").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"?"; return `<span class="cav" style="--sc:${sedeColor(c.sede)}">${esc(ini)}</span>`; }
 function fichaCliente(c){
-  const tabs=[["resumen","Ficha"],["entregas","Entregas"],["publicados","Publicados"],["chat","Chat"],["pauta","Pauta"],["agenda","Tareas y agenda"]];
+  const tabs=[["resumen","Ficha"],["entregas","Entregas"],["publicados","Publicados"],["ads","Ads"],["chat","Chat"],["pauta","Pauta"],["agenda","Tareas y agenda"]];
   const un=unread(c.id);
-  const body={resumen:tabResumen,entregas:tabEntregas,publicados:c=>`<div class="toolbar"><button class="btn pri" onclick="formPublicado(null,'${c.id}')">${icon("plus")}Cargar link</button></div>`+pubGroup(c,S.publicados.filter(p=>p.cliente_id===c.id)),chat:()=>chatBox(c.id,true),pauta:tabPauta,agenda:tabAgenda}[S.cliTab]||tabResumen;
+  const body={ads:c=>adsCard(c,true),resumen:tabResumen,entregas:tabEntregas,publicados:c=>`<div class="toolbar"><button class="btn pri" onclick="formPublicado(null,'${c.id}')">${icon("plus")}Cargar link</button></div>`+pubGroup(c,S.publicados.filter(p=>p.cliente_id===c.id)),chat:()=>chatBox(c.id,true),pauta:tabPauta,agenda:tabAgenda}[S.cliTab]||tabResumen;
   return `
   <div class="eyebrow" style="margin-bottom:10px"><a href="#clientes" style="text-decoration:none">← Clientes</a></div>
   <div class="cli-hero" style="--sc:${sedeColor(c.sede)}"><div class="ch-main">${cliAv(c)}<div style="min-width:0"><h1>${esc(c.nombre)}</h1>
@@ -1131,7 +1132,7 @@ function vDireccion(){
 /* ---------- Botón flotante (celular) ---------- */
 function renderFab(){
   const f=$("#fab"); if(!f) return;
-  const map={inicio:["Agendar","formEvento()"],agenda:["Agendar","formEvento()"],tareas:S.tareaId?null:["Nueva tarea","formTarea()"],prospectos:["Nuevo prospecto","formProspecto()"],clientes:S.cliId?null:["Nuevo cliente","formCliente()"],publicados:["Cargar link","formPublicado()"],material:isAdmin()?["Subir material","formMaterial()"]:null,novedades:null,equipo:isAdmin()?["Sumar integrante","formMiembro()"]:null};
+  const map={inicio:["Agendar","formEvento()"],agenda:["Agendar","formEvento()"],tareas:S.tareaId?null:["Nueva tarea","formTarea()"],prospectos:["Nuevo prospecto","formProspecto()"],ads:["Nueva campaña","formCampAds()"],clientes:S.cliId?null:["Nuevo cliente","formCliente()"],publicados:["Cargar link","formPublicado()"],material:isAdmin()?["Subir material","formMaterial()"]:null,novedades:null,equipo:isAdmin()?["Sumar integrante","formMiembro()"]:null};
   const a=map[S.view];
   document.body.classList.toggle("has-fab",!!a);
   if(!a){ f.hidden=true; return; }
@@ -1768,3 +1769,213 @@ async function toggleObj(i){
 
 /* ---------- Arranque ---------- */
 boot().then(handleRecovery);
+
+
+/* =========================================================
+   Ads clientes: campañas, inversión cargada por el cliente y reportes por WhatsApp
+   ========================================================= */
+const OBJ_ADS = ["Mensajes","Tráfico","Ventas","Alcance","Otro"];
+const EST_ADS = [["Activa","ok"],["Pausada","warn"],["Terminada","bad"]];
+const MET_ADS = {
+  "Mensajes":[["prospectos","Prospectos (conversaciones)"]],
+  "Tráfico":[["visitas","Visitas al perfil"],["seguidores","Seguidores nuevos"]],
+  "Ventas":[["ventas","Ventas"],["prospectos","Prospectos"]],
+  "Alcance":[["alcance","Personas alcanzadas"]],
+  "Otro":[["resultado","Resultados"]]
+};
+const MET_TXT = {prospectos:"PROSPECTOS",visitas:"VISITAS AL PERFIL",seguidores:"SEGUIDORES NUEVOS",ventas:"VENTAS",alcance:"PERSONAS ALCANZADAS",resultado:"RESULTADOS"};
+const OBJ_TXT = {
+  "Mensajes":"Con la campaña de mensajes se busca que nuevos clientes potenciales escriban directo al WhatsApp para consultar y comprar.",
+  "Tráfico":"Con la campaña de tráfico se busca en puntual poder colocar datos orgánicos a través de Instagram, donde podamos aumentar la comunidad como así también la tasa de mensajes por ese medio.",
+  "Ventas":"Con la campaña de ventas se busca generar compras directas en la tienda.",
+  "Alcance":"Con la campaña de alcance se busca que más personas de la zona conozcan la marca.",
+  "Otro":""
+};
+const pesos = n => "$"+(Math.round(Number(n)||0)).toLocaleString("es-AR");
+const diasEntre = (a,b) => Math.round((parseYmd(b)-parseYmd(a))/864e5);
+const fmtLargo = s => { const d=parseYmd(s); return d.getDate()+" "+MESES[d.getMonth()]; };
+const campsDe = cid => S.ads_campanas.filter(c=>c.cliente_id===cid).sort((a,b)=>(a.estado==="Activa"?0:1)-(b.estado==="Activa"?0:1)||String(b.inicio).localeCompare(String(a.inicio)));
+const saldosDe = cid => S.ads_saldos.filter(x=>x.cliente_id===cid).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+const repsDe = cid => S.ads_reportes.filter(x=>x.cliente_id===cid).sort((a,b)=>String(b.hasta).localeCompare(String(a.hasta))||String(b.creado).localeCompare(String(a.creado)));
+const invDiaActiva = cid => S.ads_campanas.filter(c=>c.cliente_id===cid&&c.estado==="Activa").reduce((a,c)=>a+Number(c.inversion_diaria||0),0);
+const saldoDisp = cid => saldosDe(cid).filter(x=>!x.usado).reduce((a,x)=>a+Number(x.monto||0),0);
+
+function periodoCamp(c){
+  const t=today(), d=diasEntre(c.inicio,t)+1;
+  if(c.fin){ const tot=diasEntre(c.inicio,c.fin)+1, falta=diasEntre(t,c.fin);
+    return `${fmtDate(c.inicio)} → ${fmtDate(c.fin)} · ${c.inicio>t?"arranca "+fmtDate(c.inicio):falta<0?"terminó":`día ${Math.min(d,tot)} de ${tot}${falta>=0?` · faltan ${falta} día${falta===1?"":"s"}`:""}`}`; }
+  return c.inicio>t ? `Arranca ${fmtDate(c.inicio)}` : `Desde ${fmtDate(c.inicio)} · día ${d}`;
+}
+
+function vAds(){
+  const q=(S.adsQ||"").toLowerCase();
+  const act=S.ads_campanas.filter(c=>c.estado==="Activa");
+  const cids=[...new Set([...S.ads_campanas.map(c=>c.cliente_id),...S.ads_saldos.map(x=>x.cliente_id)])]
+    .filter(id=>S.adsAll||act.some(c=>c.cliente_id===id))
+    .map(id=>cli(id)).filter(Boolean).filter(c=>!q||[c.nombre,c.contacto].join(" ").toLowerCase().includes(q))
+    .sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const invTot=act.reduce((a,c)=>a+Number(c.inversion_diaria||0),0);
+  const dispTot=[...new Set(S.ads_saldos.map(x=>x.cliente_id))].reduce((a,id)=>a+saldoDisp(id),0);
+  const head = S.mobile
+    ? `<div class="m-head"><div><div class="eyebrow">Cuentas</div><h1>Ads clientes</h1></div></div>`
+    : pageHead("Cuentas","Ads clientes","Campañas de cada cliente, la inversión que te carga y los reportes para mandar por WhatsApp.",`<button class="btn pri" onclick="formCampAds()">${icon("plus")}Nueva campaña</button>`);
+  return `${head}
+  <div class="kpis pk" style="margin-bottom:14px">
+    <div class="kpi"><div class="v">${act.length}</div><div class="l">Campañas activas</div></div>
+    <div class="kpi"><div class="v">${pesos(invTot)}</div><div class="l">Inversión por día (activas)</div></div>
+    <div class="kpi"><div class="v">${pesos(dispTot)}</div><div class="l">Saldo de clientes sin usar</div></div>
+  </div>
+  <div class="toolbar"><div class="seg"><button class="${!S.adsAll?"on":""}" onclick="S.adsAll=false;render()">Con campañas activas</button><button class="${S.adsAll?"on":""}" onclick="S.adsAll=true;render()">Todos</button></div>
+    <input type="search" id="adsQ" placeholder="Buscar cliente…" value="${esc(S.adsQ||"")}" oninput="S.adsQ=this.value;render()"></div>
+  ${cids.length?cids.map(c=>adsCard(c)).join(""):`<div class="card">${emptyMsg(S.adsAll?"Todavía no hay campañas cargadas.":"No hay campañas activas. Tocá “Nueva campaña” para cargar la primera.","mega")}</div>`}`;
+}
+
+function adsCard(c, enFicha){
+  const camps=campsDe(c.id), sal=saldosDe(c.id), reps=repsDe(c.id), disp=saldoDisp(c.id), inv=invDiaActiva(c.id);
+  const dias = inv>0 ? Math.floor(disp/inv) : null;
+  const hist=S.adsHist[c.id];
+  return `<section class="card adsc" style="--sc:${sedeColor(c.sede)}">
+    <div class="adsc-h">${enFicha?"":`<a class="adsc-cli" href="#cliente-${c.id}" onclick="S.cliTab='ads'">${cliAv(c)}<div><b>${esc(c.nombre)}</b><div class="s">${esc([c.sede,c.contacto].filter(Boolean).join(" · "))}</div></div></a>`}
+      <div class="adsc-acts"><button class="btn pri" onclick="abrirReporte('${c.id}')" ${camps.length?"":"disabled"}>${icon("send")}Armar reporte</button><button class="btn" onclick="formSaldoAds('${c.id}')">${icon("plus")}Cargar inversión</button><button class="btn" onclick="formCampAds(null,'${c.id}')">${icon("plus")}Campaña</button></div></div>
+    <div class="adsc-camps">${camps.map(k=>`<div class="camp">
+        <div class="camp-m"><div class="camp-n">${esc(k.nombre||k.objetivo)} <span class="pill ${k.plataforma==="Google"?"info":""}">${esc(k.plataforma)} · ${esc(k.objetivo)}</span></div>
+          <div class="s">${periodoCamp(k)}${k.link?` · <a href="${esc(safeUrl(k.link)||"#")}" target="_blank" rel="noopener">Administrador</a>`:""}</div></div>
+        <div class="camp-inv"><b>${pesos(k.inversion_diaria)}</b><span class="s">por día</span></div>
+        <div class="estsel">${EST_ADS.map(([e,cl])=>`<button type="button" class="${cl} ${k.estado===e?"on":""}" onclick="setCampAds('${k.id}','estado','${e}')">${e}</button>`).join("")}</div>
+        <button class="btn sm ghost ic" onclick="formCampAds('${k.id}')" title="Editar campaña" aria-label="Editar campaña">${icon("edit")}</button>
+      </div>`).join("")||`<div class="s" style="padding:6px 0">Sin campañas cargadas.</div>`}</div>
+    <div class="adsc-saldo">
+      <div class="sal-h"><b>Inversión cargada por el cliente</b>${sal.length?`<span class="sal-disp">Sin usar: <b>${pesos(disp)}</b>${dias!=null&&disp>0?` · alcanza para unos <b>${dias} día${dias===1?"":"s"}</b> a ${pesos(inv)}/día`:""}</span>`:""}</div>
+      <div class="sal-list">${sal.map(x=>`<div class="sal ${x.usado?"used":""}"><div><b>${pesos(x.monto)}</b><span class="s">${fmtDate(x.fecha)}${x.banco?" · "+esc(x.banco):""}</span></div>
+        <button type="button" class="sal-tg ${x.usado?"on":""}" onclick="setSaldoUsado('${x.id}',${!x.usado})" title="${x.usado?"Marcar como sin usar":"Marcar como usado"}">${x.usado?icon("ok")+"Usado":"Sin usar"}</button>
+        <button class="btn sm ghost ic" onclick="formSaldoAds('${c.id}','${x.id}')" aria-label="Editar" title="Editar">${icon("edit")}</button></div>`).join("")||`<span class="s">Todavía no cargó inversión.</span>`}</div>
+    </div>
+    ${reps.length?`<div class="adsc-reps"><button class="linkbtn" onclick="S.adsHist['${c.id}']=!S.adsHist['${c.id}'];render()">${icon("clock")}Último reporte: ${fmtDate(reps[0].desde)} – ${fmtDate(reps[0].hasta)}${reps[0].enviado_el?" · enviado":" · sin enviar"} · ${hist?"ocultar historial":`ver historial (${reps.length})`}</button>
+      ${hist?`<div class="rep-list">${reps.map(r=>`<div class="rep"><div><b>${fmtDate(r.desde)} – ${fmtDate(r.hasta)}</b><span class="s">${r.enviado_el?"Enviado "+fmtDate(String(r.enviado_el).slice(0,10)):"Guardado sin enviar"}</span></div><button class="btn sm" onclick="verReporte('${r.id}')">Ver mensaje</button></div>`).join("")}</div>`:""}</div>`:""}
+  </section>`;
+}
+
+async function setCampAds(id,k,val){
+  const c=S.ads_campanas.find(x=>x.id===id); if(!c||c[k]===val) return;
+  const prev=c[k]; c[k]=val; render();
+  const { error } = await sb.from("ads_campanas").update({[k]:val,actualizado:new Date().toISOString()}).eq("id",id);
+  if(error){ c[k]=prev; render(); toast("No se pudo guardar."); } else if(k==="estado") toast("Campaña "+val.toLowerCase());
+}
+async function setSaldoUsado(id,val){
+  const x=S.ads_saldos.find(y=>y.id===id); if(!x) return; const prev=x.usado; x.usado=val; render();
+  const { error } = await sb.from("ads_saldos").update({usado:val}).eq("id",id);
+  if(error){ x.usado=prev; render(); toast("No se pudo guardar."); }
+}
+
+function formCampAds(id, cid){
+  const k=id?S.ads_campanas.find(x=>x.id===id)||{}:{cliente_id:cid||(S.view==="clientes"?S.cliId:"")||"",plataforma:"Meta",objetivo:"Mensajes",inicio:today(),estado:"Activa",texto_objetivo:OBJ_TXT["Mensajes"]};
+  openModal(`<h2>${id?"Editar campaña":"Nueva campaña"}</h2><form class="form" onsubmit="saveCampAds(event,'${id||""}')">
+    <label class="f full" for="caCli">Cliente<select id="caCli" required><option value="">Elegí el cliente</option>${S.clientes.filter(c=>c.estado!=="Baja"||c.id===k.cliente_id).map(c=>`<option value="${c.id}" ${k.cliente_id===c.id?"selected":""}>${esc(c.nombre)}</option>`).join("")}</select></label>
+    <label class="f" for="caObj">Objetivo<select id="caObj" onchange="const t=document.getElementById('caTxt'); if(t&&(!t.value||Object.values(OBJ_TXT).includes(t.value))) t.value=OBJ_TXT[this.value]||'';">${opts(OBJ_ADS,k.objetivo)}</select></label>
+    <label class="f" for="caPla">Plataforma<select id="caPla">${opts(["Meta","Google"],k.plataforma)}</select></label>
+    <label class="f full" for="caNom">Nombre (opcional)<input type="text" id="caNom" value="${esc(k.nombre)}" placeholder="Ej: Mensajes WhatsApp · Tucumán"></label>
+    <label class="f" for="caInv">Inversión por día<input type="number" id="caInv" min="0" step="500" inputmode="numeric" value="${esc(k.inversion_diaria||"")}" placeholder="8000" required></label>
+    <label class="f" for="caEst">Estado<select id="caEst">${opts(EST_ADS.map(e=>e[0]),k.estado)}</select></label>
+    <label class="f" for="caIni">Inicio<input type="date" id="caIni" value="${esc(k.inicio)}" required></label>
+    <label class="f" for="caFin">Fin (opcional)<input type="date" id="caFin" value="${esc(k.fin||"")}"></label>
+    <div class="full dur-q"><span class="s">Duración rápida:</span>${[7,15,30,60].map(n=>`<button type="button" class="btn sm" onclick="const i=document.getElementById('caIni').value||today(); document.getElementById('caFin').value=addDays(i,${n}-1)">${n} días</button>`).join("")}<button type="button" class="btn sm ghost" onclick="document.getElementById('caFin').value=''">Sin fin</button></div>
+    <label class="f full" for="caTxt">Texto del objetivo (va en el reporte)<textarea id="caTxt" style="min-height:80px">${esc(k.texto_objetivo||"")}</textarea></label>
+    <label class="f full" for="caLink">Link del Administrador de anuncios (opcional)<input type="url" id="caLink" value="${esc(k.link||"")}" placeholder="https://adsmanager.facebook.com/…"></label>
+    <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('ads_campanas','${id}','esta campaña')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div>
+  </form>`);
+}
+async function saveCampAds(e,id){
+  e.preventDefault();
+  const data={cliente_id:v("caCli"),objetivo:v("caObj"),plataforma:v("caPla"),nombre:v("caNom"),inversion_diaria:Number(v("caInv"))||0,estado:v("caEst"),inicio:v("caIni")||today(),fin:nz(v("caFin")),texto_objetivo:v("caTxt"),link:v("caLink"),actualizado:new Date().toISOString()};
+  if(data.fin && data.fin<data.inicio){ toast("El fin no puede ser antes del inicio"); return; }
+  let res;
+  if(id) res=await sb.from("ads_campanas").update(data).eq("id",id).select().single();
+  else res=await sb.from("ads_campanas").insert(Object.assign({creado_por:S.me.id},data)).select().single();
+  if(res.error){ toast("No se pudo guardar: "+res.error.message); return; }
+  applyChange("ads_campanas",{eventType:id?"UPDATE":"INSERT",new:res.data});
+  closeModal(); toast(id?"Campaña actualizada":"Campaña creada");
+}
+
+function formSaldoAds(cid, id){
+  const x=id?S.ads_saldos.find(y=>y.id===id)||{}:{cliente_id:cid,fecha:today(),banco:(saldosDe(cid)[0]||{}).banco||"Ualá"};
+  const bancos=[...new Set(["Ualá","Mercado Pago","Efectivo",...S.ads_saldos.map(y=>y.banco).filter(Boolean)])];
+  openModal(`<h2>${id?"Editar inversión":"Cargar inversión del cliente"}</h2><p class="s" style="margin:-8px 0 14px">${esc(cliName(cid))}: plata que te mandó para la pauta.</p>
+  <form class="form" onsubmit="saveSaldoAds(event,'${cid}','${id||""}')">
+    <label class="f" for="saMon">Monto<input type="number" id="saMon" min="0" step="1000" inputmode="numeric" value="${esc(x.monto||"")}" required placeholder="50000"></label>
+    <label class="f" for="saFec">Fecha<input type="date" id="saFec" value="${esc(x.fecha)}"></label>
+    <label class="f" for="saBan">Banco / medio<input type="text" id="saBan" list="dlBancos" value="${esc(x.banco||"")}"></label><datalist id="dlBancos">${bancos.map(b=>`<option value="${esc(b)}">`).join("")}</datalist>
+    <label class="f" for="saNot">Nota (opcional)<input type="text" id="saNot" value="${esc(x.notas||"")}"></label>
+    ${id?`<label class="check full"><input type="checkbox" id="saUso" ${x.usado?"checked":""}><span>Ya se usó</span></label>`:""}
+    <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('ads_saldos','${id}','esta carga')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div>
+  </form>`);
+}
+async function saveSaldoAds(e,cid,id){
+  e.preventDefault();
+  const data={cliente_id:cid,monto:Number(v("saMon"))||0,fecha:v("saFec")||today(),banco:v("saBan"),notas:v("saNot")};
+  if(id) data.usado=!!document.getElementById("saUso")?.checked;
+  let res;
+  if(id) res=await sb.from("ads_saldos").update(data).eq("id",id).select().single();
+  else res=await sb.from("ads_saldos").insert(Object.assign({creado_por:S.me.id},data)).select().single();
+  if(res.error){ toast("No se pudo guardar: "+res.error.message); return; }
+  applyChange("ads_saldos",{eventType:id?"UPDATE":"INSERT",new:res.data});
+  closeModal(); toast(id?"Guardado":"Inversión cargada");
+}
+
+/* ---------- Reporte para WhatsApp ---------- */
+function campsEnPeriodo(cid, desde, hasta){
+  return campsDe(cid).filter(k=>k.inicio<=hasta && (!k.fin||k.fin>=desde) && (k.estado!=="Terminada"||(k.fin&&k.fin>=desde)||String(k.actualizado||"").slice(0,10)>=desde));
+}
+function abrirReporte(cid){
+  const t=today(), last=repsDe(cid)[0], camps=campsDe(cid);
+  let desde = last ? last.hasta : (camps.filter(k=>k.estado==="Activa").map(k=>k.inicio).sort()[0]||addDays(t,-7));
+  if(desde>t) desde=t;
+  S.rep={cid, desde, hasta:t, vals:{}, manual:false};
+  pintarReporte();
+}
+function pintarReporte(){
+  const r=S.rep, c=cli(r.cid), camps=campsEnPeriodo(r.cid,r.desde,r.hasta);
+  camps.forEach(k=>{ if(!r.vals[k.id]) r.vals[k.id]={inv:Number(k.inversion_diaria)||0}; });
+  openModal(`<h2>Reporte de campañas</h2><p class="s" style="margin:-8px 0 14px">${esc(c?.nombre||"")} · completá los números y mandalo por WhatsApp.</p>
+  <div class="form rep-form">
+    <label class="f" for="rDes">Desde<input type="date" id="rDes" value="${r.desde}" onchange="S.rep.desde=this.value;S.rep.manual=false;pintarReporte()"></label>
+    <label class="f" for="rHas">Hasta<input type="date" id="rHas" value="${r.hasta}" onchange="S.rep.hasta=this.value;S.rep.manual=false;pintarReporte()"></label>
+    ${camps.length?camps.map(k=>`<div class="full rep-camp"><div class="rep-camp-h"><b>${esc(k.nombre||k.objetivo)}</b><span class="pill">${esc(k.objetivo)}</span></div>
+      <div class="rep-mets">${(MET_ADS[k.objetivo]||[]).map(([m,l])=>`<label class="f">${l}<input type="number" min="0" inputmode="numeric" value="${esc(r.vals[k.id][m]??"")}" oninput="repVal('${k.id}','${m}',this.value)"></label>`).join("")}
+      <label class="f">Inversión por día<input type="number" min="0" step="500" inputmode="numeric" value="${esc(r.vals[k.id].inv??"")}" oninput="repVal('${k.id}','inv',this.value)"></label></div></div>`).join("")
+      :`<div class="full s">No hay campañas en ese período.</div>`}
+    <label class="f full" for="rMsg">Mensaje <span class="s" id="rMsgNota">${r.manual?"(editado a mano · <a href='#' onclick='S.rep.manual=false;refreshRepMsg();return false'>volver a armar</a>)":"(se arma solo; podés editarlo)"}</span><textarea id="rMsg" style="min-height:240px;font-family:inherit" oninput="S.rep.manual=true;S.rep.texto=this.value">${esc(r.manual?r.texto:armarMsg())}</textarea></label>
+    <div class="actions full"><div><button type="button" class="btn" onclick="copiarReporte()">${icon("copy")}Copiar</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" onclick="guardarReporte(false)">Guardar</button><button type="button" class="btn wa" onclick="guardarReporte(true)">${icon("wa")}Enviar por WhatsApp</button></div></div>
+  </div>`);
+}
+function repVal(kid,m,val){ S.rep.vals[kid]=S.rep.vals[kid]||{}; S.rep.vals[kid][m]= val===""?"":Number(val); if(!S.rep.manual) refreshRepMsg(); }
+function refreshRepMsg(){ const t=document.getElementById("rMsg"); if(t) t.value=armarMsg(); const n=document.getElementById("rMsgNota"); if(n) n.textContent="(se arma solo; podés editarlo)"; }
+function armarMsg(){
+  const r=S.rep, camps=campsEnPeriodo(r.cid,r.desde,r.hasta);
+  const plats=[...new Set(camps.map(k=>k.plataforma))];
+  const tit = plats.length===1 ? (plats[0]==="Google"?"REPORTE GOOGLE ADS":"REPORTE META ADS") : "REPORTE ADS";
+  const dias=Math.max(1,diasEntre(r.desde,r.hasta));
+  const tot={}; let inv=0;
+  camps.forEach(k=>{ const vv=r.vals[k.id]||{}; (MET_ADS[k.objetivo]||[]).forEach(([m])=>{ if(vv[m]!==""&&vv[m]!=null) tot[m]=(tot[m]||0)+Number(vv[m]); }); inv+=Number(vv.inv)||0; });
+  const orden=["prospectos","ventas","seguidores","visitas","alcance","resultado"];
+  const lineas=[`${dias} DÍA${dias===1?"":"S"}`, ...orden.filter(m=>tot[m]!=null).map(m=>`${Number(tot[m]).toLocaleString("es-AR")} ${MET_TXT[m]}`)];
+  if(inv) lineas.push(`${pesos(inv)} INVERSIÓN X DÍA`);
+  const textos=[...new Set(camps.map(k=>(k.texto_objetivo||"").trim()).filter(Boolean))];
+  return `${tit} | Adjunto reporte parcial de cómo van las campañas en el período desde ${fmtLargo(r.desde)} - ${fmtLargo(r.hasta)}.\n\n${lineas.join("\n")}${textos.length?"\n\n"+textos.map(x=>"*"+x).join("\n\n"):""}`;
+}
+function textoReporte(){ const t=document.getElementById("rMsg"); return t?t.value:armarMsg(); }
+async function copiarReporte(){ try{ await navigator.clipboard.writeText(textoReporte()); toast("Mensaje copiado"); }catch(_){ toast("No se pudo copiar"); } }
+async function guardarReporte(enviar){
+  const r=S.rep, c=cli(r.cid), msg=textoReporte();
+  if(r.hasta<r.desde){ toast("Revisá las fechas"); return; }
+  let w=null; if(enviar){ const n=waNumber(c?.whatsapp||""); w=window.open(`https://wa.me/${n}?text=${encodeURIComponent(msg)}`,"_blank"); }
+  const { data, error } = await sb.from("ads_reportes").insert({cliente_id:r.cid,desde:r.desde,hasta:r.hasta,datos:r.vals,mensaje:msg,enviado_el:enviar?new Date().toISOString():null,creado_por:S.me.id}).select().single();
+  if(error){ toast("No se pudo guardar el reporte: "+error.message); return; }
+  applyChange("ads_reportes",{eventType:"INSERT",new:data});
+  closeModal(); toast(enviar?(waNumber(c?.whatsapp||"")?"Reporte guardado · se abrió WhatsApp":"Reporte guardado · elegí el chat en WhatsApp"):"Reporte guardado");
+}
+function verReporte(id){
+  const r=S.ads_reportes.find(x=>x.id===id); if(!r) return; const c=cli(r.cliente_id);
+  openModal(`<h2>Reporte ${fmtDate(r.desde)} – ${fmtDate(r.hasta)}</h2><p class="s" style="margin:-8px 0 14px">${esc(c?.nombre||"")} · ${r.enviado_el?"enviado "+fmtDate(String(r.enviado_el).slice(0,10)):"guardado sin enviar"}</p>
+    <div class="form"><label class="f full" for="rVer">Mensaje<textarea id="rVer" readonly style="min-height:240px">${esc(r.mensaje||"")}</textarea></label>
+    <div class="actions full"><div><button type="button" class="btn danger" onclick="askDel('ads_reportes','${r.id}','este reporte')">Borrar</button></div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="navigator.clipboard.writeText(document.getElementById('rVer').value).then(()=>toast('Mensaje copiado'))">${icon("copy")}Copiar</button><button type="button" class="btn" onclick="closeModal()">Cerrar</button></div></div></div>`);
+}
