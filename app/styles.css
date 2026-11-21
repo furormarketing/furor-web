@@ -840,3 +840,12 @@ table.rtable input.inl[type=date]{width:140px}
   .camp > .btn{grid-column:2;grid-row:1;align-self:start}
   .camp-inv{grid-column:1;align-items:flex-start;flex-direction:row;gap:6px;align-items:baseline}
 }
+/* Material por servicio */
+.serv-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.serv-tabs button{display:flex;align-items:center;gap:8px;font:inherit;font-size:14px;font-weight:700;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer;box-shadow:var(--shadow);text-align:left}
+.serv-tabs button span{flex:1;min-width:0}
+.serv-tabs button b{font-size:12px;background:var(--surface-2);border-radius:6px;padding:1px 7px;color:var(--ink)}
+.serv-tabs button .ico{width:18px;height:18px;color:var(--brand)}
+.serv-tabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.serv-tabs button.on .ico{color:#fff} .serv-tabs button.on b{background:rgba(255,255,255,.22);color:#fff}
+@media (max-width:900px){ .serv-tabs{grid-template-columns:repeat(2,minmax(0,1fr))} .serv-tabs button:first-child{grid-column:1/-1} }
