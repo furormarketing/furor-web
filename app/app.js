@@ -348,7 +348,7 @@ function render(){
   hidratarImagenes();
 }
 function navBadges(){
-  return { chat:unreadTotal(), tareas:overdue(openTasks().filter(t=>t.asignado===S.me.id)).length, contenido:pendingToday(S.me.rol==="cm").length, prospectos:prospAtrasados(true).length, publicados:(S.me.rol==="admin"?S.publicados.filter(p=>!p.enviado).length:0) };
+  return { chat:unreadTotal(), tareas:overdue(openTasks().filter(t=>t.asignado===S.me.id)).length, contenido:pendingToday(S.me.rol==="cm").length, prospectos:0, publicados:(S.me.rol==="admin"?S.publicados.filter(p=>!p.enviado).length:0) };
 }
 function renderNav(){
   const b=navBadges(); let html="", grp="";
@@ -436,7 +436,7 @@ function vInicio(){
   const pend=pendingToday(S.me.rol==="cm"), lateW=lateThisWeek();
   const ped=openPedidos(), paraRevisar=S.entregas.filter(e=>e.estado==="Para revisar");
   const venc=overdue(S.me.rol==="admin"?openTasks():mineAll);
-  const pAtr=prospAtrasados(S.me.rol!=="admin"), pHoy=S.prospectos.filter(p=>p.proximo===t&&!["Ganado","Perdido"].includes(p.etapa)&&(S.me.rol==="admin"||p.setter===S.me.id));
+  const pAtr=prospAtrasados(S.me.rol!=="admin"), pHoy=[];
   const enf=cfg("enfoque")||{}; const objs=Array.isArray(enf.objetivos)?enf.objetivos:[];
   const first=(S.me.nombre||"").split(" ")[0];
 
@@ -444,13 +444,11 @@ function vInicio(){
     [ferHoy.length?"Hoy":0,"bad","cal","Feriado"+(ferHoy.some(f=>f.titulo&&f.titulo!=="Feriado")?": "+ferHoy.map(f=>f.titulo+(f.sede?" ("+f.sede+")":"")).join(" · "):""),"#agenda"],
     [lateW,"bad","alert","Publicaciones atrasadas esta semana","#contenido"],
     [venc.length,"bad","clock",S.me.rol==="admin"?"Tareas vencidas del equipo":"Tareas tuyas vencidas","#tareas"],
-    [pAtr.length,"bad","target","Prospectos con seguimiento atrasado","#prospectos"],
     [ped.length,"warn","chat","Pedidos sin resolver","#chat"],
     [paraRevisar.length,"warn","eye","Piezas esperando revisión","#clientes"],
     [isAdmin()?S.publicados.filter(p=>!p.enviado).length:0,"warn","send","Links publicados sin enviar al cliente","#publicados"],
     [pend.length,"info","grid","Publicaciones para hoy","#contenido"],
-    [evHoy.length,"info","cal","Reuniones, llamadas y visitas hoy","#agenda"],
-    [pHoy.length,"info","phone","Prospectos para contactar hoy","#prospectos"]
+    [evHoy.length,"info","cal","Reuniones, llamadas y visitas hoy","#agenda"]
   ].filter(a=>a[0]);
 
   return `
@@ -477,8 +475,7 @@ function vInicio(){
         <div class="list">${evs.length?evs.map(evRow).join(""):emptyMsg("Nada agendado por ahora.","cal")}</div></section>
       <section class="card">${cardH(`Publicar hoy <span class="count">${pend.length}</span>`, `<a href="#contenido">Calendario →</a>`)}
         <div class="list">${pend.length?pend.slice(0,10).map(({c,f})=>`<div class="row"><div class="main"><div class="t">${esc(c.nombre)}</div><div class="s">${esc(f)}${c.instagram?" · "+esc(c.instagram):""}</div></div><button class="btn sm pri" onclick="togglePub('${c.id}','${t}','${f}')">${icon("ok")}Publicado</button></div>`).join(""):emptyMsg(pautaClients().length?"Todo publicado por hoy.":"Cargá la pauta de cada cliente para ver acá lo que toca subir.","grid")}</div></section>
-      ${(S.me.rol==="setter"||isAdmin())?`<section class="card">${cardH(`Prospectos a contactar <span class="count">${pAtr.length+pHoy.length}</span>`, `<a href="#prospectos">Prospectos →</a>`)}
-        <div class="list">${[...pAtr,...pHoy].slice(0,8).map(prospRow).join("")||emptyMsg("No hay seguimientos pendientes.","target")}</div></section>`:""}
+
     </div>
     <div class="grid">
       <section class="card">${cardH(`Mis tareas <span class="count">${mine.length}</span>`, `<a href="#tareas">Tablero →</a>`)}
@@ -1165,13 +1162,12 @@ async function saveMiembro(e,id){
 const activeProsp = p => !["Ganado","Perdido"].includes(p.etapa);
 function prospAtrasados(onlyMine){
   const t=today();
-  return S.prospectos.filter(p=>activeProsp(p) && p.proximo && p.proximo<t && (!onlyMine || p.setter===S.me?.id));
+  return []; // sin alertas de seguimiento en prospectos
 }
 function prospRow(p){
   const late=p.proximo&&p.proximo<today();
   return `<div class="row"><div class="main"><div class="t" style="cursor:pointer" onclick="formProspecto('${p.id}')">${esc(p.nombre)}${p.negocio?" · "+esc(p.negocio):""}</div>
     <div class="s">${esc([p.etapa, p.sede, p.setter?memName(p.setter):""].filter(Boolean).join(" · "))}</div></div>
-    ${p.proximo?`<span class="pill ${late?"bad":"warn"}">${late?"Atrasado "+fmtDate(p.proximo):"Hoy"}</span>`:""}
     <button class="btn sm wa" onclick="usarPlantilla(null,'${p.id}')">${icon("wa")}Escribir</button></div>`;
 }
 function vProspectos(){
@@ -1183,12 +1179,12 @@ function vProspectos(){
   const mesDe = p => String(p.creado||p.actualizado||"").slice(0,7);
   const meses=[...new Set(S.prospectos.map(mesDe).filter(Boolean))].sort().reverse();
   if(S.f.pMes) list=list.filter(p=>mesDe(p)===S.f.pMes);
-  const act=list.filter(activeProsp), atr=act.filter(p=>p.proximo&&p.proximo<t), hoy=act.filter(p=>p.proximo===t);
+  const act=list.filter(activeProsp), cargMes=list.filter(p=>String(p.creado||p.actualizado||"").slice(0,7)===t.slice(0,7)).length;
   const mes=t.slice(0,7), ganMes=list.filter(p=>p.etapa==="Ganado"&&String(p.actualizado).slice(0,7)===mes).length;
   const cerrados=list.filter(p=>!activeProsp(p)).length, ganTot=list.filter(p=>p.etapa==="Ganado").length;
   const et=S.f.pEt||"";
   let rows = et==="" ? act : et==="todos" ? list : list.filter(p=>p.etapa===et);
-  rows = rows.sort((a,b)=> activeProsp(a)&&activeProsp(b) ? String(a.proximo||"9999").localeCompare(String(b.proximo||"9999")) : String(b.actualizado||b.creado).localeCompare(String(a.actualizado||a.creado)));
+  rows = rows.sort((a,b)=> String(b.creado||"").localeCompare(String(a.creado||"")));
   const cells=`<div class="etcells">
     <button class="${et===""?"on":""}" style="--c:var(--brand)" onclick="S.f.pEt='';render()">En seguimiento<b>${act.length}</b></button>
     ${ETAPAS.map(e=>`<button class="${et===e?"on":""}" style="--c:${ETAPA_C[e]}" onclick="S.f.pEt='${e}';render()"><span class="dot"></span>${ETAPA_CORTA[e]}<b>${list.filter(p=>p.etapa===e).length}</b></button>`).join("")}
@@ -1200,18 +1196,17 @@ function vProspectos(){
   const body = rows.length ? grupos : `<div class="card">${emptyMsg(et===""?"No hay prospectos en seguimiento. Cargá el primero con “Nuevo prospecto”.":"No hay prospectos en esta etapa.","target")}</div>`;
   if(S.mobile){
     return `<div class="m-head"><div><div class="eyebrow">Ventas</div><h1>Prospectos</h1></div><a class="btn sm" href="#plantillas">${icon("message")}Plantillas</a></div>
-    <div class="m-kpis"><div><b>${act.length}</b><span>En seguimiento</span></div><div class="${hoy.length?"warn":""}"><b>${hoy.length}</b><span>Hoy</span></div><div class="${atr.length?"bad":""}"><b>${atr.length}</b><span>Atrasados</span></div><div class="ok"><b>${ganMes}</b><span>Clientes nuevos</span></div></div>
+    <div class="m-kpis"><div><b>${act.length}</b><span>En seguimiento</span></div><div><b>${cargMes}</b><span>Cargados este mes</span></div><div class="ok"><b>${ganMes}</b><span>Clientes nuevos</span></div></div>
     <div class="m-filters"><div class="seg"><button class="${S.f.pScope==="todos"?"on":""}" onclick="S.f.pScope='todos';render()">Todos</button><button class="${S.f.pScope==="mios"?"on":""}" onclick="S.f.pScope='mios';render()">Míos</button></div>
       <select id="pSedeM" aria-label="Sede" onchange="S.f.pSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.slice(0,3).map(x=>`<option ${S.f.pSede===x?"selected":""}>${x}</option>`).join("")}</select></div>
     <div style="margin-bottom:8px">${mesSel}</div>
     <input type="search" id="pQ" placeholder="Buscar por nombre, negocio o número…" value="${esc(S.f.pQ)}" oninput="S.f.pQ=this.value;render()" style="margin-bottom:10px">
     ${cells}${body}`;
   }
-  return `${pageHead("Ventas","Prospectos","Nombre, negocio y número a la vista. Tocá la etapa para moverlo; lo atrasado se marca en rojo.",`<a class="btn" href="#plantillas">${icon("message")}Plantillas</a><button class="btn pri" onclick="formProspecto()">${icon("plus")}Nuevo prospecto</button>`)}
+  return `${pageHead("Ventas","Prospectos","Los datos que ingresan de cada sede y en qué etapa está cada uno. Tocá la etapa para moverlo.",`<a class="btn" href="#plantillas">${icon("message")}Plantillas</a><button class="btn pri" onclick="formProspecto()">${icon("plus")}Nuevo prospecto</button>`)}
   <div class="kpis pk" style="margin-bottom:14px">
     <div class="kpi"><div class="v">${act.length}</div><div class="l">En seguimiento</div></div>
-    <div class="kpi"><div class="v" style="color:var(--warn)">${hoy.length}</div><div class="l">Para contactar hoy</div></div>
-    <div class="kpi"><div class="v" style="color:${atr.length?"var(--danger)":"inherit"}">${atr.length}</div><div class="l">Seguimiento atrasado</div></div>
+    <div class="kpi"><div class="v">${cargMes}</div><div class="l">Cargados este mes</div></div>
     <div class="kpi"><div class="v" style="color:var(--ok)">${ganMes}</div><div class="l">Clientes nuevos este mes</div></div>
     <div class="kpi"><div class="v">${cerrados?Math.round(ganTot/cerrados*100)+"%":"—"}</div><div class="l">Tasa de cierre</div></div>
   </div>
@@ -1225,9 +1220,9 @@ function vProspectos(){
 }
 const ETAPA_CORTA = {"Contactado":"Contactado","Honorarios enviados":"Honorarios","Llamada":"Llamada","Reunión":"Reunión","Ganado":"Cliente nuevo","Perdido":"Perdido"};
 function pRow(p){
-  const t=today(), late=activeProsp(p)&&p.proximo&&p.proximo<t, wa=waNumber(p.whatsapp||""), idx=ETAPAS.indexOf(p.etapa);
+  const wa=waNumber(p.whatsapp||""), idx=ETAPAS.indexOf(p.etapa);
   const steps=ETAPAS.map((e,i)=>`<button type="button" class="${e===p.etapa?"on":""} ${e!=="Perdido"&&i<idx&&p.etapa!=="Perdido"?"done":""} ${e==="Perdido"?"lost":""}" style="--c:${ETAPA_C[e]}" title="${e===p.etapa?"Etapa actual":"Mover a "+e}" onclick="moverEtapa('${p.id}','${e}')">${ETAPA_CORTA[e]}</button>`).join("");
-  return `<div class="prow2 ${late?"late":""}" style="--c:${ETAPA_C[p.etapa]||"var(--line)"}">
+  return `<div class="prow2" style="--c:${ETAPA_C[p.etapa]||"var(--line)"}">
     <div class="pr-main" onclick="formProspecto('${p.id}')" title="Ver / editar">
       <div class="pr-nom">${esc(p.nombre)}</div>
       <div class="pr-neg">${p.negocio?esc(p.negocio):`<span class="nodata">Sin negocio</span>`}${p.rubro?` <span class="s">· ${esc(p.rubro)}</span>`:""}</div>
@@ -1236,7 +1231,7 @@ function pRow(p){
       <a class="btn sm ghost ic" href="tel:+${wa}" title="Llamar" aria-label="Llamar">${icon("phone")}</a>
       <button class="btn sm ghost ic" onclick="usarPlantilla(null,'${p.id}')" title="Mensaje con plantilla" aria-label="Mensaje con plantilla">${icon("message")}</button>`
       :`<span class="nodata">Sin número</span>`}</div>
-    <div class="pr-meta">${activeProsp(p)&&p.proximo?`<span class="pill ${late?"bad":p.proximo===t?"warn":""}">${icon("clock")}${late?"Atrasado · ":p.proximo===t?"Hoy · ":""}${fmtDate(p.proximo)}</span>`:""}
+    <div class="pr-meta">
       <span class="s">${p.sede?`<span class="sede-dot" style="--sc:${sedeColor(p.sede)}"></span>${esc(p.sede)} · `:""}${esc(p.setter?memName(p.setter):"Sin setter")}</span>
       ${p.etapa==="Ganado"&&!p.cliente_id?`<button class="btn sm pri" onclick="pasarACliente('${p.id}')">Pasar a cliente</button>`:""}</div>
     <div class="pr-steps">${steps}</div>
@@ -1265,7 +1260,7 @@ async function moverEtapa(id, etapa){
   if(!await run(sb.from("prospectos").update(data).eq("id",id), etapa==="Ganado"?"¡Cliente nuevo!":"Movido a "+etapaL(etapa))){ Object.assign(p,prev); render(); }
 }
 function formProspecto(id){
-  const p=id?S.prospectos.find(x=>x.id===id)||{}:{etapa:"Contactado",setter:S.me.id,sede:S.me.sede||"",proximo:today()};
+  const p=id?S.prospectos.find(x=>x.id===id)||{}:{etapa:"Contactado",setter:S.me.id,sede:S.me.sede||""};
   openModal(`<h2>${id?esc(p.nombre):"Nuevo prospecto"}</h2><form class="form" onsubmit="saveProspecto(event,'${id||""}')">
     <label class="f" for="pNom">Nombre del contacto<input type="text" id="pNom" required value="${esc(p.nombre)}"></label>
     <label class="f" for="pNeg">Negocio<input type="text" id="pNeg" value="${esc(p.negocio)}"></label>
@@ -1275,7 +1270,6 @@ function formProspecto(id){
     <label class="f" for="pOri">Origen<select id="pOri"><option value="">—</option>${opts(ORIGENES,p.origen)}</select></label>
     <div class="sep">Seguimiento</div>
     <label class="f" for="pEt">Etapa<select id="pEt">${ETAPAS.map(e=>`<option value="${e}" ${p.etapa===e?"selected":""}>${esc(etapaL(e))}</option>`).join("")}</select></label>
-    <label class="f" for="pProx">Próximo contacto<input type="date" id="pProx" value="${esc(p.proximo)}"></label>
     <label class="f" for="pSede">Sede<select id="pSede"><option value="">—</option>${opts(SEDES,p.sede)}</select></label>
     <label class="f" for="pSet">Setter<select id="pSet">${memOptions(p.setter)}</select></label>
     <label class="f" for="pPlan">Plan de interés<select id="pPlan"><option value="">—</option>${opts(PLANES,p.plan)}</select></label>
@@ -1287,7 +1281,7 @@ function formProspecto(id){
 async function saveProspecto(e,id){
   e.preventDefault();
   const etapa=v("pEt");
-  const data={nombre:v("pNom"),negocio:v("pNeg"),rubro:v("pRub"),whatsapp:v("pWa"),instagram:v("pIg"),origen:v("pOri"),etapa,proximo:activeProsp({etapa})?nz(v("pProx")):null,sede:v("pSede"),setter:nz(v("pSet")),plan:v("pPlan"),motivo_perdida:v("pMot"),notas:v("pNot"),actualizado:new Date().toISOString()};
+  const data={nombre:v("pNom"),negocio:v("pNeg"),rubro:v("pRub"),whatsapp:v("pWa"),instagram:v("pIg"),origen:v("pOri"),etapa,sede:v("pSede"),setter:nz(v("pSet")),plan:v("pPlan"),motivo_perdida:v("pMot"),notas:v("pNot"),actualizado:new Date().toISOString()};
   const ok = id ? await run(sb.from("prospectos").update(data).eq("id",id),"Prospecto actualizado") : await run(sb.from("prospectos").insert(data),"Prospecto cargado");
   if(ok) closeModal();
 }
@@ -1333,7 +1327,7 @@ function usarPlantilla(tplId, prospId){
       <label class="f" for="uSede">Sede<input type="text" id="uSede" value="${esc(p?.sede||S.me.sede||"")}" oninput="refreshUso()"></label>
       <label class="f" for="uWa">WhatsApp<input type="tel" id="uWa" value="${esc(p?.whatsapp||"")}" oninput="refreshUso()"></label>
       <label class="f full" for="uTxt">Mensaje (lo podés retocar)<textarea id="uTxt" style="min-height:190px" oninput="refreshUso()"></textarea></label>
-      <div class="full" id="uReg">${prospId?`<label class="check"><input type="checkbox" id="uLog" checked><span>Registrar el contacto y programar el próximo seguimiento en <select id="uDias" style="width:auto;display:inline-block;padding:3px 6px"><option value="1">1 día</option><option value="2" selected>2 días</option><option value="3">3 días</option><option value="7">1 semana</option></select></span></label>`:""}</div>
+      <div class="full" id="uReg">${prospId?`<label class="check"><input type="checkbox" id="uLog" checked><span>Registrar el contacto en el prospecto</span></label>`:""}</div>
       <div class="actions"><button type="button" class="btn" onclick="closeModal()">Cerrar</button><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="enviarUso('copiar')">${icon("copy")}Copiar</button><a class="btn wa" id="uWaBtn" href="#" target="_blank" rel="noopener" onclick="enviarUso('wa')">${icon("wa")}Abrir WhatsApp</a></div></div>
     </div>`);
   refreshUso();
@@ -1341,7 +1335,7 @@ function usarPlantilla(tplId, prospId){
 function fillUsoFromProsp(){
   const p=S.prospectos.find(x=>x.id===S.uso.prosp);
   $("#uNom").value=p?.nombre?.split(" ")[0]||""; $("#uNeg").value=p?.negocio||"tu negocio"; $("#uSede").value=p?.sede||S.me.sede||""; $("#uWa").value=p?.whatsapp||"";
-  $("#uReg").innerHTML=p?`<label class="check"><input type="checkbox" id="uLog" checked><span>Registrar el contacto y programar el próximo seguimiento en <select id="uDias" style="width:auto;display:inline-block;padding:3px 6px"><option value="1">1 día</option><option value="2" selected>2 días</option><option value="3">3 días</option><option value="7">1 semana</option></select></span></label>`:"";
+  $("#uReg").innerHTML=p?`<label class="check"><input type="checkbox" id="uLog" checked><span>Registrar el contacto en el prospecto</span></label>`:"";
 }
 function waNumber(raw){
   let d=String(raw||"").replace(/\D/g,"");
@@ -1367,7 +1361,7 @@ async function enviarUso(modo){
   const log=$("#uLog");
   if(log&&log.checked&&S.uso.prosp){
     const p=S.prospectos.find(x=>x.id===S.uso.prosp); if(!p) return;
-    const data={contactos:(p.contactos||0)+1,ultimo_contacto:new Date().toISOString(),proximo:addDays(today(),Number($("#uDias").value||2)),actualizado:new Date().toISOString()};
+    const data={contactos:(p.contactos||0)+1,ultimo_contacto:new Date().toISOString(),actualizado:new Date().toISOString()};
     if(p.etapa==="Nuevo") data.etapa="Contactado";
     await run(sb.from("prospectos").update(data).eq("id",p.id),"Contacto registrado");
     log.checked=false;
