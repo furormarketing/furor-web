@@ -323,7 +323,7 @@ async function cobrar(cid, cobroId, monto){
   const c=cuenta(cid); if(!c) return;
   await run(sb.from("fin_cobros").insert({cuenta_id:c.id,titular:c.titular,fecha:today().slice(0,7)===D.mes?today():`${D.mes}-${pad(Math.min(c.dia_cobro||1,28))}`,monto,estado:"Pagado"}),"Cobro registrado");
 }
-function inlMonto(t,id,campo,val){ return `<label class="inl-m"><span>$</span><input class="inl num" type="number" min="0" step="1000" inputmode="numeric" value="${Number(val)||0}" onchange="DIR.campo('${t}','${id}','${campo}',Number(this.value)||0)" onfocus="this.select()"></label>`; }
+function inlMonto(t,id,campo,val){ return `<label class="inl-m"><span>$</span><input class="inl num" ${MONTO_IN} value="${montoVal(Number(val)||0)}" onchange="DIR.campo('${t}','${id}','${campo}',parseMonto(this.value))"></label>`; }
 function segEstado(id,estado,late){
   const ops=[["Pagado","ok","Pagado"],["Parcial","info","Parcial"],["Pendiente",late?"bad":"warn",late?"Vencido":"Pendiente"]];
   return `<div class="estsel">${ops.map(([v,cl,l])=>`<button type="button" class="${cl} ${estado===v?"on":""}" onclick="DIR.campo('fin_cobros','${id}','estado','${v}')">${l}</button>`).join("")}</div>`;
@@ -361,19 +361,19 @@ function formCobro(id){
   const c=id?D.fin_cobros.find(x=>x.id===id)||{}:{fecha:today().slice(0,7)===D.mes?today():D.mes+"-01",estado:"Pagado"};
   const act=D.fin_cuentas.filter(x=>x.activo||x.id===c.cuenta_id);
   openModal(`<h2>${id?"Editar cobro":"Registrar cobro"}</h2><form class="form" onsubmit="DIR.saveCobro(event,'${id||""}')">
-    <label class="f full" for="cbC">Cliente<select id="cbC" required onchange="const k=DIR._c(this.value); if(k&&!$('#cbM').value) $('#cbM').value=k">${act.map(x=>`<option value="${x.id}" ${x.id===c.cuenta_id?"selected":""}>${esc(x.negocio)} · ${esc(x.titular||"")}</option>`).join("")}</select></label>
+    <label class="f full" for="cbC">Cliente<select id="cbC" required onchange="const k=DIR._c(this.value); if(k&&!$('#cbM').value) $('#cbM').value=montoVal(k)">${act.map(x=>`<option value="${x.id}" ${x.id===c.cuenta_id?"selected":""}>${esc(x.negocio)} · ${esc(x.titular||"")}</option>`).join("")}</select></label>
     <label class="f" for="cbF">Fecha<input type="date" id="cbF" required value="${esc(c.fecha)}"></label>
-    <label class="f" for="cbM">Monto<input type="number" id="cbM" required min="0" step="1" value="${c.monto!=null?Number(c.monto):""}"></label>
+    <label class="f" for="cbM">Monto<input ${MONTO_IN} id="cbM" required value="${c.monto!=null?montoVal(c.monto):""}"></label>
     <label class="f" for="cbE">Estado<select id="cbE">${opts(["Pagado","Parcial","Pendiente"],c.estado)}</select></label>
     <label class="f" for="cbMd">Medio de pago<select id="cbMd"><option value="">—</option>${opts(["Transferencia","Efectivo","Mercado Pago","Otro"],c.medio)}</select></label>
     <label class="f full" for="cbO">Observaciones<input type="text" id="cbO" value="${esc(c.obs)}" placeholder="Ej: resta abonar $100.000"></label>
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="DIR.borrar('fin_cobros','${id}')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
-  if(!id){ const k=ultimoMonto($("#cbC").value)??cuenta($("#cbC").value)?.pack; if(k) $("#cbM").value=Number(k); }
+  if(!id){ const k=ultimoMonto($("#cbC").value)??cuenta($("#cbC").value)?.pack; if(k) $("#cbM").value=montoVal(k); }
 }
 async function saveCobro(e,id){
   e.preventDefault();
   const cu=cuenta(v("cbC"));
-  const data={cuenta_id:v("cbC"),titular:cu?.titular||"",fecha:v("cbF"),monto:Number(v("cbM")),estado:v("cbE"),medio:v("cbMd"),obs:v("cbO")};
+  const data={cuenta_id:v("cbC"),titular:cu?.titular||"",fecha:v("cbF"),monto:parseMonto(v("cbM")),estado:v("cbE"),medio:v("cbMd"),obs:v("cbO")};
   const ok= id? await run(sb.from("fin_cobros").update(data).eq("id",id),"Cobro actualizado") : await run(sb.from("fin_cobros").insert(data),"Cobro registrado");
   if(ok) closeModal();
 }
@@ -382,7 +382,7 @@ function formCuenta(id){
   openModal(`<h2>${id?"Editar cliente":"Nuevo cliente"}</h2><form class="form" onsubmit="DIR.saveCuenta(event,'${id||""}')">
     <label class="f" for="cuN">Negocio<input type="text" id="cuN" required value="${esc(c.negocio)}"></label>
     <label class="f" for="cuT">Titular<input type="text" id="cuT" value="${esc(c.titular)}"></label>
-    <label class="f" for="cuP">Pack mensual<input type="number" id="cuP" min="0" step="1" required value="${c.pack!=null?Number(c.pack):""}"></label>
+    <label class="f" for="cuP">Pack mensual<input ${MONTO_IN} id="cuP" required value="${c.pack!=null?montoVal(c.pack):""}"></label>
     <label class="f" for="cuD">Día de cobro<input type="number" id="cuD" min="1" max="31" value="${esc(c.dia_cobro)}"></label>
     <label class="f" for="cuA">Fecha de alta<input type="date" id="cuA" value="${esc(c.alta)}"></label>
     <label class="f" for="cuS">Sede<select id="cuS"><option value="">—</option>${opts(SEDES,c.sede)}</select></label>
@@ -394,7 +394,7 @@ function formCuenta(id){
 }
 async function saveCuenta(e,id){
   e.preventDefault();
-  const data={negocio:v("cuN"),titular:v("cuT"),pack:Number(v("cuP")),dia_cobro:v("cuD")?Number(v("cuD")):null,alta:nz(v("cuA")),sede:v("cuS"),notas:v("cuNo"),activo:$("#cuAc").checked,cobro_con:nz(v("cuCon"))};
+  const data={negocio:v("cuN"),titular:v("cuT"),pack:parseMonto(v("cuP")),dia_cobro:v("cuD")?Number(v("cuD")):null,alta:nz(v("cuA")),sede:v("cuS"),notas:v("cuNo"),activo:$("#cuAc").checked,cobro_con:nz(v("cuCon"))};
   if(id){ if(await run(sb.from("fin_cuentas").update(data).eq("id",id),"Cliente actualizado")) closeModal(); return; }
   if($("#cuEq")?.checked){
     const { data:cl } = await sb.from("clientes").insert({nombre:data.negocio,contacto:data.titular,sede:data.sede,estado:"Onboarding",inicio:data.alta}).select().single();
@@ -409,14 +409,14 @@ function formGasto(id){
     <label class="f" for="gaC">Categoría<select id="gaC">${opts(CAT_G,g.categoria)}</select></label>
     <label class="f" for="gaK">Concepto<input type="text" id="gaK" list="gaL" required value="${esc(g.concepto)}"><datalist id="gaL">${conceptos.map(c=>`<option value="${esc(c)}">`).join("")}</datalist></label>
     <label class="f" for="gaF">Fecha<input type="date" id="gaF" required value="${esc(g.fecha)}"></label>
-    <label class="f" for="gaM">Monto<input type="number" id="gaM" min="0" step="0.01" required value="${g.monto!=null?Number(g.monto):""}"></label>
+    <label class="f" for="gaM">Monto<input ${MONTO_IN} id="gaM" required value="${g.monto!=null?montoVal(g.monto):""}"></label>
     <label class="f" for="gaS">Sede<select id="gaS"><option value="">General</option>${opts(SEDES,g.sede)}</select></label>
     <label class="f" for="gaMd">Medio de pago<select id="gaMd"><option value="">—</option>${opts(["Transferencia","Efectivo","Tarjeta","Mercado Pago","Otro"],g.medio)}</select></label>
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="DIR.borrar('fin_gastos','${id}')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
 }
 async function saveGasto(e,id){
   e.preventDefault();
-  const data={categoria:v("gaC"),concepto:v("gaK"),fecha:v("gaF"),monto:Number(v("gaM")),sede:v("gaS"),medio:v("gaMd")};
+  const data={categoria:v("gaC"),concepto:v("gaK"),fecha:v("gaF"),monto:parseMonto(v("gaM")),sede:v("gaS"),medio:v("gaMd")};
   const ok= id? await run(sb.from("fin_gastos").update(data).eq("id",id),"Gasto actualizado") : await run(sb.from("fin_gastos").insert(data),"Gasto cargado");
   if(ok) closeModal();
 }
@@ -432,7 +432,7 @@ function formPago(id){
     <label class="f" for="paP">Persona<input type="text" id="paP" list="paL" required value="${esc(p.persona)}"><datalist id="paL">${personas.map(x=>`<option value="${esc(x)}">`).join("")}</datalist></label>
     <label class="f" for="paC">Concepto<select id="paC">${opts(CONC_E,p.concepto)}</select></label>
     <label class="f" for="paF">Fecha<input type="date" id="paF" required value="${esc(p.fecha)}"></label>
-    <label class="f" for="paM">Monto<input type="number" id="paM" min="0" step="1" required value="${p.monto!=null?Number(p.monto):""}"></label>
+    <label class="f" for="paM">Monto<input ${MONTO_IN} id="paM" required value="${p.monto!=null?montoVal(p.monto):""}"></label>
     <label class="f full" for="paN">Notas<input type="text" id="paN" value="${esc(p.notas)}"></label>
     <label class="check full"><input type="checkbox" id="paOk" ${p.pagado?"checked":""}><span>Ya está pagado</span></label>
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="DIR.borrar('fin_equipo','${id}')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
@@ -440,7 +440,7 @@ function formPago(id){
 async function savePago(e,id){
   e.preventDefault();
   const persona=v("paP"), mb=S.miembros.find(m=>(m.nombre||m.email)===persona);
-  const data={persona,miembro_id:mb?mb.id:null,concepto:v("paC"),fecha:v("paF"),monto:Number(v("paM")),notas:v("paN"),pagado:$("#paOk").checked};
+  const data={persona,miembro_id:mb?mb.id:null,concepto:v("paC"),fecha:v("paF"),monto:parseMonto(v("paM")),notas:v("paN"),pagado:$("#paOk").checked};
   const ok= id? await run(sb.from("fin_equipo").update(data).eq("id",id),"Pago actualizado") : await run(sb.from("fin_equipo").insert(data),"Pago cargado");
   if(ok) closeModal();
 }
@@ -451,7 +451,7 @@ async function copiarEquipo(){
 }
 function formCampana(id){
   const c=id?D.fin_campanas.find(x=>x.id===id)||{}:{mes:D.mes+"-01",sede:"Tucumán"};
-  const f=(k,l)=>`<label class="f" for="ca_${k}">${l}<input type="number" id="ca_${k}" min="0" step="any" value="${c[k]!=null?Number(c[k]):""}"></label>`;
+  const f=(k,l)=>`<label class="f" for="ca_${k}">${l}<input ${MONTO_IN} id="ca_${k}" value="${c[k]!=null?montoVal(c[k]):""}"></label>`;
   openModal(`<h2>${id?"Editar campaña":"Cargar campaña del mes"}</h2><form class="form" onsubmit="DIR.saveCampana(event,'${id||""}')">
     <label class="f" for="caM">Mes<input type="month" id="caM" required value="${esc(String(c.mes).slice(0,7))}"></label>
     <label class="f" for="caS">Sede<select id="caS">${opts(SEDES.slice(0,3),c.sede)}</select></label>
@@ -461,7 +461,7 @@ function formCampana(id){
 }
 async function saveCampana(e,id){
   e.preventDefault();
-  const g=k=>{ const x=v("ca_"+k); return x===""?null:Number(x); };
+  const g=k=>{ const x=v("ca_"+k); return x===""?null:parseMonto(x); };
   const data={mes:v("caM")+"-01",sede:v("caS"),prospectos:g("prospectos"),llamadas:g("llamadas"),pdf:g("pdf"),no_interesados:g("no_interesados"),clientes_nuevos:g("clientes_nuevos"),pendientes:g("pendientes"),inversion:g("inversion"),ingresos:g("ingresos"),dias:g("dias")};
   const ok= id? await run(sb.from("fin_campanas").update(data).eq("id",id),"Campaña actualizada") : await run(sb.from("fin_campanas").upsert(data,{onConflict:"mes,sede"}),"Campaña cargada");
   if(ok) closeModal();

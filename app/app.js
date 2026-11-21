@@ -11,7 +11,7 @@ const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY,
 });
 const NAV = [
   ["inicio","Inicio","home","Operación"],["agenda","Agenda","cal","Operación"],["tareas","Tareas","check","Operación"],["chat","Chat","chat","Operación"],
-  ["clientes","Clientes","briefcase","Cuentas"],["contenido","Contenido","grid","Cuentas"],["publicados","Publicados","link","Cuentas"],["ads","Ads clientes","mega","Cuentas"],
+  ["clientes","Clientes","briefcase","Cuentas"],["contenido","Contenido","grid","Cuentas"],["ads","Ads clientes","mega","Cuentas"],
   ["prospectos","Prospectos","target","Ventas"],["plantillas","Plantillas","message","Ventas"],["material","Material","file","Ventas"],
   ["novedades","Novedades","bell","Equipo"],["equipo","Equipo","users","Equipo"],
   ["direccion","Dirección","lock","Privado"]
@@ -267,8 +267,9 @@ async function saveNewPass(e){ e.preventDefault(); if(await run(sb.auth.updateUs
 function route(){
   const h=(location.hash||"").replace(/^#/,"");
   if(h.startsWith("cliente-")){ S.view="clientes"; S.cliId=h.slice(8); }
+  else if(h==="publicados"){ S.view="contenido"; S.ctTab="pub"; S.cliId=null; S.tareaId=null; }
   else if(h.startsWith("tarea-")){ S.view="tareas"; S.tareaId=h.slice(6); S.cliId=null; }
-  else { S.view = NAV.some(n=>n[0]===h) ? h : "inicio"; S.cliId=null; S.tareaId=null; }
+  else { S.view = NAV.some(n=>n[0]===h) ? h : "inicio"; S.cliId=null; S.tareaId=null; if(h==="contenido") S.ctTab="cal"; }
   if(S.view==="direccion" && S.me && !isAdmin()){ S.view="inicio"; }
   render(); window.scrollTo(0,0);
 }
@@ -337,7 +338,7 @@ function render(){
       <nav class="bottom-nav" id="bnav"></nav><button class="fab" id="fab" hidden></button><div class="more-sheet" id="more" onclick="if(event.target.id==='more'){S.more=false;render()}"></div>`;
   }
   renderNav();
-  const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,publicados:vPublicados,ads:vAds,direccion:vDireccion};
+  const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,ads:vAds,direccion:vDireccion};
   $("#main").innerHTML = views[S.view]();
   document.querySelectorAll("body > .daysheet-bg").forEach(x=>x.remove());
   const ds=$("#main .daysheet-bg"); if(ds) document.body.appendChild(ds);
@@ -350,7 +351,7 @@ function render(){
   hidratarImagenes();
 }
 function navBadges(){
-  return { chat:unreadTotal(), tareas:overdue(openTasks().filter(t=>t.asignado===S.me.id)).length, contenido:pendingToday(S.me.rol==="cm").length, prospectos:0, publicados:(S.me.rol==="admin"?S.publicados.filter(p=>!p.enviado).length:0) };
+  return { chat:unreadTotal(), tareas:overdue(openTasks().filter(t=>t.asignado===S.me.id)).length, contenido:pendingToday(S.me.rol==="cm").length+(isAdmin()?S.publicados.filter(p=>!p.enviado).length:0), prospectos:0, publicados:(S.me.rol==="admin"?S.publicados.filter(p=>!p.enviado).length:0) };
 }
 function renderNav(){
   const b=navBadges(); let html="", grp="";
@@ -574,7 +575,12 @@ function calMove(n){ let {y,m}=S.cal; m+=n; if(m<0){m=11;y--;} if(m>11){m=0;y++;
 function calToday(){ const d=new Date(); S.cal={y:d.getFullYear(),m:d.getMonth()}; S.f.calSel=today(); render(); }
 
 /* ---------- Calendario de contenido ---------- */
-function vContenido(){
+function ctTabs(){
+  const pend=S.publicados.filter(p=>!p.enviado).length;
+  return `<div class="tabs" style="margin-bottom:14px"><button class="${S.ctTab!=="pub"?"on":""}" onclick="S.ctTab='cal';render()">Calendario</button><button class="${S.ctTab==="pub"?"on":""}" onclick="S.ctTab='pub';render()">Links publicados${pend?` <span class="badge">${pend}</span>`:""}</button></div>`;
+}
+function vContenido(){ return S.ctTab==="pub" ? vPublicadosCont() : vCalendarioCont(); }
+function vCalendarioCont(){
   const ws=weekStart(S.weekOff), days=[...Array(7)].map((_,i)=>addDays(ws,i)), t=today();
   let list=pautaClients();
   if(S.f.ctScope==="mias") list=list.filter(c=>c.responsable===S.me.id);
@@ -586,9 +592,9 @@ function vContenido(){
       return `<td class="${d===t?"today":""}">${exp}${ents}</td>`;
     }).join("")}</tr>`).join("");
   return `
-  <div class="head"><div><div class="eyebrow">Cuentas</div><h1>Calendario de contenido</h1><p>Qué se publica en cada cuenta, día por día. Tocá cada casilla para marcarla como publicada.</p></div>
+  <div class="head"><div><div class="eyebrow">Cuentas</div><h1>Contenido</h1><p>Qué se publica en cada cuenta, día por día. Tocá cada casilla para marcarla como publicada.</p></div>
     <div class="acts"><button class="btn" onclick="S.weekOff--;render()" aria-label="Semana anterior">‹</button><h2 style="min-width:170px;text-align:center">${fmtDate(days[0])} – ${fmtDate(days[6])}</h2><button class="btn" onclick="S.weekOff++;render()" aria-label="Semana siguiente">›</button><button class="btn" onclick="S.weekOff=0;render()">Esta semana</button></div></div>
-  <div class="toolbar"><div class="seg"><button class="${S.f.ctScope==="todas"?"on":""}" onclick="S.f.ctScope='todas';render()">Todas las cuentas</button><button class="${S.f.ctScope==="mias"?"on":""}" onclick="S.f.ctScope='mias';render()">Mis cuentas</button></div>
+  ${ctTabs()}<div class="toolbar"><div class="seg"><button class="${S.f.ctScope==="todas"?"on":""}" onclick="S.f.ctScope='todas';render()">Todas las cuentas</button><button class="${S.f.ctScope==="mias"?"on":""}" onclick="S.f.ctScope='mias';render()">Mis cuentas</button></div>
     ${late?`<span class="pill bad">${late} publicaciones atrasadas esta semana</span>`:`<span class="pill ok">Semana al día</span>`}
     <span class="s">Verde: publicado · Rojo: atrasado · Línea punteada: pieza programada</span></div>
   ${list.length?`<div class="week"><table><thead><tr><th>Cuenta</th>${days.map((d,i)=>{ const f=feriadosDe(d); return `<th class="${d===t?"today":""} ${f.length?"ferth":""}">${DIAS[i]} ${parseYmd(d).getDate()}${f.length?`<span class="pill bad" title="${esc(f.map(x=>x.titulo+(x.sede?" ("+x.sede+")":"")).join(" · "))}">Feriado</span>`:""}</th>`; }).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`
@@ -1122,7 +1128,7 @@ function vDireccion(){
   if(window.DIR) return DIR.vista();
   if(!_dirCargando){
     _dirCargando=true;
-    const sc=document.createElement("script"); sc.src="direccion.js?v=10"; sc.onload=()=>render();
+    const sc=document.createElement("script"); sc.src="direccion.js?v=11"; sc.onload=()=>render();
     sc.onerror=()=>{ _dirCargando=false; toast("No se pudo abrir Dirección. Revisá la conexión."); };
     document.body.appendChild(sc);
   }
@@ -1132,7 +1138,7 @@ function vDireccion(){
 /* ---------- Botón flotante (celular) ---------- */
 function renderFab(){
   const f=$("#fab"); if(!f) return;
-  const map={inicio:["Agendar","formEvento()"],agenda:["Agendar","formEvento()"],tareas:S.tareaId?null:["Nueva tarea","formTarea()"],prospectos:["Nuevo prospecto","formProspecto()"],ads:["Nueva campaña","formCampAds()"],clientes:S.cliId?null:["Nuevo cliente","formCliente()"],publicados:["Cargar link","formPublicado()"],material:isAdmin()?["Subir material","formMaterial()"]:null,novedades:null,equipo:isAdmin()?["Sumar integrante","formMiembro()"]:null};
+  const map={inicio:["Agendar","formEvento()"],agenda:["Agendar","formEvento()"],tareas:S.tareaId?null:["Nueva tarea","formTarea()"],prospectos:["Nuevo prospecto","formProspecto()"],ads:["Nueva campaña","formCampAds()"],clientes:S.cliId?null:["Nuevo cliente","formCliente()"],contenido:S.ctTab==="pub"?["Cargar link","formPublicado()"]:null,material:isAdmin()?["Subir material","formMaterial()"]:null,novedades:null,equipo:isAdmin()?["Sumar integrante","formMiembro()"]:null};
   const a=map[S.view];
   document.body.classList.toggle("has-fab",!!a);
   if(!a){ f.hidden=true; return; }
@@ -1478,14 +1484,15 @@ async function saveMaterial(e,id){
 const FMT_PUB = ["Reel","Post","Carrusel","Historia","Video","Otro"];
 const REDES = ["Instagram","Facebook","TikTok","YouTube","Otra"];
 const shortUrl = u => String(u).replace(/^https?:\/\/(www\.)?/,"").replace(/\/$/,"").slice(0,48)+(String(u).length>55?"…":"");
-function vPublicados(){
+function vPublicadosCont(){
   const q=S.f.pubQ.toLowerCase();
   let list=S.publicados.filter(p=>(S.f.pubEst!=="pendientes"||!p.enviado)&&(!S.f.pubCli||p.cliente_id===S.f.pubCli));
   if(q) list=list.filter(p=>[cliName(p.cliente_id),p.url,p.nota,p.formato].join(" ").toLowerCase().includes(q));
   const byCli={}; list.forEach(p=>(byCli[p.cliente_id]=byCli[p.cliente_id]||[]).push(p));
   const ids=Object.keys(byCli).sort((a,b)=>cliName(a).localeCompare(cliName(b)));
   const pend=S.publicados.filter(p=>!p.enviado).length;
-  return `${pageHead("Cuentas","Publicados","La CM carga el link de cada publicación. Después se los mandás al cliente por WhatsApp, todos juntos en un solo mensaje.",`<button class="btn pri" onclick="formPublicado()">${icon("plus")}Cargar link</button>`)}
+  return `${pageHead("Cuentas","Contenido","La CM carga el link de cada publicación. Después se los mandás al cliente por WhatsApp, todos juntos en un solo mensaje.",`<button class="btn pri" onclick="formPublicado()">${icon("plus")}Cargar link</button>`)}
+  ${ctTabs()}
   <div class="toolbar">
     <div class="seg"><button class="${S.f.pubEst==="pendientes"?"on":""}" onclick="S.f.pubEst='pendientes';render()">Sin enviar <span class="count" style="margin-left:4px">${pend}</span></button><button class="${S.f.pubEst==="todos"?"on":""}" onclick="S.f.pubEst='todos';render()">Todos</button></div>
     <select id="pubCli" aria-label="Cliente" onchange="S.f.pubCli=this.value;render()"><option value="">Todos los clientes</option>${S.clientes.filter(c=>S.publicados.some(p=>p.cliente_id===c.id)).map(c=>`<option value="${c.id}" ${S.f.pubCli===c.id?"selected":""}>${esc(c.nombre)}</option>`).join("")}</select>
@@ -1601,6 +1608,12 @@ const memOptions = sel => `<option value="">Sin asignar</option>`+S.miembros.fil
 const cliOptions = sel => `<option value="">Ninguno / interno</option>`+S.clientes.filter(c=>c.estado!=="Baja"||c.id===sel).map(c=>`<option value="${c.id}" ${sel===c.id?"selected":""}>${esc(c.nombre)}</option>`).join("");
 const v = id => { const el=document.getElementById(id); return el?el.value.trim():""; };
 const nz = x => x===""?null:x;
+// Montos: acepta "$1.575", "1575", "1.575,50", "1575.5"
+const parseMonto = s => { let t=String(s??"").replace(/[^\d.,-]/g,""); if(!t) return 0;
+  if(t.includes(",")) t=t.replace(/\./g,"").replace(",","."); else if(/^\d{1,3}(\.\d{3})+$/.test(t)) t=t.replace(/\./g,"");
+  return Number(t)||0; };
+const montoVal = n => (n===""||n==null) ? "" : (Number(n)||0).toLocaleString("es-AR",{maximumFractionDigits:2});
+const MONTO_IN = 'type="text" inputmode="decimal" autocomplete="off" onfocus="this.select()" onblur="if(this.value.trim()) this.value=montoVal(parseMonto(this.value))"';
 function askDel(table,id,what){
   openModal(`<h2>¿Borrar ${esc(what)}?</h2><p>Se borra para todo el equipo y no se puede deshacer.</p><div class="form"><div class="actions"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" style="background:var(--danger);border-color:var(--danger)" onclick="doDel('${table}','${id}')">Borrar</button></div></div>`);
 }
@@ -1874,7 +1887,7 @@ function formCampAds(id, cid){
     <label class="f" for="caObj">Objetivo<select id="caObj" onchange="const t=document.getElementById('caTxt'); if(t&&(!t.value||Object.values(OBJ_TXT).includes(t.value))) t.value=OBJ_TXT[this.value]||'';">${opts(OBJ_ADS,k.objetivo)}</select></label>
     <label class="f" for="caPla">Plataforma<select id="caPla">${opts(["Meta","Google"],k.plataforma)}</select></label>
     <label class="f full" for="caNom">Nombre (opcional)<input type="text" id="caNom" value="${esc(k.nombre)}" placeholder="Ej: Mensajes WhatsApp · Tucumán"></label>
-    <label class="f" for="caInv">Inversión por día<input type="number" id="caInv" min="0" step="500" inputmode="numeric" value="${esc(k.inversion_diaria||"")}" placeholder="8000" required></label>
+    <label class="f" for="caInv">Inversión por día<input ${MONTO_IN} id="caInv" value="${esc(montoVal(k.inversion_diaria||""))}" placeholder="$ 8.000" required></label>
     <label class="f" for="caEst">Estado<select id="caEst">${opts(EST_ADS.map(e=>e[0]),k.estado)}</select></label>
     <label class="f" for="caIni">Inicio<input type="date" id="caIni" value="${esc(k.inicio)}" required></label>
     <label class="f" for="caFin">Fin (opcional)<input type="date" id="caFin" value="${esc(k.fin||"")}"></label>
@@ -1886,7 +1899,7 @@ function formCampAds(id, cid){
 }
 async function saveCampAds(e,id){
   e.preventDefault();
-  const data={cliente_id:v("caCli"),objetivo:v("caObj"),plataforma:v("caPla"),nombre:v("caNom"),inversion_diaria:Number(v("caInv"))||0,estado:v("caEst"),inicio:v("caIni")||today(),fin:nz(v("caFin")),texto_objetivo:v("caTxt"),link:v("caLink"),actualizado:new Date().toISOString()};
+  const data={cliente_id:v("caCli"),objetivo:v("caObj"),plataforma:v("caPla"),nombre:v("caNom"),inversion_diaria:parseMonto(v("caInv")),estado:v("caEst"),inicio:v("caIni")||today(),fin:nz(v("caFin")),texto_objetivo:v("caTxt"),link:v("caLink"),actualizado:new Date().toISOString()};
   if(data.fin && data.fin<data.inicio){ toast("El fin no puede ser antes del inicio"); return; }
   let res;
   if(id) res=await sb.from("ads_campanas").update(data).eq("id",id).select().single();
@@ -1901,7 +1914,7 @@ function formSaldoAds(cid, id){
   const bancos=[...new Set(["Ualá","Mercado Pago","Efectivo",...S.ads_saldos.map(y=>y.banco).filter(Boolean)])];
   openModal(`<h2>${id?"Editar inversión":"Cargar inversión del cliente"}</h2><p class="s" style="margin:-8px 0 14px">${esc(cliName(cid))}: plata que te mandó para la pauta.</p>
   <form class="form" onsubmit="saveSaldoAds(event,'${cid}','${id||""}')">
-    <label class="f" for="saMon">Monto<input type="number" id="saMon" min="0" step="1000" inputmode="numeric" value="${esc(x.monto||"")}" required placeholder="50000"></label>
+    <label class="f" for="saMon">Monto<input ${MONTO_IN} id="saMon" value="${esc(montoVal(x.monto||""))}" required placeholder="$ 50.000"></label>
     <label class="f" for="saFec">Fecha<input type="date" id="saFec" value="${esc(x.fecha)}"></label>
     <label class="f" for="saBan">Banco / medio<input type="text" id="saBan" list="dlBancos" value="${esc(x.banco||"")}"></label><datalist id="dlBancos">${bancos.map(b=>`<option value="${esc(b)}">`).join("")}</datalist>
     <label class="f" for="saNot">Nota (opcional)<input type="text" id="saNot" value="${esc(x.notas||"")}"></label>
@@ -1911,7 +1924,7 @@ function formSaldoAds(cid, id){
 }
 async function saveSaldoAds(e,cid,id){
   e.preventDefault();
-  const data={cliente_id:cid,monto:Number(v("saMon"))||0,fecha:v("saFec")||today(),banco:v("saBan"),notas:v("saNot")};
+  const data={cliente_id:cid,monto:parseMonto(v("saMon")),fecha:v("saFec")||today(),banco:v("saBan"),notas:v("saNot")};
   if(id) data.usado=!!document.getElementById("saUso")?.checked;
   let res;
   if(id) res=await sb.from("ads_saldos").update(data).eq("id",id).select().single();
@@ -1941,7 +1954,7 @@ function pintarReporte(){
     <label class="f" for="rHas">Hasta<input type="date" id="rHas" value="${r.hasta}" onchange="S.rep.hasta=this.value;S.rep.manual=false;pintarReporte()"></label>
     ${camps.length?camps.map(k=>`<div class="full rep-camp"><div class="rep-camp-h"><b>${esc(k.nombre||k.objetivo)}</b><span class="pill">${esc(k.objetivo)}</span></div>
       <div class="rep-mets">${(MET_ADS[k.objetivo]||[]).map(([m,l])=>`<label class="f">${l}<input type="number" min="0" inputmode="numeric" value="${esc(r.vals[k.id][m]??"")}" oninput="repVal('${k.id}','${m}',this.value)"></label>`).join("")}
-      <label class="f">Inversión por día<input type="number" min="0" step="500" inputmode="numeric" value="${esc(r.vals[k.id].inv??"")}" oninput="repVal('${k.id}','inv',this.value)"></label></div></div>`).join("")
+      <label class="f">Inversión por día<input ${MONTO_IN} value="${esc(montoVal(r.vals[k.id].inv??""))}" oninput="repVal('${k.id}','inv',parseMonto(this.value))"></label></div></div>`).join("")
       :`<div class="full s">No hay campañas en ese período.</div>`}
     <label class="f full" for="rMsg">Mensaje <span class="s" id="rMsgNota">${r.manual?"(editado a mano · <a href='#' onclick='S.rep.manual=false;refreshRepMsg();return false'>volver a armar</a>)":"(se arma solo; podés editarlo)"}</span><textarea id="rMsg" style="min-height:240px;font-family:inherit" oninput="S.rep.manual=true;S.rep.texto=this.value">${esc(r.manual?r.texto:armarMsg())}</textarea></label>
     <div class="actions full"><div><button type="button" class="btn" onclick="copiarReporte()">${icon("copy")}Copiar</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" onclick="guardarReporte(false)">Guardar</button><button type="button" class="btn wa" onclick="guardarReporte(true)">${icon("wa")}Enviar por WhatsApp</button></div></div>
