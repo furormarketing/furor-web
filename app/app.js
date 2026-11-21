@@ -1423,21 +1423,19 @@ async function savePlantilla(e,id){
 function vMaterial(){
   const sv=S.f.matServ||"";
   const base=S.material.filter(m=>!sv||servMat(m)===sv);
-  const list=base.filter(m=>!S.f.matCat||m.categoria===S.f.matCat).sort((a,b)=>(b.vigente-a.vigente)||(CAT_MAT.indexOf(a.categoria)-CAT_MAT.indexOf(b.categoria))||String(b.actualizado).localeCompare(String(a.actualizado)));
+  const list=base.filter(m=>!S.f.matCat||m.categoria===S.f.matCat).sort((a,b)=>(CAT_MAT.indexOf(a.categoria)-CAT_MAT.indexOf(b.categoria))||String(b.actualizado).localeCompare(String(a.actualizado)));
   const cats=CAT_MAT.filter(c=>base.some(m=>m.categoria===c));
   if(S.f.matCat && !cats.includes(S.f.matCat)) S.f.matCat="";
-  const hon=base.filter(m=>m.categoria==="Honorarios"&&m.vigente);
   const servTabs=`<div class="serv-tabs"><button class="${!sv?"on":""}" onclick="S.f.matServ='';render()">${icon("grid")}<span>Todo</span><b>${S.material.length}</b></button>${SERV_MAT.map(([n,ic])=>`<button class="${sv===n?"on":""}" onclick="S.f.matServ='${n}';S.f.matCat='';render()">${icon(ic)}<span>${n}</span><b>${S.material.filter(m=>servMat(m)===n).length}</b></button>`).join("")}</div>`;
-  return `${pageHead("Ventas","Material","Honorarios vigentes, propuestas, contratos y presentaciones para usar con prospectos y clientes.",isAdmin()?`<button class="btn pri" onclick="formMaterial()">${icon("plus")}Subir material</button>`:"")}
-  ${hon.length?`<div class="note" style="background:var(--brand-soft)">${icon("ok")}<span><b>Honorarios vigentes:</b> ${hon.map(h=>esc(h.titulo)+` <span class="s">(${esc(servMat(h))}${h.sede?" · "+esc(h.sede):""})</span>`).join(", ")}. Usá siempre estos al pasar precios.</span></div>`:`<div class="note">${icon("file")}<span>${isAdmin()?"Subí el PDF de honorarios actualizado y marcalo como <b>vigente</b>: el equipo lo va a ver destacado arriba de todo.":"Todavía no hay honorarios cargados. Consultale a Marcelo antes de pasar precios."}</span></div>`}
+  return `${pageHead("Ventas","Material","Honorarios, propuestas, contratos y presentaciones de cada servicio para usar con prospectos y clientes.",isAdmin()?`<button class="btn pri" onclick="formMaterial()">${icon("plus")}Subir material</button>`:"")}
   ${servTabs}
   ${cats.length>1?`<div class="toolbar"><div class="seg">${["",...cats].map(c=>`<button class="${S.f.matCat===c?"on":""}" onclick="S.f.matCat='${c}';render()">${c||"Todas las categorías"}</button>`).join("")}</div></div>`:""}
   <div class="grid g2">${list.map(docCard).join("")||`<div class="card">${emptyMsg("No hay material cargado todavía.","file")}</div>`}</div>`;
 }
 function docCard(m){
   const a=m.archivo, ext=a?(a.nombre.split(".").pop()||"").slice(0,4).toUpperCase():"LINK", link=safeUrl(m.link);
-  return `<div class="doc ${m.vigente?"vig":""}"><div class="fic ${a?"":"link"}">${esc(ext)}</div><div class="main">
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">${esc(m.titulo)}</span>${m.vigente?`<span class="pill brand">Vigente</span>`:`<span class="pill">Anterior</span>`}</div>
+  return `<div class="doc"><div class="fic ${a?"":"link"}">${esc(ext)}</div><div class="main">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">${esc(m.titulo)}</span></div>
     <div class="s">${esc([servMat(m),m.categoria,m.sede||"Todas las sedes","actualizado "+fmtDate(String(m.actualizado).slice(0,10))].join(" · "))}</div>
     ${m.descripcion?`<div style="font-size:14px;white-space:pre-wrap">${esc(m.descripcion)}</div>`:""}
     <div class="acts">${a?`<button class="btn sm pri" onclick="abrirMaterial('${m.id}',false)">${icon("eye")}Ver</button><button class="btn sm" onclick="abrirMaterial('${m.id}',true)">${icon("download")}Descargar</button>`:""}${link?`<a class="btn sm" href="${esc(link)}" target="_blank" rel="noopener">Abrir link</a>`:""}${isAdmin()?`<button class="btn sm ghost" onclick="formMaterial('${m.id}')">Editar</button>`:""}</div>
@@ -1460,7 +1458,6 @@ function formMaterial(id){
     <label class="f full" for="maFile">Archivo (PDF, imagen, hasta 50 MB)${m.archivo?` <span class="s">Actual: ${esc(m.archivo.nombre)}. Elegí otro solo si querés reemplazarlo.</span>`:""}<input type="file" id="maFile" accept="application/pdf,image/*,.doc,.docx,.ppt,.pptx,.xls,.xlsx"></label>
     <label class="f full" for="maLink">O un link (Drive, Canva…)<input type="url" id="maLink" value="${esc(m.link)}"></label>
     <label class="f full" for="maDes">Descripción / cómo usarlo<textarea id="maDes" placeholder="Ej: Usar para prospectos de Salta y Santiago desde el 1/12.">${esc(m.descripcion)}</textarea></label>
-    <label class="check full"><input type="checkbox" id="maVig" ${m.vigente?"checked":""}><span>Vigente (si es honorarios, los anteriores del mismo servicio y sede pasan a "Anterior")</span></label>
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('material','${id}','este material')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" id="maSave">Guardar</button></div></div></form>`);
 }
 async function saveMaterial(e,id){
@@ -1479,11 +1476,7 @@ async function saveMaterial(e,id){
     if(prev.archivo) await sb.storage.from("material").remove([prev.archivo.path]);
     archivo={path,nombre:f.name,tipo:f.type,tam:f.size};
   }
-  const data={titulo:v("maTit"),servicio:v("maServ")||"General",categoria:v("maCat"),sede:v("maSede"),link:v("maLink"),descripcion:v("maDes"),vigente:$("#maVig").checked,archivo,actualizado:new Date().toISOString()};
-  if(data.vigente && data.categoria==="Honorarios"){
-    const otros=S.material.filter(x=>x.id!==id&&x.categoria==="Honorarios"&&x.vigente&&servMat(x)===data.servicio&&(x.sede||"")===data.sede).map(x=>x.id);
-    if(otros.length) await sb.from("material").update({vigente:false}).in("id",otros);
-  }
+  const data={titulo:v("maTit"),servicio:v("maServ")||"General",categoria:v("maCat"),sede:v("maSede"),link:v("maLink"),descripcion:v("maDes"),vigente:true,archivo,actualizado:new Date().toISOString()};
   const ok = id ? await run(sb.from("material").update(data).eq("id",id),"Material actualizado") : await run(sb.from("material").insert(Object.assign({autor:S.me.id},data)),"Material subido");
   if(ok) closeModal(); else { $("#maSave").disabled=false; $("#maSave").textContent="Guardar"; }
 }
