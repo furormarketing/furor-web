@@ -586,8 +586,9 @@ function ctTabs(){
   return `<div class="tabs" style="margin-bottom:14px"><button class="${S.ctTab!=="pub"?"on":""}" onclick="S.ctTab='cal';render()">Calendario</button><button class="${S.ctTab==="pub"?"on":""}" onclick="S.ctTab='pub';render()">Links publicados${pend?` <span class="badge">${pend}</span>`:""}</button></div>`;
 }
 function vContenido(){ return S.ctTab==="pub" ? vPublicadosCont() : vCalendarioCont(); }
+const DKEYS_LAB = DKEYS.slice(0,5); // lunes a viernes
 function vCalendarioCont(){
-  const ws=weekStart(S.weekOff), days=[...Array(7)].map((_,i)=>addDays(ws,i)), t=today();
+  const ws=weekStart(S.weekOff), days=[...Array(5)].map((_,i)=>addDays(ws,i)), t=today();
   let list=pautaClients();
   if(S.f.ctScope==="mias") list=list.filter(c=>c.responsable===S.me.id);
   const late=lateThisWeek();
@@ -599,7 +600,7 @@ function vCalendarioCont(){
     }).join("")}</tr>`).join("");
   return `
   <div class="head"><div><div class="eyebrow">Cuentas</div><h1>Contenido</h1><p>Qué se publica en cada cuenta, día por día. Tocá cada casilla para marcarla como publicada.</p></div>
-    <div class="acts"><button class="btn" onclick="S.weekOff--;render()" aria-label="Semana anterior">‹</button><h2 style="min-width:170px;text-align:center">${fmtDate(days[0])} – ${fmtDate(days[6])}</h2><button class="btn" onclick="S.weekOff++;render()" aria-label="Semana siguiente">›</button><button class="btn" onclick="S.weekOff=0;render()">Esta semana</button></div></div>
+    <div class="acts"><button class="btn" onclick="S.weekOff--;render()" aria-label="Semana anterior">‹</button><h2 style="min-width:170px;text-align:center">${fmtDate(days[0])} – ${fmtDate(days[4])}</h2><button class="btn" onclick="S.weekOff++;render()" aria-label="Semana siguiente">›</button><button class="btn" onclick="S.weekOff=0;render()">Esta semana</button></div></div>
   ${ctTabs()}<div class="toolbar"><div class="seg"><button class="${S.f.ctScope==="todas"?"on":""}" onclick="S.f.ctScope='todas';render()">Todas las cuentas</button><button class="${S.f.ctScope==="mias"?"on":""}" onclick="S.f.ctScope='mias';render()">Mis cuentas</button></div>
     ${late?`<span class="pill bad">${late} publicaciones atrasadas esta semana</span>`:`<span class="pill ok">Semana al día</span>`}
     <span class="s">Verde: publicado · Rojo: atrasado · Línea punteada: pieza programada</span></div>
@@ -713,11 +714,11 @@ function entCard(e){
   </div>`;
 }
 function tabPauta(c){
-  const p=c.pauta||{}, total=DKEYS.reduce((a,k)=>a+(p[k]||[]).length,0);
-  const porFmt=FORMATOS.map(f=>[f,DKEYS.filter(k=>(p[k]||[]).includes(f)).length]).filter(x=>x[1]);
+  const p=c.pauta||{}, total=DKEYS_LAB.reduce((a,k)=>a+(p[k]||[]).length,0);
+  const porFmt=FORMATOS.map(f=>[f,DKEYS_LAB.filter(k=>(p[k]||[]).includes(f)).length]).filter(x=>x[1]);
   return `<section class="card"><h2>${icon("cal")}Pauta de publicación</h2>
     <p class="s" style="margin:0 0 12px">Tocá lo que se publica cada día. <b>Se guarda solo.</b> Con esto se arma el <a href="#contenido">Calendario de contenido</a> de la CM: cuando lo marca como publicado, le pide el link y queda en <b>Publicados</b> para mandárselo al cliente.</p>
-    <div class="pauta2">${DKEYS.map((k,i)=>`<div class="pd ${(p[k]||[]).length?"has":""}"><b>${DIAS[i]}</b>${FORMATOS.map(f=>{ const on=(p[k]||[]).includes(f); return `<button type="button" class="pz-b fmt-${f.toLowerCase()} ${on?"on":""}" aria-pressed="${on}" onclick="togglePauta('${c.id}','${k}','${f}')">${on?icon("ok"):""}${f}</button>`; }).join("")}</div>`).join("")}</div>
+    <div class="pauta2">${DKEYS_LAB.map((k,i)=>`<div class="pd ${(p[k]||[]).length?"has":""}"><b>${DIAS[i]}</b>${FORMATOS.map(f=>{ const on=(p[k]||[]).includes(f); return `<button type="button" class="pz-b fmt-${f.toLowerCase()} ${on?"on":""}" aria-pressed="${on}" onclick="togglePauta('${c.id}','${k}','${f}')">${on?icon("ok"):""}${f}</button>`; }).join("")}</div>`).join("")}</div>
     ${total||c.pauta_desde?`<div class="pz-desde">${icon("clock")}<span>Cuenta para el calendario desde</span><input type="date" class="inl" value="${esc(c.pauta_desde||"")}" onchange="setPautaDesde('${c.id}',this.value)">${c.pauta_desde&&c.pauta_desde>today()?`<span class="s">· antes de esa fecha no figura nada como pendiente ni atrasado</span>`:""}</div>`:""}
     <div class="pauta-foot">
       <div class="pz-sum">${total?`<b>${total} ${total>1?"publicaciones":"publicación"} por semana</b><span class="s">${porFmt.map(([f,n])=>n+" "+f.toLowerCase()+(n>1?(f==="Reel"?"s":f==="Historia"?"s":f==="Carrusel"?"es":"s"):"")).join(" · ")}</span>`:`<span class="s">Todavía no hay nada marcado.</span>`}</div>

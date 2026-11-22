@@ -924,3 +924,6 @@ table.rtable input.inl[type=date]{width:140px}
 .sede-cards.rows .sc-h{margin-bottom:6px}
 .sede-cards.rows .sc-m{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:900px){ .sede-cards.rows .sc-m{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.cdays{grid-template-columns:repeat(5,minmax(0,1fr))}
+.pauta2{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:900px){ .pauta2{grid-template-columns:1fr} }
