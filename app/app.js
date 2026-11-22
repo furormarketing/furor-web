@@ -341,7 +341,11 @@ function render(){
   }
   renderNav();
   const views={inicio:vInicio,agenda:vAgenda,contenido:vContenido,clientes:vClientes,tareas:vTareas,chat:vChat,novedades:vNovedades,equipo:vEquipo,prospectos:vProspectos,plantillas:vPlantillas,material:vMaterial,ads:vAds,direccion:vDireccion};
+  const HS=".table-wrap,.week,.etcells,.cdays,.tabs,.serv-tabs";
+  const hsPrev=S.view===S._lastView?[...document.querySelectorAll("#main "+HS)].map(e=>e.scrollLeft):[];
   $("#main").innerHTML = views[S.view]();
+  S._lastView=S.view;
+  if(hsPrev.length) document.querySelectorAll("#main "+HS).forEach((e,i)=>{ if(hsPrev[i]) e.scrollLeft=hsPrev[i]; });
   document.querySelectorAll("body > .daysheet-bg").forEach(x=>x.remove());
   const ds=$("#main .daysheet-bg"); if(ds) document.body.appendChild(ds);
   if(aid){ const el=document.getElementById(aid); if(el){ el.focus(); try{ if(sel!=null) el.setSelectionRange(sel,sel); }catch(e){} } }
@@ -599,8 +603,21 @@ function vCalendarioCont(){
   ${ctTabs()}<div class="toolbar"><div class="seg"><button class="${S.f.ctScope==="todas"?"on":""}" onclick="S.f.ctScope='todas';render()">Todas las cuentas</button><button class="${S.f.ctScope==="mias"?"on":""}" onclick="S.f.ctScope='mias';render()">Mis cuentas</button></div>
     ${late?`<span class="pill bad">${late} publicaciones atrasadas esta semana</span>`:`<span class="pill ok">Semana al día</span>`}
     <span class="s">Verde: publicado · Rojo: atrasado · Línea punteada: pieza programada</span></div>
-  ${list.length?`<div class="week"><table><thead><tr><th>Cuenta</th>${days.map((d,i)=>{ const f=feriadosDe(d); return `<th class="${d===t?"today":""} ${f.length?"ferth":""}">${DIAS[i]} ${parseYmd(d).getDate()}${f.length?`<span class="pill bad" title="${esc(f.map(x=>x.titulo+(x.sede?" ("+x.sede+")":"")).join(" · "))}">Feriado</span>`:""}</th>`; }).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`
+  ${list.length&&(S.mobile||innerWidth<=1250)?ctMobile(list,days,t):list.length?`<div class="week"><table><thead><tr><th>Cuenta</th>${days.map((d,i)=>{ const f=feriadosDe(d); return `<th class="${d===t?"today":""} ${f.length?"ferth":""}">${DIAS[i]} ${parseYmd(d).getDate()}${f.length?`<span class="pill bad" title="${esc(f.map(x=>x.titulo+(x.sede?" ("+x.sede+")":"")).join(" · "))}">Feriado</span>`:""}</th>`; }).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`
     :`<div class="card"><div class="empty">Ninguna cuenta tiene pauta cargada. Entrá a un cliente → pestaña <b>Pauta</b> y marcá qué se publica cada día.</div></div>`}`;
+}
+function ctMobile(list,days,t){
+  if(S.ctDay==null || !days.includes(S.ctDay)) S.ctDay = days.includes(t) ? t : days[0];
+  const d=S.ctDay;
+  const strip=`<div class="cdays">${days.map((x,i)=>{ const exp=list.reduce((a,c)=>a+expected(c,x).length,0), done=list.reduce((a,c)=>a+expected(c,x).filter(f=>pubDone(c.id,x,f)).length,0), late=x<t&&done<exp, fer=feriadosDe(x).length;
+    return `<button class="${x===d?"on":""} ${x===t?"hoy":""} ${late?"late":""} ${fer?"fer":""}" onclick="S.ctDay='${x}';render()"><span>${DIAS[i]}</span><b>${parseYmd(x).getDate()}</b><i>${exp?done+"/"+exp:"–"}</i></button>`; }).join("")}</div>`;
+  const fer=feriadosDe(d);
+  const cards=list.map(c=>{ const exp=expected(c,d); const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.fecha_pub===d);
+    if(!exp.length && !ents.length) return "";
+    return `<div class="cday-card"><a href="#cliente-${c.id}" onclick="S.cliTab='pauta'"><b>${esc(c.nombre)}</b><span class="s">${esc(c.instagram||"")}${c.responsable?" · "+esc(memName(c.responsable)):""}</span></a>
+      <div class="cday-chips">${exp.map(f=>{ const done=pubDone(c.id,d,f), isLate=!done&&d<t; return `<button class="chip ${done?"done":isLate?"late":""}" onclick="togglePub('${c.id}','${d}','${f}')">${done?icon("ok"):""}${esc(f)}</button>`; }).join("")}${ents.map(e=>`<button class="chip ent" onclick="formEntrega('${e.id}')">${esc(e.titulo)}</button>`).join("")}</div></div>`; }).join("");
+  return `${strip}${fer.length?`<div class="note" style="margin-bottom:10px">${icon("cal")}<span><b>Feriado</b>${fer.some(f=>f.titulo&&f.titulo!=="Feriado")?": "+esc(fer.map(f=>f.titulo).join(" · ")):""}</span></div>`:""}
+    ${cards||`<div class="card"><div class="empty">No hay publicaciones para este día.</div></div>`}`;
 }
 async function togglePub(cid,fecha,formato){
   const ex=S.publicaciones.find(p=>p.cliente_id===cid&&p.fecha===fecha&&p.formato===formato);
@@ -627,7 +644,7 @@ function vClientes(){
     return `<a class="mcard cli" href="#cliente-${c.id}" style="--sc:${sedeColor(c.sede)}"><div class="mc-top">${cliAv(c)}<b class="cn">${esc(c.nombre)}</b></div>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:""}
     <div class="s">${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"Sin sede"}${c.rubro?" · "+esc(c.rubro):""}${c.responsable?" · "+esc(memName(c.responsable)):""}</div>
     ${ents||un?`<div style="display:flex;gap:6px;margin-top:6px">${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span>`:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</div>`:""}${estSel(c)}</a>`; }).join("")}</div>`
-  :list.length?`<div class="table-wrap"><table><thead><tr><th>Negocio · Titular</th><th>Sede</th><th>Servicio</th><th>Responsable</th><th>Estado</th><th>Pendiente</th></tr></thead><tbody>
+  :list.length?`<div class="table-wrap"><table class="cli-tbl"><thead><tr><th>Negocio · Titular</th><th>Sede</th><th>Servicio</th><th>Responsable</th><th>Estado</th><th>Pendiente</th></tr></thead><tbody>
   ${list.map(c=>{ const ents=S.entregas.filter(e=>e.cliente_id===c.id&&e.estado!=="Publicada").length; const un=unread(c.id); return `<tr class="click cli-tr" style="--sc:${sedeColor(c.sede)}" onclick="location.hash='cliente-${c.id}'"><td><div class="cli-cell">${cliAv(c)}<div><b class="cn">${esc(c.nombre)}</b>${c.contacto&&c.contacto!==c.nombre?`<div class="titular">${icon("users")}${esc(c.contacto)}${hermanos(c).length?` <span class="pill">${hermanos(c).length+1} negocios</span>`:""}</div>`:c.contacto===c.nombre?`<div class="s" style="color:var(--warn)">Falta el nombre del negocio</div>`:""}${c.rubro?`<div class="s">${esc(c.rubro)}</div>`:""}</div></div></td><td>${c.sede?`<span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}`:"—"}</td><td>${esc(c.plan||"—")}</td><td>${esc(c.responsable?memName(c.responsable):"—")}</td><td class="estcell">${estSel(c)}</td><td>${ents?`<span class="pill info">${ents} pieza${ents>1?"s":""}</span> `:""}${un?`<span class="pill bad">${un} mensajes</span>`:""}</td></tr>`; }).join("")}
   </tbody></table></div>`:`<div class="card"><div class="empty">${S.clientes.length?"No hay clientes con esos filtros.":"Todavía no hay clientes. Cargá el primero."}</div></div>`}`;
 }
@@ -1130,7 +1147,7 @@ function vDireccion(){
   if(window.DIR) return DIR.vista();
   if(!_dirCargando){
     _dirCargando=true;
-    const sc=document.createElement("script"); sc.src="direccion.js?v=11"; sc.onload=()=>render();
+    const sc=document.createElement("script"); sc.src="direccion.js?v=14"; sc.onload=()=>render();
     sc.onerror=()=>{ _dirCargando=false; toast("No se pudo abrir Dirección. Revisá la conexión."); };
     document.body.appendChild(sc);
   }
@@ -1147,6 +1164,7 @@ function renderFab(){
   f.hidden=false; f.innerHTML=icon("plus")+`<span>${a[0]}</span>`; f.setAttribute("onclick",a[1]); f.setAttribute("aria-label",a[0]);
 }
 window.matchMedia('(max-width:900px)').addEventListener("change",e=>{ S.mobile=e.matches; render(); });
+window.matchMedia('(max-width:1250px)').addEventListener("change",()=>render());
 
 /* ---------- Novedades ---------- */
 function vNovedades(){

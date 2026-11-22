@@ -150,9 +150,11 @@ function ventasSede(m){
     const altas=D.fin_cuentas.filter(x=>x.alta&&ym(x.alta)===m&&(x.sede||"Tucumán")===s);
     return {s,prospectos,nuevos,ingresos:Number(c.ingresos)||altas.reduce((a,x)=>a+Number(x.pack),0),inv:Number(c.inversion)||0};
   });
-  return `<div class="table-wrap" style="box-shadow:none"><table><thead><tr><th>Sede</th><th>Prospectos</th><th>Cierres</th><th>Conversión</th><th>Ingresos nuevos</th></tr></thead><tbody>
-  ${rows.map(r=>`<tr><td><span class="sede-dot" style="--sc:${sedeColor(r.s)}"></span>${r.s}</td><td>${r.prospectos||"—"}</td><td><b>${r.nuevos||0}</b></td><td>${r.prospectos?Math.round(r.nuevos/r.prospectos*100)+"%":"—"}</td><td>${r.ingresos?money(r.ingresos):"—"}</td></tr>`).join("")}
-  </tbody></table></div>`;
+  return `<div class="sede-cards rows">${rows.map(r=>sedeCard(r.s,[["Prospectos",r.prospectos||"—"],["Cierres",r.nuevos||0,true],["Conversión",r.prospectos?Math.round(r.nuevos/r.prospectos*100)+"%":"—"],["Ingresos nuevos",r.ingresos?money(r.ingresos):"—",true]])).join("")}</div>`;
+}
+function sedeCard(nombre, mets, extra){
+  return `<div class="sede-card" style="--sc:${nombre==="Total"?"var(--ink-2)":sedeColor(nombre)}"><div class="sc-h"><span class="sede-dot" style="--sc:${nombre==="Total"?"var(--ink-2)":sedeColor(nombre)}"></span><b>${esc(nombre)}</b>${extra||""}</div>
+    <div class="sc-m">${mets.map(([l,v,strong])=>`<div><span>${l}</span>${strong?`<b>${v}</b>`:`<em>${v}</em>`}</div>`).join("")}</div></div>`;
 }
 function barrasCat(m){
   const g=D.fin_gastos.filter(x=>ym(x.fecha)===m), by={};
@@ -211,8 +213,8 @@ function vGastos(){
   const list=D.fin_gastos.filter(g=>ym(g.fecha)===m).sort((a,b)=>Number(b.monto)-Number(a.monto));
   const tot=list.reduce((a,g)=>a+Number(g.monto),0), prev=D.fin_gastos.filter(g=>ym(g.fecha)===addMes(m,-1)).reduce((a,g)=>a+Number(g.monto),0);
   return `<div class="toolbar">${seg}<span style="flex:1"></span>${!list.length&&prev?`<button class="btn" onclick="DIR.copiarGastos()">Copiar fijos del mes anterior</button>`:""}<button class="btn pri" onclick="DIR.formGasto()">${icon("plus")}Cargar gasto</button></div>
-  <div class="split"><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th class="num">Monto</th><th></th></tr></thead><tbody>
-    ${list.map(g=>`<tr><td>${fmtDate(g.fecha)}</td><td><span class="pill">${esc(g.categoria)}</span></td><td>${esc(g.concepto)}${g.sede?`<div class="s">${esc(g.sede)}</div>`:""}</td><td class="num">${money(g.monto)}</td><td><button class="btn sm ghost" onclick="DIR.formGasto('${g.id}')">Editar</button></td></tr>`).join("")||`<tr><td colspan="5">${emptyMsg("Sin gastos en este mes.","file")}</td></tr>`}
+  <div class="split"><div class="table-wrap"><table class="rtable"><thead><tr><th>Fecha</th><th>Categoría</th><th>Concepto</th><th class="num">Monto</th><th></th></tr></thead><tbody>
+    ${list.map(g=>`<tr><td class="rt-fecha">${fmtDate(g.fecha)}</td><td data-l="Categoría"><span class="pill">${esc(g.categoria)}</span></td><td class="rt-cli"><b>${esc(g.concepto)}</b>${g.sede?`<div class="s">${esc(g.sede)}</div>`:""}</td><td class="num" data-l="Monto"><b>${money(g.monto)}</b></td><td><button class="btn sm ghost" onclick="DIR.formGasto('${g.id}')">Editar</button></td></tr>`).join("")||`<tr><td colspan="5">${emptyMsg("Sin gastos en este mes.","file")}</td></tr>`}
     ${list.length?`<tr class="tot"><td colspan="3"><b>Total</b></td><td class="num"><b>${money(tot)}</b></td><td></td></tr>`:""}
   </tbody></table></div>
   <section class="card">${cardH("Por categoría")}${barrasCat(m)}${prev?`<p class="s" style="margin:12px 0 0">Mes anterior: ${money(prev)} (${tot>=prev?"+":""}${Math.round((tot-prev)/prev*100)}%)</p>`:""}</section></div>`;
@@ -226,8 +228,8 @@ function vEquipo(){
   const anual=personas.map(p=>({p,tot:D.fin_equipo.filter(e=>e.persona===p&&String(e.fecha).startsWith(y)).reduce((a,e)=>a+Number(e.monto),0)})).sort((a,b)=>b.tot-a.tot);
   const tot=list.filter(e=>e.concepto!=="Retiro").reduce((a,e)=>a+Number(e.monto),0);
   return `<div class="toolbar"><span class="s">Sueldos, comisiones y pagos por trabajo. El retiro de Marcelo se muestra aparte y no cuenta como gasto.</span><span style="flex:1"></span>${!list.length&&D.fin_equipo.some(e=>ym(e.fecha)===addMes(m,-1))?`<button class="btn" onclick="DIR.copiarEquipo()">Copiar sueldos del mes anterior</button>`:""}<button class="btn pri" onclick="DIR.formPago()">${icon("plus")}Cargar pago</button></div>
-  <div class="split"><div class="table-wrap"><table><thead><tr><th>Persona</th><th>Concepto</th><th class="num">Monto</th><th>Estado</th><th></th></tr></thead><tbody>
-    ${list.map(e=>`<tr class="${e.concepto==="Retiro"?"dim":""}"><td><b>${esc(e.persona)}</b>${e.notas&&e.notas!=="Importado de CAJA"?`<div class="s">${esc(e.notas)}</div>`:""}</td><td>${esc(e.concepto)}</td><td class="num">${money(e.monto)}</td><td><span class="pill ${e.pagado?"ok":"warn"}">${e.pagado?"Pagado":"A pagar"}</span></td><td><button class="btn sm ghost" onclick="DIR.formPago('${e.id}')">Editar</button></td></tr>`).join("")||`<tr><td colspan="5">${emptyMsg("Sin pagos cargados este mes.","users")}</td></tr>`}
+  <div class="split"><div class="table-wrap"><table class="rtable"><thead><tr><th>Persona</th><th>Concepto</th><th class="num">Monto</th><th>Estado</th><th></th></tr></thead><tbody>
+    ${list.map(e=>`<tr class="${e.concepto==="Retiro"?"dim":""}"><td class="rt-cli"><b>${esc(e.persona)}</b>${e.notas&&e.notas!=="Importado de CAJA"?`<div class="s">${esc(e.notas)}</div>`:""}</td><td data-l="Concepto">${esc(e.concepto)}</td><td class="num" data-l="Monto"><b>${money(e.monto)}</b></td><td data-l="Estado"><span class="pill ${e.pagado?"ok":"warn"}">${e.pagado?"Pagado":"A pagar"}</span></td><td><button class="btn sm ghost" onclick="DIR.formPago('${e.id}')">Editar</button></td></tr>`).join("")||`<tr><td colspan="5">${emptyMsg("Sin pagos cargados este mes.","users")}</td></tr>`}
     ${list.length?`<tr class="tot"><td colspan="2"><b>Total equipo (sin retiro)</b></td><td class="num"><b>${money(tot)}</b></td><td colspan="2"></td></tr>`:""}
   </tbody></table></div>
   <section class="card">${cardH("Acumulado "+y)}<div class="hbars">${anual.map(a=>`<div class="hb"><span>${esc(a.p)}</span><div><i style="width:${a.tot/Math.max(1,anual[0]?.tot||1)*100}%"></i></div><b>${moneyK(a.tot)}</b></div>`).join("")}</div></section></div>`;
@@ -259,7 +261,7 @@ function vVisitas(){
   </form>
   ${ag.length?`<div class="card vag"><b>${icon("cal")} Agendadas por el equipo en la Agenda</b>${ag.map(e=>`<div class="row"><div class="main"><div class="t">${esc(e.titulo)}</div><div class="s">${fmtDate(e.fecha)}${e.hora?" · "+String(e.hora).slice(0,5)+" hs":""}</div></div><button class="btn sm pri" onclick="DIR.desdeAgenda('${e.id}')">${icon("plus")}Sumar</button></div>`).join("")}</div>`:""}
   <datalist id="dlFilm">${nombres.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
-  <div class="table-wrap"><table class="rtable"><thead><tr><th>Cliente</th><th>Visitas</th><th>Fecha</th><th>Filmaker</th><th class="num">Pago filmaker</th><th class="num">Modelo (cliente)</th><th>Pago</th><th></th></tr></thead><tbody>
+  <div class="table-wrap"><table class="rtable vtbl"><thead><tr><th>Cliente</th><th>Visitas</th><th>Fecha</th><th>Filmaker</th><th class="num">Pago filmaker</th><th class="num">Modelo (cliente)</th><th>Pago</th><th></th></tr></thead><tbody>
   ${list.map(v=>`<tr>
     <td class="rt-cli"><b>${esc(v.negocio)}</b>${v.fechas_txt?`<div class="s">${esc(v.fechas_txt)}</div>`:""}${v.notas?`<div class="s">${esc(v.notas)}</div>`:""}</td>
     <td data-l="Visitas hechas"><div class="vchecks">${[...Array(v.visitas)].map((_,i)=>`<button type="button" class="${i<v.hechas?"on":""}" title="Visita ${i+1}: ${i<v.hechas?"hecha":"pendiente"}" onclick="DIR.hecha('${v.id}',${i+1})">${i<v.hechas?icon("ok"):""}</button>`).join("")}</div></td>
@@ -305,16 +307,25 @@ function vComercial(){
   const setters=S.miembros.filter(mb=>mb.rol==="setter"||S.prospectos.some(p=>p.setter===mb.id)).map(mb=>{ const pr=S.prospectos.filter(p=>p.setter===mb.id&&ym(p.creado)===D.mes); const cerr=pr.filter(p=>!["Ganado","Perdido"].includes(p.etapa)===false).length; const gan=pr.filter(p=>p.etapa==="Ganado").length;
     return {n:mb.nombre||mb.email, sede:mb.sede, total:pr.length, contactos:pr.reduce((a,p)=>a+(p.contactos||0),0), gan, tasa:cerr?Math.round(gan/cerr*100):null}; });
   const f=(v)=>v==null||v===""?"—":v;
+  const meses=[...new Set(rows.map(c=>ym(c.mes)))].sort().reverse();
+  if(D.camMes==null) D.camMes = meses.includes(D.mes) ? D.mes : (meses[0]||"");
+  const sel=D.camMes, sub=sel?rows.filter(c=>ym(c.mes)===sel):rows;
+  const agg=list=>{ const t={prospectos:0,llamadas:0,pdf:0,clientes_nuevos:0,inversion:0,ingresos:0}; list.forEach(c=>Object.keys(t).forEach(k=>t[k]+=Number(c[k])||0)); return t; };
+  const mets=c=>{ const conv=c.prospectos&&c.clientes_nuevos!=null?Math.round(c.clientes_nuevos/c.prospectos*1000)/10+"%":"—", cpp=c.prospectos&&c.inversion?money(c.inversion/c.prospectos):"—", roas=c.inversion&&c.ingresos?(c.ingresos/c.inversion).toFixed(1)+"x":"—";
+    return [["Prospectos",f(c.prospectos)],["Llamadas",f(c.llamadas)],["PDF enviados",f(c.pdf)],["Clientes nuevos",f(c.clientes_nuevos),true],["Conversión",conv,true],["Inversión ads",c.inversion?money(c.inversion):"—"],["Costo x prospecto",cpp],["Ingresos",c.ingresos?money(c.ingresos):"—",true],["ROAS",roas,true]]; };
+  const sedesOrden=["Tucumán","Salta","Santiago del Estero"];
+  const cards = sel
+    ? sedesOrden.map(sd=>{ const c=sub.find(x=>x.sede===sd); return c?sedeCard(sd,mets(c),`<button class="btn sm ghost ic" style="margin-left:auto" onclick="DIR.formCampana('${c.id}')" title="Editar" aria-label="Editar">${icon("edit")}</button>`):sedeCard(sd,[["Sin datos cargados",""]]); }).join("") + (sub.length>1?sedeCard("Total",mets(agg(sub))):"")
+    : sedesOrden.map(sd=>sedeCard(sd,mets(agg(rows.filter(c=>c.sede===sd))))).join("") + sedeCard("Total",mets(agg(rows)));
   return `<section class="card" style="margin-bottom:16px">${cardH("En vivo · "+mesLabel(D.mes)+" (desde la app)")}
-    <div class="table-wrap" style="box-shadow:none"><table><thead><tr><th>Sede</th><th>Prospectos</th><th>Honorarios enviados</th><th>Llamada</th><th>Reunión</th><th>Clientes nuevos</th><th>Perdidos</th></tr></thead><tbody>
-    ${live.map(r=>`<tr><td><span class="sede-dot" style="--sc:${sedeColor(r.s)}"></span>${r.s}</td><td>${r.total}</td><td>${r.hon}</td><td>${r.llam}</td><td>${r.reun}</td><td><b>${r.gan}</b></td><td>${r.perd}</td></tr>`).join("")}</tbody></table></div>
-    ${setters.length?`<h3 style="margin:16px 0 8px">Por setter</h3><div class="table-wrap" style="box-shadow:none"><table><thead><tr><th>Setter</th><th>Prospectos del mes</th><th>Mensajes enviados</th><th>Clientes nuevos</th><th>Tasa de cierre</th></tr></thead><tbody>${setters.map(s=>`<tr><td><b>${esc(s.n)}</b><div class="s">${esc(s.sede||"")}</div></td><td>${s.total}</td><td>${s.contactos}</td><td><b>${s.gan}</b></td><td>${s.tasa==null?"—":s.tasa+"%"}</td></tr>`).join("")}</tbody></table></div>`:""}
+    <div class="sede-cards">${live.map(r=>sedeCard(r.s,[["Prospectos",r.total,true],["Honorarios enviados",r.hon],["Llamada",r.llam],["Reunión",r.reun],["Clientes nuevos",r.gan,true],["Perdidos",r.perd]])).join("")}</div>
+    ${setters.length?`<h3 style="margin:16px 0 8px">Por setter</h3><div class="sede-cards">${setters.map(r=>sedeCard(r.sede||"Total",[["Prospectos del mes",r.total,true],["Mensajes enviados",r.contactos],["Clientes nuevos",r.gan,true],["Tasa de cierre",r.tasa!=null?r.tasa+"%":"—"]]).replace(`<b>${esc(r.sede||"Total")}</b>`,`<b>${esc(r.n)}</b><span class="s">${esc(r.sede||"")}</span>`)).join("")}</div>`:""}
   </section>
-  <section class="card">${cardH("Campañas "+y+" (historial de tu planilla + meses nuevos)", `<button class="btn sm pri" onclick="DIR.formCampana()">${icon("plus")}Cargar mes</button>`)}
-  <div class="table-wrap" style="box-shadow:none"><table><thead><tr><th>Mes</th><th>Sede</th><th class="num">Prosp.</th><th class="num">Llamadas</th><th class="num">PDF</th><th class="num">Clientes nuevos</th><th class="num">Conversión</th><th class="num">Inversión ads</th><th class="num">Costo x prosp.</th><th class="num">Ingresos</th><th class="num">ROAS</th><th></th></tr></thead><tbody>
-  ${rows.map(c=>{ const conv=c.prospectos&&c.clientes_nuevos!=null?Math.round(c.clientes_nuevos/c.prospectos*1000)/10+"%":"—"; const cpp=c.prospectos&&c.inversion?money(c.inversion/c.prospectos):"—"; const roas=c.inversion&&c.ingresos?(c.ingresos/c.inversion).toFixed(1)+"x":"—";
-    return `<tr><td>${MES_L[Number(String(c.mes).slice(5,7))-1]}</td><td><span class="sede-dot" style="--sc:${sedeColor(c.sede)}"></span>${esc(c.sede)}</td><td class="num">${f(c.prospectos)}</td><td class="num">${f(c.llamadas)}</td><td class="num">${f(c.pdf)}</td><td class="num"><b>${f(c.clientes_nuevos)}</b></td><td class="num">${conv}</td><td class="num">${c.inversion?money(c.inversion):"—"}</td><td class="num">${cpp}</td><td class="num">${c.ingresos?money(c.ingresos):"—"}</td><td class="num"><b>${roas}</b></td><td><button class="btn sm ghost" onclick="DIR.formCampana('${c.id}')">Editar</button></td></tr>`; }).join("")}
-  </tbody></table></div></section>`;
+  <section class="card">${cardH("Campañas "+y, `<button class="btn sm pri" onclick="DIR.formCampana()">${icon("plus")}Cargar mes</button>`)}
+    <div class="cam-meses"><button class="${!sel?"on":""}" onclick="DIR._camMes('')">Año ${y}</button>${meses.map(m=>`<button class="${sel===m?"on":""}" onclick="DIR._camMes('${m}')">${MES_L[Number(m.slice(5,7))-1]}</button>`).join("")}</div>
+    <p class="s" style="margin:0 0 10px">${sel?"Análisis de "+MES_L[Number(sel.slice(5,7))-1].toLowerCase()+" por sede.":"Suma de todo el año por sede."}</p>
+    ${rows.length?`<div class="sede-cards">${cards}</div>`:emptyMsg("Todavía no hay meses cargados.","chart")}
+  </section>`;
 }
 
 /* ---------- acciones ---------- */
@@ -476,6 +487,7 @@ window.DIR = {
   mes(k){ D.mes=addMes(D.mes,k); render(); }, buscar(q){ D.q=q; render(); },
   cobrar, marcarPagado, campo, generar, recordar, formCobro, saveCobro, formCuenta, saveCuenta, formGasto, saveGasto, copiarGastos,
   formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar, nuevaVisita, desdeAgenda, hecha,
+  _camMes(m){ D.camMes=m; render(); },
   _nv(k,v){ D.nv[k]=v; if(k==="cuenta") render(); },
   async _del(t,id){ if(await run(sb.from(t).delete().eq("id",id),"Borrado")) closeModal(); },
   _c(id){ return ultimoMonto(id)??cuenta(id)?.pack; }
