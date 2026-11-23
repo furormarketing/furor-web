@@ -141,10 +141,13 @@ let channel=null;
 const PK = { lecturas:r=>r.miembro_id+"|"+r.canal, config:r=>r.clave };
 const keyOf = (t,r) => (PK[t]||(x=>x.id))(r);
 let _rf=0;
-function renderSoon(){ if(_rf) return; _rf=requestAnimationFrame(()=>{ _rf=0; render(); }); }
+const escribiendoNota = () => { const a=document.activeElement; return !!(a && a.classList && (a.classList.contains("ns-in")||a.classList.contains("ns-new"))); };
+document.addEventListener("focusout", e=>{ if(e.target && e.target.classList && (e.target.classList.contains("ns-in")||e.target.classList.contains("ns-new"))) setTimeout(()=>{ if(S._pendRender && !escribiendoNota()){ S._pendRender=false; render(); } },60); });
+function renderSoon(){ if(escribiendoNota()){ S._pendRender=true; return; } if(_rf) return; _rf=requestAnimationFrame(()=>{ _rf=0; render(); }); }
 function applyChange(t, p){
   const arr=S[t]; if(!Array.isArray(arr)) return scheduleReload(t);
   const ev=p.eventType, nw=p.new, old=p.old;
+  if(t==="notas_semana" && ev==="UPDATE" && nw && document.activeElement && document.activeElement.id==="ns-"+nw.id){ const loc=arr.find(r=>r.id===nw.id); if(loc){ Object.assign(loc, nw, {texto:loc.texto}); return; } }
   if(ev==="DELETE"){ const k=keyOf(t,old); S[t]=arr.filter(r=>keyOf(t,r)!==k); }
   else {
     if(!nw || Array.isArray(nw) || Object.keys(nw).length===0 || (PK[t]?false:!nw.id)) return scheduleReload(t);
@@ -1079,7 +1082,7 @@ function nsCol(sem,dia,lbl,fecha){
   return `<div class="ns-col ${fecha===t?"hoy":""} ${fer.length?"ns-feriado":""} ${dia==="semana"?"ns-sem":""}">
     <div class="ns-h"><b>${lbl}</b>${fecha===t?`<span class="ns-hoy">hoy</span>`:""}${fer.length?`<span class="ns-fer">FERIADO</span>`:""}</div>
     ${notasDe(sem,dia).map(nsRow).join("")}
-    <input type="text" id="nsNew-${dia}" class="ns-new" placeholder="+ escribir…" onkeydown="nsNuevo(event,'${dia}')" onblur="if(this.value.trim())nsNuevo({key:'Enter',preventDefault(){},target:this},'${dia}')" aria-label="Nueva nota">
+    <input type="text" id="nsNew-${dia}" class="ns-new" placeholder="+ escribir…" value="${esc((S.nsDraft||{})[sem+dia]||"")}" oninput="(S.nsDraft=S.nsDraft||{})['${sem}${dia}']=this.value" onkeydown="nsNuevo(event,'${dia}')" onblur="nsSoltar(this,'${dia}')" aria-label="Nueva nota">
   </div>`;
 }
 function vMiSemana(){
@@ -1108,7 +1111,14 @@ async function nsCrear(dia,texto,orden){
 }
 function nsNuevo(e,dia){
   if(e.key!=="Enter") return; e.preventDefault(); const inp=e.target, txt=inp.value.trim(); if(!txt) return;
-  inp.value=""; const lista=notasDe(weekStart(S.nsOff),dia); nsCrear(dia,txt,(lista.length?lista[lista.length-1].orden:0)+1);
+  const sem=weekStart(S.nsOff); inp.value=""; if(S.nsDraft) delete S.nsDraft[sem+dia];
+  const lista=notasDe(sem,dia); nsCrear(dia,txt,(lista.length?Math.max(...lista.map(n=>n.orden||0)):0)+1);
+}
+function nsSoltar(inp,dia){
+  // al salir del renglón nuevo, si quedó algo escrito lo guarda como nota
+  if(!document.body.contains(inp)) return;
+  const txt=inp.value.trim(); if(!txt) return;
+  setTimeout(()=>{ if(document.activeElement===inp) return; nsNuevo({key:"Enter",preventDefault(){},target:inp},dia); },0);
 }
 function nsKey(e,id,dia){
   if(e.key==="Enter"){ e.preventDefault(); const nx=document.getElementById("nsNew-"+dia); if(nx) nx.focus(); }
