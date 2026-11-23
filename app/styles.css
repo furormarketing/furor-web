@@ -927,3 +927,30 @@ table.rtable input.inl[type=date]{width:140px}
 .cdays{grid-template-columns:repeat(5,minmax(0,1fr))}
 .pauta2{grid-template-columns:repeat(5,minmax(0,1fr))}
 @media (max-width:900px){ .pauta2{grid-template-columns:1fr} }
+/* Mi semana */
+.ns-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.ns-bar > b{font-size:16px;min-width:130px;text-align:center}
+.ns-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:10px}
+.ns-col{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;min-height:190px;display:flex;flex-direction:column;gap:2px;box-shadow:var(--shadow)}
+.ns-col.hoy{border:2px solid var(--brand)}
+.ns-col.ns-feriado{background:color-mix(in srgb,var(--danger) 6%,var(--surface))}
+.ns-col.ns-sem{min-height:0;border-style:dashed;box-shadow:none}
+.ns-h{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:14px}
+.ns-hoy{font-size:11px;font-weight:700;color:var(--brand)}
+.ns-fer{font-size:11px;font-weight:800;color:var(--danger);letter-spacing:.04em}
+.ns-row{display:flex;align-items:flex-start;gap:6px}
+.ns-ck{flex:none;width:18px;height:18px;margin-top:7px;border-radius:5px;border:2px solid var(--line);background:var(--surface);display:grid;place-items:center;padding:0;cursor:pointer;color:#fff}
+.ns-ck .ico{width:12px;height:12px}
+.ns-row.done .ns-ck{background:var(--brand);border-color:var(--brand)}
+.ns-in,.ns-new{flex:1;min-width:0;width:100%;border:0;background:transparent;font:inherit;font-size:14px;padding:6px 2px;color:var(--ink);border-radius:6px}
+.ns-in:focus,.ns-new:focus{outline:none;background:var(--brand-soft)}
+.ns-row.done .ns-in{text-decoration:line-through;color:var(--muted)}
+.ns-new{color:var(--muted);margin-top:2px}
+.ns-new::placeholder{color:var(--muted)}
+@media (max-width:1100px){ .ns-grid{grid-template-columns:1fr} .ns-col{min-height:0} .ns-in,.ns-new{font-size:16px} }
+.ns-col input.ns-in,.ns-col input.ns-new{border:0!important;background:transparent!important;box-shadow:none!important;height:auto!important;min-height:0!important;padding:5px 4px!important;border-radius:6px!important}
+.ns-col input.ns-in:focus,.ns-col input.ns-new:focus{background:var(--brand-soft)!important}
+.ns-col.ns-feriado .ns-h b{color:var(--danger)}
+.ns-col{justify-content:flex-start}
+.ns-col input.ns-in,.ns-col input.ns-new{margin:0!important;flex:0 0 auto}
+.ns-row{flex:0 0 auto}

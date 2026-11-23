@@ -70,6 +70,7 @@ Sin build, sin dependencias, sin `npm`. Es copiar archivos.
 | Pauta | Se marca con un toque y se guarda sola. `clientes.pauta` = `{lun:["Feed","Reel"],…}`. `pauta_desde` = desde cuándo cuenta para el calendario (al cargar la primera pauta, el lunes siguiente). |
 | Contenido | Pestañas **Calendario** (sale de las pautas) y **Links publicados** (los carga la CM; botón "Ya lo envié" y envío por WhatsApp). |
 | Ads clientes | Campañas por cliente (objetivo, inversión diaria, inicio/fin, estado), inversión cargada por el cliente (con "Usado / Sin usar") y **reporte para WhatsApp** con el formato de Marcelo. Cada reporte queda guardado. |
+| Tareas | Pestañas **Mi semana** (solo admin: pizarra lunes a viernes + "para esta semana", tachar, pasar pendientes), **Mías** y **Todas** (tareas asignadas con estados). |
 | Prospectos | Lista agrupada por mes de carga. Etapas: Contactado, Honorarios enviados, Llamada, Reunión, Cliente nuevo (`Ganado` en la base), Perdido. **Sin alertas de seguimiento** (pedido explícito). |
 | Material | Separado por servicio: Sistemas MKT, Desarrollo web, Gestión Ads, General. Sin indicador de vigente. |
 | Dirección (solo admin) | Resumen (cobrado, por cobrar, gastos + equipo, **Sueldo Marcelo**), Cobros, Visitas (filmaker; el pago a modelo lo abona el cliente y es solo registro), Gastos, Equipo, Comercial. Edición en línea. Meses pasados muestran solo lo registrado; mes actual suma clientes activos sin pago. |
@@ -78,6 +79,9 @@ Sin build, sin dependencias, sin `npm`. Es copiar archivos.
 
 ### Tablas del equipo (todas con RLS `es_miembro()`)
 `miembros`, `clientes`, `tareas`, `eventos` (tipo: Reunión, Llamada, Videollamada, Visita, Feriado), `entregas`, `publicaciones` (lo marcado como publicado en el calendario), `publicados` (links), `mensajes` (chat; `tarea_id` para chats de tareas, `adjuntos` jsonb para fotos/audios), `lecturas` (visto por canal), `novedades`, `config`, `material` (escritura solo admin), `plantillas` (escritura solo admin), `prospectos`, `ads_campanas`, `ads_saldos`, `ads_reportes`.
+
+### Tabla personal
+`notas_semana` (pizarra "Mi semana" de Tareas): RLS `miembro_id = mi_id()`, cada uno ve solo sus notas. Hoy la pestaña solo se muestra al admin.
 
 ### Tablas privadas (RLS `es_admin()`)
 `fin_cuentas` (cliente de Dirección: pack, día de cobro, alta, activo, `cobro_con`), `fin_cobros` (estado: Pagado / Parcial / Pendiente; en Parcial el monto es lo que realmente entró), `fin_gastos`, `fin_equipo` (concepto "Retiro" = retiro de Marcelo, no cuenta como gasto), `fin_campanas`, `fin_visitas`.

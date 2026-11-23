@@ -75,13 +75,13 @@ const DKEYS = ["lun","mar","mie","jue","vie","sab","dom"];
 const DIAS = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const MES_C = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
-const TABLES = ["miembros","clientes","tareas","eventos","entregas","publicaciones","mensajes","novedades","config","material","plantillas","prospectos","publicados","lecturas","ads_campanas","ads_saldos","ads_reportes"];
+const TABLES = ["miembros","clientes","tareas","eventos","entregas","publicaciones","mensajes","novedades","config","material","plantillas","prospectos","publicados","lecturas","ads_campanas","ads_saldos","ads_reportes","notas_semana"];
 const MAX_MB = 50;
 
 /* ---------- Estado ---------- */
 const S = {
   session:null, me:null, loading:true, authMode:"entrar", authErr:"", authBusy:false,
-  miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[], material:[], plantillas:[], prospectos:[], publicados:[], ads_campanas:[], ads_saldos:[], ads_reportes:[], adsAll:false, adsQ:"", rep:null, adsHist:{}, selPub:{}, lecturas:[], rec:null,
+  miembros:[], clientes:[], tareas:[], eventos:[], entregas:[], publicaciones:[], mensajes:[], novedades:[], config:[], material:[], plantillas:[], prospectos:[], publicados:[], ads_campanas:[], ads_saldos:[], ads_reportes:[], notas_semana:[], nsOff:0, adsAll:false, adsQ:"", rep:null, adsHist:{}, selPub:{}, lecturas:[], rec:null,
   more:false, chatOpen:false, tEstM:'pendiente', pendAtt:{}, sending:false, tareaId:null, mobile:window.matchMedia('(max-width:900px)').matches, pEtM:'',
   view:"inicio", cliId:null, cliTab:"resumen",
   f:{ cliQ:"", cliSede:"", cliEstado:"Activo", tScope:"todas", tArea:"", agSede:"", calSel:null, ctScope:"todas", chatQ:"", pScope:"todos", pSede:"", pQ:"", matCat:"", tplEt:"", pubEst:"pendientes", pubCli:"", pubQ:"" },
@@ -121,7 +121,7 @@ function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("sh
 const ls = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
 
 /* ---------- Datos ---------- */
-const ORDER = { mensajes:["creado",true], novedades:["creado",false], miembros:["nombre",true], clientes:["nombre",true], material:["creado",false], plantillas:["orden",true], prospectos:["actualizado",false], publicados:["fecha",false], ads_campanas:["inicio",false], ads_saldos:["fecha",false], ads_reportes:["hasta",false] };
+const ORDER = { mensajes:["creado",true], novedades:["creado",false], miembros:["nombre",true], clientes:["nombre",true], material:["creado",false], plantillas:["orden",true], prospectos:["actualizado",false], publicados:["fecha",false], ads_campanas:["inicio",false], ads_saldos:["fecha",false], ads_reportes:["hasta",false], notas_semana:["orden",true] };
 async function loadTable(t){
   let q = sb.from(t).select("*");
   if(ORDER[t]) q = q.order(ORDER[t][0], {ascending:ORDER[t][1]});
@@ -1038,8 +1038,15 @@ async function descargarImagen(mid,i){
 async function resolver(id){ await run(sb.from("mensajes").update({resuelto:true}).eq("id",id),"Pedido resuelto"); }
 
 /* ---------- Tareas ---------- */
+function tScopeSeg(){
+  const ops=[...(isAdmin()?[["semana","Mi semana"]]:[]),["mias","Mías"],["todas","Todas"]];
+  return `<div class="seg">${ops.map(([k,l])=>`<button class="${S.f.tScope===k?"on":""}" onclick="S.f.tScope='${k}';render()">${l}</button>`).join("")}</div>`;
+}
 function vTareas(){
   if(S.tareaId){ const t=S.tareas.find(x=>x.id===S.tareaId); if(t) return vTarea(t); }
+  if(isAdmin() && !S._tInit){ S._tInit=true; S.f.tScope="semana"; }
+  if(S.f.tScope==="semana" && !isAdmin()) S.f.tScope="todas";
+  if(S.f.tScope==="semana") return vMiSemana();
   let list=S.tareas.slice();
   if(S.f.tScope==="mias") list=list.filter(t=>t.asignado===S.me.id);
   if(S.f.tArea) list=list.filter(t=>t.area===S.f.tArea);
@@ -1050,15 +1057,68 @@ function vTareas(){
     let it=list.filter(t=>t.estado===S.tEstM);
     it = S.tEstM==="hecha" ? it.sort((a,b)=>String(b.hecha_el||"").localeCompare(String(a.hecha_el||""))).slice(0,30) : sortTasks(it);
     return `<div class="m-head"><div><div class="eyebrow">Operación</div><h1>Tareas</h1></div></div>
-    <div class="m-filters"><div class="seg"><button class="${S.f.tScope==="todas"?"on":""}" onclick="S.f.tScope='todas';render()">Todas</button><button class="${S.f.tScope==="mias"?"on":""}" onclick="S.f.tScope='mias';render()">Mías</button></div>
+    <div class="m-filters">${tScopeSeg()}
       <select id="tAreaM" aria-label="Área" onchange="S.f.tArea=this.value;render()"><option value="">Todas las áreas</option>${AREAS.map(a=>`<option ${S.f.tArea===a?"selected":""}>${a}</option>`).join("")}</select></div>
     <div class="etabs">${cols.map(([k,l])=>`<button class="${S.tEstM===k?"on":""}" style="--c:${k==="pendiente"?"var(--s-otra)":k==="curso"?"var(--info)":"var(--ok)"}" onclick="S.tEstM='${k}';render()"><span class="dot"></span>${l}<b>${list.filter(t=>t.estado===k).length}</b></button>`).join("")}</div>
     <div>${it.map(taskCard).join("")||`<div class="card">${emptyMsg("No hay tareas acá.","check")}</div>`}</div>`;
   }
   return `<div class="head"><div><div class="eyebrow">Operación</div><h1>Tareas</h1><p>Quién hace qué, para qué cliente y para cuándo</p></div><button class="btn pri" onclick="formTarea()">${icon("plus")}Nueva tarea</button></div>
-  <div class="toolbar"><div class="seg"><button class="${S.f.tScope==="todas"?"on":""}" onclick="S.f.tScope='todas';render()">Todas</button><button class="${S.f.tScope==="mias"?"on":""}" onclick="S.f.tScope='mias';render()">Mías</button></div>
+  <div class="toolbar">${tScopeSeg()}
     <select id="tArea" aria-label="Área" onchange="S.f.tArea=this.value;render()"><option value="">Todas las áreas</option>${AREAS.map(a=>`<option ${S.f.tArea===a?"selected":""}>${a}</option>`).join("")}</select></div>
   <div class="board">${[["pendiente","Por hacer"],["curso","En curso"],["hecha","Hechas"]].map(col).join("")}</div>`;
+}
+/* ---------- Mi semana (pizarra personal, solo admin) ---------- */
+const NS_DIAS=[["lun","Lun"],["mar","Mar"],["mie","Mié"],["jue","Jue"],["vie","Vie"]];
+function notasDe(sem,dia){ return S.notas_semana.filter(n=>n.semana===sem&&n.dia===dia&&n.miembro_id===S.me.id).sort((a,b)=>(a.orden-b.orden)||String(a.creado).localeCompare(String(b.creado))); }
+function nsRow(n){
+  return `<div class="ns-row ${n.hecho?"done":""}"><button type="button" class="ns-ck" onclick="nsToggle('${n.id}')" aria-label="${n.hecho?"Desmarcar":"Tachar"}">${n.hecho?icon("ok"):""}</button>
+    <input type="text" id="ns-${n.id}" class="ns-in" value="${esc(n.texto)}" oninput="nsEdit('${n.id}',this.value)" onchange="nsBlur('${n.id}',this.value)" onkeydown="nsKey(event,'${n.id}','${n.dia}')" aria-label="Nota"></div>`;
+}
+function nsCol(sem,dia,lbl,fecha){
+  const t=today(), fer=fecha?feriadosDe(fecha,S.me.sede):[];
+  return `<div class="ns-col ${fecha===t?"hoy":""} ${fer.length?"ns-feriado":""} ${dia==="semana"?"ns-sem":""}">
+    <div class="ns-h"><b>${lbl}</b>${fecha===t?`<span class="ns-hoy">hoy</span>`:""}${fer.length?`<span class="ns-fer">FERIADO</span>`:""}</div>
+    ${notasDe(sem,dia).map(nsRow).join("")}
+    <input type="text" id="nsNew-${dia}" class="ns-new" placeholder="+ escribir…" onkeydown="nsNuevo(event,'${dia}')" onblur="if(this.value.trim())nsNuevo({key:'Enter',preventDefault(){},target:this},'${dia}')" aria-label="Nueva nota">
+  </div>`;
+}
+function vMiSemana(){
+  const sem=weekStart(S.nsOff), dias=NS_DIAS.map(([k,l],i)=>[k,l,addDays(sem,i)]);
+  const pend=S.notas_semana.filter(n=>n.semana===sem&&!n.hecho&&n.texto.trim()).length;
+  const head = S.mobile ? `<div class="m-head"><div><div class="eyebrow">Operación</div><h1>Tareas</h1></div></div><div class="m-filters">${tScopeSeg()}</div>`
+    : `<div class="head"><div><div class="eyebrow">Operación</div><h1>Tareas</h1><p>Tu pizarra de la semana. Escribí, tachá y pasá lo pendiente. Solo la ves vos.</p></div></div><div class="toolbar">${tScopeSeg()}</div>`;
+  return `${head}
+  <div class="ns-bar"><button class="btn" onclick="S.nsOff--;render()" aria-label="Semana anterior">‹</button><b>${fmtDate(sem)} – ${fmtDate(addDays(sem,4))}</b><button class="btn" onclick="S.nsOff++;render()" aria-label="Semana siguiente">›</button>
+    ${S.nsOff?`<button class="btn" onclick="S.nsOff=0;render()">Esta semana</button>`:""}<span style="flex:1"></span>
+    ${pend?`<button class="btn" onclick="nsPasar('${sem}')">${icon("send")}Pasar lo pendiente a la semana que viene (${pend})</button>`:""}</div>
+  <div class="ns-grid">${dias.map(([k,l,f])=>nsCol(sem,k,`${l} ${parseYmd(f).getDate()}`,f)).join("")}</div>
+  ${nsCol(sem,"semana","Para esta semana · sin día fijo",null)}`;
+}
+const nsTimers={};
+function nsEdit(id,val){ const n=S.notas_semana.find(x=>x.id===id); if(!n) return; n.texto=val; clearTimeout(nsTimers[id]); nsTimers[id]=setTimeout(()=>{ if(!String(id).startsWith("tmp")) sb.from("notas_semana").update({texto:val}).eq("id",id).then(({error})=>{ if(error) toast("No se pudo guardar la nota."); }); },600); }
+async function nsBlur(id,val){ if(val.trim()) return; clearTimeout(nsTimers[id]); S.notas_semana=S.notas_semana.filter(x=>x.id!==id); render(); if(!String(id).startsWith("tmp")) await sb.from("notas_semana").delete().eq("id",id); }
+async function nsToggle(id){ const n=S.notas_semana.find(x=>x.id===id); if(!n) return; n.hecho=!n.hecho; render(); const { error } = await sb.from("notas_semana").update({hecho:n.hecho}).eq("id",id); if(error){ n.hecho=!n.hecho; render(); toast("No se pudo guardar."); } }
+async function nsCrear(dia,texto,orden){
+  const sem=weekStart(S.nsOff), tmp={id:"tmp"+Date.now()+Math.random(),miembro_id:S.me.id,semana:sem,dia,texto,hecho:false,orden,creado:new Date().toISOString()};
+  S.notas_semana.push(tmp); render();
+  const { data, error } = await sb.from("notas_semana").insert({miembro_id:S.me.id,semana:sem,dia,texto,orden}).select().single();
+  S.notas_semana=S.notas_semana.filter(x=>x.id!==tmp.id);
+  if(error){ render(); toast("No se pudo guardar la nota."); return null; }
+  applyChange("notas_semana",{eventType:"INSERT",new:data}); return data;
+}
+function nsNuevo(e,dia){
+  if(e.key!=="Enter") return; e.preventDefault(); const inp=e.target, txt=inp.value.trim(); if(!txt) return;
+  inp.value=""; const lista=notasDe(weekStart(S.nsOff),dia); nsCrear(dia,txt,(lista.length?lista[lista.length-1].orden:0)+1);
+}
+function nsKey(e,id,dia){
+  if(e.key==="Enter"){ e.preventDefault(); const nx=document.getElementById("nsNew-"+dia); if(nx) nx.focus(); }
+  else if(e.key==="Backspace" && !e.target.value){ e.preventDefault(); nsBlur(id,""); const nx=document.getElementById("nsNew-"+dia); if(nx) setTimeout(()=>{ const n2=document.getElementById("nsNew-"+dia); if(n2) n2.focus(); }); }
+}
+async function nsPasar(sem){
+  const ids=S.notas_semana.filter(n=>n.semana===sem&&!n.hecho&&n.texto.trim()).map(n=>n.id).filter(id=>!String(id).startsWith("tmp")); if(!ids.length) return;
+  const nueva=addDays(sem,7); S.notas_semana.forEach(n=>{ if(ids.includes(n.id)) n.semana=nueva; }); render();
+  const { error } = await sb.from("notas_semana").update({semana:nueva}).in("id",ids);
+  if(error){ toast("No se pudo pasar."); return; } toast(ids.length+(ids.length>1?" notas pasadas":" nota pasada")+" a la semana del "+fmtDate(nueva));
 }
 function taskCard(t){
   const late=t.vence&&t.vence<today()&&t.estado!=="hecha";
@@ -1158,7 +1218,7 @@ function vDireccion(){
 /* ---------- Botón flotante (celular) ---------- */
 function renderFab(){
   const f=$("#fab"); if(!f) return;
-  const map={inicio:["Agendar","formEvento()"],agenda:["Agendar","formEvento()"],tareas:S.tareaId?null:["Nueva tarea","formTarea()"],prospectos:["Nuevo prospecto","formProspecto()"],ads:["Nueva campaña","formCampAds()"],clientes:S.cliId?null:["Nuevo cliente","formCliente()"],contenido:S.ctTab==="pub"?["Cargar link","formPublicado()"]:null,material:isAdmin()?["Subir material","formMaterial()"]:null,novedades:null,equipo:isAdmin()?["Sumar integrante","formMiembro()"]:null};
+  const map={inicio:["Agendar","formEvento()"],agenda:["Agendar","formEvento()"],tareas:(S.tareaId||S.f.tScope==="semana")?null:["Nueva tarea","formTarea()"],prospectos:["Nuevo prospecto","formProspecto()"],ads:["Nueva campaña","formCampAds()"],clientes:S.cliId?null:["Nuevo cliente","formCliente()"],contenido:S.ctTab==="pub"?["Cargar link","formPublicado()"]:null,material:isAdmin()?["Subir material","formMaterial()"]:null,novedades:null,equipo:isAdmin()?["Sumar integrante","formMiembro()"]:null};
   const a=map[S.view];
   document.body.classList.toggle("has-fab",!!a);
   if(!a){ f.hidden=true; return; }
