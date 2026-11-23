@@ -20,6 +20,7 @@ const navItems = () => NAV.filter(n=>n[0]!=="direccion"||isAdmin());
 const MOBILE_NAV = ["inicio","agenda","prospectos","chat"];
 const ICONS = {
   mega:'<path d="M3 10v4a1 1 0 0 0 1 1h3l6 4.5v-15L7 9H4a1 1 0 0 0-1 1z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 5.5a9 9 0 0 1 0 13"/>',
+  trash:'<path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
   home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
   cal:'<rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>',
   check:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/>',
@@ -117,6 +118,7 @@ const cliName = id => cli(id)?.nombre || "";
 const norm = s => String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
 const hermanos = c => c && c.contacto ? S.clientes.filter(x=>x.id!==c.id && norm(x.contacto)===norm(c.contacto) && norm(x.contacto)!==norm(x.nombre)) : [];
 const cfg = k => (S.config.find(c=>c.clave===k)||{}).valor || null;
+function toastAccion(msg,label,fn,ms){ const t=$("#toast"); t.innerHTML=`<span>${esc(msg)}</span><button type="button" class="toast-btn">${esc(label)}</button>`; t.querySelector("button").onclick=()=>{ t.classList.remove("show"); fn(); }; t.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"),ms||5000); }
 function toast(msg){ const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"),3000); }
 const ls = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
 
@@ -1075,7 +1077,7 @@ const NS_DIAS=[["lun","Lun"],["mar","Mar"],["mie","Mié"],["jue","Jue"],["vie","
 function notasDe(sem,dia){ return S.notas_semana.filter(n=>n.semana===sem&&n.dia===dia&&n.miembro_id===S.me.id).sort((a,b)=>(a.orden-b.orden)||String(a.creado).localeCompare(String(b.creado))); }
 function nsRow(n){
   return `<div class="ns-row ${n.hecho?"done":""}"><button type="button" class="ns-ck" onclick="nsToggle('${n.id}')" aria-label="${n.hecho?"Desmarcar":"Tachar"}">${n.hecho?icon("ok"):""}</button>
-    <input type="text" id="ns-${n.id}" class="ns-in" value="${esc(n.texto)}" oninput="nsEdit('${n.id}',this.value)" onchange="nsBlur('${n.id}',this.value)" onkeydown="nsKey(event,'${n.id}','${n.dia}')" aria-label="Nota"></div>`;
+    <input type="text" id="ns-${n.id}" class="ns-in" value="${esc(n.texto)}" oninput="nsEdit('${n.id}',this.value)" onchange="nsBlur('${n.id}',this.value)" onkeydown="nsKey(event,'${n.id}','${n.dia}')" aria-label="Nota"><button type="button" class="ns-x" onclick="nsBlur('${n.id}','')" title="Borrar" aria-label="Borrar nota">✕</button></div>`;
 }
 function nsCol(sem,dia,lbl,fecha){
   const t=today(), fer=fecha?feriadosDe(fecha,S.me.sede):[];
@@ -1130,6 +1132,13 @@ async function nsPasar(sem){
   const { error } = await sb.from("notas_semana").update({semana:nueva}).in("id",ids);
   if(error){ toast("No se pudo pasar."); return; } toast(ids.length+(ids.length>1?" notas pasadas":" nota pasada")+" a la semana del "+fmtDate(nueva));
 }
+const _borrando={};
+function borrarTarea(id){
+  const t=S.tareas.find(x=>x.id===id); if(!t) return;
+  S.tareas=S.tareas.filter(x=>x.id!==id); if(S.tareaId===id) location.hash="tareas"; render();
+  _borrando[id]=setTimeout(async()=>{ delete _borrando[id]; const { error } = await sb.from("tareas").delete().eq("id",id); if(error){ S.tareas.push(t); render(); toast("No se pudo borrar la tarea."); } },5000);
+  toastAccion("Tarea borrada","Deshacer",()=>{ clearTimeout(_borrando[id]); delete _borrando[id]; if(!S.tareas.some(x=>x.id===id)) S.tareas.push(t); render(); toast("Tarea recuperada"); });
+}
 function taskCard(t){
   const late=t.vence&&t.vence<today()&&t.estado!=="hecha";
   const nCom=S.mensajes.filter(m=>m.tarea_id===t.id).length, nImg=S.mensajes.filter(m=>m.tarea_id===t.id).reduce((a,m)=>a+(m.adjuntos||[]).length,0), un=unread("t-"+t.id);
@@ -1137,7 +1146,7 @@ function taskCard(t){
   ${t.detalle?`<div class="s" style="white-space:pre-wrap">${esc(t.detalle.length>140?t.detalle.slice(0,140)+"…":t.detalle)}</div>`:""}
   <div class="meta"><span>${esc(memName(t.asignado))}</span>${t.cliente_id?`<span>· ${esc(cliName(t.cliente_id))}</span>`:""}${t.area?`<span>· ${esc(t.area)}</span>`:""}</div>
   ${nCom?`<div class="meta"><span class="pill ${un?"bad":""}">${icon("chat")}${nCom} mensaje${nCom>1?"s":""}${un?" · "+un+" sin leer":""}</span>${nImg?`<span class="pill">${icon("image")}${nImg}</span>`:""}</div>`:""}
-  <div class="acts">${t.vence?`<span class="pill ${late?"bad":t.vence===today()?"warn":""}">${esc(late?"Venció "+fmtDate(t.vence):"Vence "+fmtDate(t.vence))}</span>`:""}<button class="btn sm" onclick="advance('${t.id}')">${t.estado==="hecha"?"Reabrir":t.estado==="curso"?"Terminar":"Empezar"}</button></div></div>`;
+  <div class="acts">${t.vence?`<span class="pill ${late?"bad":t.vence===today()?"warn":""}">${esc(late?"Venció "+fmtDate(t.vence):"Vence "+fmtDate(t.vence))}</span>`:""}<button class="btn sm" onclick="advance('${t.id}')">${t.estado==="hecha"?"Reabrir":t.estado==="curso"?"Terminar":"Empezar"}</button><button class="btn sm ghost ic del-t" onclick="borrarTarea('${t.id}')" title="Borrar tarea" aria-label="Borrar tarea">${icon("trash")}</button></div></div>`;
 }
 async function advance(id){
   const t=S.tareas.find(x=>x.id===id); if(!t) return;
@@ -1150,7 +1159,7 @@ function vTarea(t){
   const PR={alta:"Alta",media:"Media",baja:"Baja"}, ES={pendiente:"Por hacer",curso:"En curso",hecha:"Hecha"};
   return `<div class="head"><div><div class="eyebrow"><a href="#tareas" style="text-decoration:none">← Tareas</a></div><h1>${esc(t.titulo)}</h1>
     <p>${esc([t.cliente_id?cliName(t.cliente_id):"", t.area].filter(Boolean).join(" · "))}</p></div>
-    <div class="acts"><button class="btn" onclick="formTarea('${t.id}')">${icon("edit")}Editar</button><button class="btn pri" onclick="advance('${t.id}')">${t.estado==="hecha"?"Reabrir":t.estado==="curso"?"Marcar terminada":"Empezar"}</button></div></div>
+    <div class="acts"><button class="btn ghost del-t" onclick="borrarTarea('${t.id}')">${icon("trash")}Borrar</button><button class="btn" onclick="formTarea('${t.id}')">${icon("edit")}Editar</button><button class="btn pri" onclick="advance('${t.id}')">${t.estado==="hecha"?"Reabrir":t.estado==="curso"?"Marcar terminada":"Empezar"}</button></div></div>
   <div class="split">
     <section class="card" style="padding:0;overflow:hidden">${thread("t-"+t.id)}</section>
     <section class="card"><h2 style="margin-bottom:12px">Detalle</h2><dl class="ficha">

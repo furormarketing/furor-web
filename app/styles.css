@@ -954,3 +954,18 @@ table.rtable input.inl[type=date]{width:140px}
 .ns-col{justify-content:flex-start}
 .ns-col input.ns-in,.ns-col input.ns-new{margin:0!important;flex:0 0 auto}
 .ns-row{flex:0 0 auto}
+.toast.show{display:flex;align-items:center;gap:12px}
+.toast-btn{font:inherit;font-size:13px;font-weight:800;background:none;border:0;color:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:4px 6px;text-transform:uppercase;letter-spacing:.03em}
+.del-t{color:var(--muted)} .del-t:hover{color:var(--danger);background:var(--danger-soft)}
+.del-t .ico{width:16px;height:16px}
+.ns-x{flex:none;border:0;background:none;color:var(--muted);cursor:pointer;font-size:13px;padding:6px 4px;opacity:0;transition:opacity .15s}
+.ns-row:hover .ns-x,.ns-row:focus-within .ns-x{opacity:1}
+.ns-x:hover{color:var(--danger)}
+@media (hover:none){ .ns-x{opacity:.6} }
+@media (max-width:900px){
+  .toast{bottom:calc(84px + env(safe-area-inset-bottom))}
+  .m-filters{flex-wrap:wrap}
+  .m-filters .seg{flex:1 1 100%;display:flex}
+  .m-filters .seg button{flex:1;white-space:nowrap}
+  .m-filters select{flex:1 1 100%}
+}
