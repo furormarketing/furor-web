@@ -133,6 +133,7 @@ async function loadTable(t){
   const { data, error } = await q;
   if(error){ console.error(t,error); return; }
   S[t] = t==="mensajes" ? (data||[]).reverse() : (data||[]);
+  if(t==="tareas" && typeof _borrando!=="undefined") S.tareas=S.tareas.filter(x=>!_borrando[x.id]);
 }
 const reloadTimers = {};
 function scheduleReload(t){
@@ -153,6 +154,7 @@ function applyChange(t, p){
   if(ev==="DELETE"){ const k=keyOf(t,old); S[t]=arr.filter(r=>keyOf(t,r)!==k); }
   else {
     if(!nw || Array.isArray(nw) || Object.keys(nw).length===0 || (PK[t]?false:!nw.id)) return scheduleReload(t);
+    if(t==="tareas" && _borrando[nw.id]) return;
     const k=keyOf(t,nw), i=arr.findIndex(r=>keyOf(t,r)===k);
     // reemplaza el mensaje "enviando…" propio por el definitivo
     if(ev==="INSERT" && t==="mensajes") S.mensajes=arr.filter(r=>!(String(r.id).startsWith("tmp")&&r.autor===nw.autor&&(r.texto||"")===(nw.texto||"")&&(r.adjuntos||[]).length===(nw.adjuntos||[]).length));
@@ -286,7 +288,8 @@ window.addEventListener("hashchange", route);
 const openTasks = () => S.tareas.filter(t=>t.estado!=="hecha");
 const overdue = l => l.filter(t=>t.vence && t.vence<today());
 const prio = {alta:0,media:1,baja:2};
-const sortTasks = l => l.slice().sort((a,b)=>(prio[a.prioridad]??1)-(prio[b.prioridad]??1) || String(a.vence||"9999").localeCompare(String(b.vence||"9999")));
+const vencida = t => !!(t.vence && t.vence<today() && t.estado!=="hecha");
+const sortTasks = l => l.slice().sort((a,b)=>(vencida(b)-vencida(a)) || (prio[a.prioridad]??1)-(prio[b.prioridad]??1) || String(a.vence||"9999").localeCompare(String(b.vence||"9999")));
 const evFrom = from => S.eventos.filter(e=>e.fecha>=from).sort((a,b)=>(a.fecha+(a.hora||"")).localeCompare(b.fecha+(b.hora||"")));
 const pubDone = (cid,fecha,f) => S.publicaciones.some(p=>p.cliente_id===cid&&p.fecha===fecha&&p.formato===f);
 const proxLunes = () => { const d=parseYmd(today()), w=d.getDay(); return addDays(today(), w===1?0:((8-w)%7||7)); };
@@ -1055,8 +1058,8 @@ function vTareas(){
   let list=S.tareas.slice();
   if(S.f.tScope==="mias") list=list.filter(t=>t.asignado===S.me.id);
   if(S.f.tArea) list=list.filter(t=>t.area===S.f.tArea);
-  const col=([k,l])=>{ let it=list.filter(t=>t.estado===k); it = k==="hecha" ? it.sort((a,b)=>String(b.hecha_el||"").localeCompare(String(a.hecha_el||""))).slice(0,20) : sortTasks(it);
-    return `<div class="col"><h3>${l}<span class="pill">${it.length}</span></h3>${it.length?it.map(taskCard).join(""):`<div class="empty">Vacío</div>`}</div>`; };
+  const col=([k,l])=>{ let it=list.filter(t=>t.estado===k); const n=it.length; it = k==="hecha" ? it.sort((a,b)=>String(b.hecha_el||"").localeCompare(String(a.hecha_el||""))).slice(0,20) : sortTasks(it);
+    return `<div class="col"><h3>${l}<span class="pill">${n}</span></h3>${it.length?it.map(taskCard).join(""):`<div class="empty">Vacío</div>`}${n>it.length?`<div class="s" style="padding:4px 2px">Se muestran las últimas ${it.length}.</div>`:""}</div>`; };
   if(S.mobile){
     const cols=[["pendiente","Por hacer"],["curso","En curso"],["hecha","Hechas"]];
     let it=list.filter(t=>t.estado===S.tEstM);
@@ -1065,7 +1068,7 @@ function vTareas(){
     <div class="m-filters">${tScopeSeg()}
       <select id="tAreaM" aria-label="Área" onchange="S.f.tArea=this.value;render()"><option value="">Todas las áreas</option>${AREAS.map(a=>`<option ${S.f.tArea===a?"selected":""}>${a}</option>`).join("")}</select></div>
     <div class="etabs">${cols.map(([k,l])=>`<button class="${S.tEstM===k?"on":""}" style="--c:${k==="pendiente"?"var(--s-otra)":k==="curso"?"var(--info)":"var(--ok)"}" onclick="S.tEstM='${k}';render()"><span class="dot"></span>${l}<b>${list.filter(t=>t.estado===k).length}</b></button>`).join("")}</div>
-    <div>${it.map(taskCard).join("")||`<div class="card">${emptyMsg("No hay tareas acá.","check")}</div>`}</div>`;
+    <div>${it.map(taskCard).join("")||`<div class="card">${emptyMsg(S.tEstM==="hecha"?"Todavía no hay tareas terminadas.":"No hay tareas acá.","check")}</div>`}${S.tEstM==="hecha"&&list.filter(t=>t.estado==="hecha").length>it.length?`<div class="s" style="padding:4px 2px">Se muestran las últimas ${it.length}.</div>`:""}</div>`;
   }
   return `<div class="head"><div><div class="eyebrow">Operación</div><h1>Tareas</h1><p>Quién hace qué, para qué cliente y para cuándo</p></div><button class="btn pri" onclick="formTarea()">${icon("plus")}Nueva tarea</button></div>
   <div class="toolbar">${tScopeSeg()}
@@ -1133,25 +1136,44 @@ async function nsPasar(sem){
   if(error){ toast("No se pudo pasar."); return; } toast(ids.length+(ids.length>1?" notas pasadas":" nota pasada")+" a la semana del "+fmtDate(nueva));
 }
 const _borrando={};
-function borrarTarea(id){
-  const t=S.tareas.find(x=>x.id===id); if(!t) return;
-  S.tareas=S.tareas.filter(x=>x.id!==id); if(S.tareaId===id) location.hash="tareas"; render();
-  _borrando[id]=setTimeout(async()=>{ delete _borrando[id]; const { error } = await sb.from("tareas").delete().eq("id",id); if(error){ S.tareas.push(t); render(); toast("No se pudo borrar la tarea."); } },5000);
-  toastAccion("Tarea borrada","Deshacer",()=>{ clearTimeout(_borrando[id]); delete _borrando[id]; if(!S.tareas.some(x=>x.id===id)) S.tareas.push(t); render(); toast("Tarea recuperada"); });
+async function _borrarYa(id){
+  const p=_borrando[id]; if(!p) return; clearTimeout(p.timer); delete _borrando[id];
+  const paths=S.mensajes.filter(m=>m.tarea_id===id).flatMap(m=>(m.adjuntos||[]).map(a=>a.path)).filter(Boolean);
+  const { error } = await sb.from("tareas").delete().eq("id",id);
+  if(error){ if(!S.tareas.some(x=>x.id===id)) S.tareas.push(p.t); render(); toast("No se pudo borrar la tarea."); return; }
+  S.mensajes=S.mensajes.filter(m=>m.tarea_id!==id);
+  if(paths.length) sb.storage.from("chat").remove(paths);
 }
+function borrarTarea(id){
+  const t=S.tareas.find(x=>x.id===id); if(!t||_borrando[id]) return;
+  if($("#modal form[onsubmit*='saveTarea']")) closeModal();
+  S.tareas=S.tareas.filter(x=>x.id!==id); if(S.tareaId===id) location.hash="tareas"; render();
+  _borrando[id]={t,timer:setTimeout(()=>_borrarYa(id),5000)};
+  toastAccion("Tarea borrada","Deshacer",()=>{ const p=_borrando[id]; if(!p) return; clearTimeout(p.timer); delete _borrando[id]; if(!S.tareas.some(x=>x.id===id)) S.tareas.push(t); render(); toast("Tarea recuperada"); });
+}
+// si se cierra o se minimiza la app con un borrado en espera, se borra en ese momento
+const _flushBorrados=()=>Object.keys(_borrando).forEach(_borrarYa);
+window.addEventListener("pagehide",_flushBorrados);
+document.addEventListener("visibilitychange",()=>{ if(document.hidden) _flushBorrados(); });
 function taskCard(t){
   const late=t.vence&&t.vence<today()&&t.estado!=="hecha";
   const nCom=S.mensajes.filter(m=>m.tarea_id===t.id).length, nImg=S.mensajes.filter(m=>m.tarea_id===t.id).reduce((a,m)=>a+(m.adjuntos||[]).length,0), un=unread("t-"+t.id);
-  return `<div class="task p-${esc(t.prioridad)}"><a class="t" href="#tarea-${t.id}" style="color:inherit;text-decoration:none;display:block">${esc(t.titulo)}</a>
+  return `<div class="task p-${esc(t.prioridad)} ${late?"late":""}" onclick="if(!event.target.closest('button,a'))location.hash='tarea-${t.id}'"><a class="t" href="#tarea-${t.id}" style="color:inherit;text-decoration:none;display:block">${esc(t.titulo)}</a>
   ${t.detalle?`<div class="s" style="white-space:pre-wrap">${esc(t.detalle.length>140?t.detalle.slice(0,140)+"…":t.detalle)}</div>`:""}
-  <div class="meta"><span>${esc(memName(t.asignado))}</span>${t.cliente_id?`<span>· ${esc(cliName(t.cliente_id))}</span>`:""}${t.area?`<span>· ${esc(t.area)}</span>`:""}</div>
+  <div class="meta"><span>${t.asignado?esc(memName(t.asignado)):"Sin responsable"}</span>${t.cliente_id?`<span>· ${esc(cliName(t.cliente_id))}</span>`:""}${t.area?`<span>· ${esc(t.area)}</span>`:""}</div>
   ${nCom?`<div class="meta"><span class="pill ${un?"bad":""}">${icon("chat")}${nCom} mensaje${nCom>1?"s":""}${un?" · "+un+" sin leer":""}</span>${nImg?`<span class="pill">${icon("image")}${nImg}</span>`:""}</div>`:""}
   <div class="acts">${t.vence?`<span class="pill ${late?"bad":t.vence===today()?"warn":""}">${esc(late?"Venció "+fmtDate(t.vence):"Vence "+fmtDate(t.vence))}</span>`:""}<button class="btn sm" onclick="advance('${t.id}')">${t.estado==="hecha"?"Reabrir":t.estado==="curso"?"Terminar":"Empezar"}</button><button class="btn sm ghost ic del-t" onclick="borrarTarea('${t.id}')" title="Borrar tarea" aria-label="Borrar tarea">${icon("trash")}</button></div></div>`;
 }
+const _avanzando={};
 async function advance(id){
-  const t=S.tareas.find(x=>x.id===id); if(!t) return;
+  const t=S.tareas.find(x=>x.id===id); if(!t||_avanzando[id]) return;
+  const prev={estado:t.estado,hecha_el:t.hecha_el};
   const nx = t.estado==="pendiente"?"curso":t.estado==="curso"?"hecha":"pendiente";
-  await run(sb.from("tareas").update({estado:nx,hecha_el:nx==="hecha"?new Date().toISOString():null}).eq("id",id), nx==="hecha"?"Tarea terminada":null);
+  const cambio={estado:nx,hecha_el:nx==="hecha"?new Date().toISOString():null};
+  Object.assign(t,cambio); _avanzando[id]=true; render();
+  const ok=await run(sb.from("tareas").update(cambio).eq("id",id), nx==="hecha"?"Tarea terminada":nx==="curso"?"Tarea en curso":"Tarea reabierta");
+  delete _avanzando[id];
+  if(!ok){ Object.assign(t,prev); render(); }
 }
 
 function vTarea(t){
@@ -1160,14 +1182,14 @@ function vTarea(t){
   return `<div class="head"><div><div class="eyebrow"><a href="#tareas" style="text-decoration:none">← Tareas</a></div><h1>${esc(t.titulo)}</h1>
     <p>${esc([t.cliente_id?cliName(t.cliente_id):"", t.area].filter(Boolean).join(" · "))}</p></div>
     <div class="acts"><button class="btn ghost del-t" onclick="borrarTarea('${t.id}')">${icon("trash")}Borrar</button><button class="btn" onclick="formTarea('${t.id}')">${icon("edit")}Editar</button><button class="btn pri" onclick="advance('${t.id}')">${t.estado==="hecha"?"Reabrir":t.estado==="curso"?"Marcar terminada":"Empezar"}</button></div></div>
-  <div class="split">
+  <div class="split tarea-det">
     <section class="card" style="padding:0;overflow:hidden">${thread("t-"+t.id)}</section>
-    <section class="card"><h2 style="margin-bottom:12px">Detalle</h2><dl class="ficha">
+    <section class="card t-info"><h2 style="margin-bottom:12px">Detalle</h2><dl class="ficha">
       <div><dt>Estado</dt><dd><span class="pill ${t.estado==="hecha"?"ok":t.estado==="curso"?"info":""}">${ES[t.estado]}</span></dd></div>
       <div><dt>Prioridad</dt><dd><span class="pill ${t.prioridad==="alta"?"bad":t.prioridad==="media"?"warn":"ok"}">${PR[t.prioridad]||"—"}</span></dd></div>
-      <div><dt>Responsable</dt><dd>${dd(memName(t.asignado))}</dd></div>
+      <div><dt>Responsable</dt><dd>${t.asignado?dd(memName(t.asignado)):dd("")}</dd></div>
       <div><dt>Vence</dt><dd>${t.vence?`<span class="pill ${late?"bad":""}">${esc(late?"Venció "+fmtDate(t.vence):fmtDate(t.vence))}</span>`:"—"}</dd></div>
-      <div><dt>Creada por</dt><dd>${dd(memName(t.creado_por))}</dd></div>
+      <div><dt>Creada por</dt><dd>${t.creado_por?dd(memName(t.creado_por)):dd("")}</dd></div>
       ${t.cliente_id?`<div><dt>Cliente</dt><dd><a href="#cliente-${t.cliente_id}">${esc(cliName(t.cliente_id))}</a></dd></div>`:""}</dl>
       ${t.detalle?`<h3 style="margin:16px 0 6px">Brief</h3><p style="white-space:pre-wrap;margin:0">${esc(t.detalle)}</p>`:""}
     </section></div>`;
@@ -1739,7 +1761,7 @@ function formTarea(id, cliId, vence){
       <label class="btn" style="cursor:pointer">${icon("image")}Agregar fotos<input type="file" hidden accept="image/*" multiple onchange="agregarAdj('form-tarea',this.files);pintarFotosForm();this.value=''"></label>
       <span class="s" style="margin-left:8px">También podés pegar una captura acá (Ctrl+V).</span>
       ${id?`<div style="margin-top:10px"><a href="#tarea-${id}" onclick="closeModal()">${icon("chat")} Ver la conversación de la tarea (${S.mensajes.filter(m=>m.tarea_id===id).length} mensajes)</a></div>`:""}</div>
-    <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('tareas','${id}','esta tarea')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
+    <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="borrarTarea('${id}')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
 }
 async function saveTarea(e,id){
   e.preventDefault();
@@ -1748,11 +1770,11 @@ async function saveTarea(e,id){
   const data={titulo:v("tTit"),detalle:v("tDet"),asignado:nz(v("tAsig")),cliente_id:nz(v("tCli")),area:v("tArea2"),prioridad:v("tPrio"),vence:nz(v("tVence")),estado,hecha_el:estado==="hecha"?(prev.hecha_el||new Date().toISOString()):null};
   const btn=e.submitter||document.querySelector("#modal .btn.pri"); if(btn){ btn.disabled=true; btn.textContent="Guardando…"; }
   let tid=id;
-  if(id){ if(!await run(sb.from("tareas").update(data).eq("id",id))){ if(btn){btn.disabled=false;btn.textContent="Guardar";} return; } }
+  if(id){ if(!await run(sb.from("tareas").update(data).eq("id",id))){ if(btn){btn.disabled=false;btn.textContent="Guardar";} return; } Object.assign(prev,data); }
   else {
     const { data:row, error } = await sb.from("tareas").insert(Object.assign({creado_por:S.me.id},data)).select().single();
     if(error){ toast("No se pudo guardar: "+error.message); if(btn){btn.disabled=false;btn.textContent="Guardar";} return; }
-    tid=row.id;
+    tid=row.id; applyChange("tareas",{eventType:"INSERT",new:row});
   }
   const fotos=S.pendAtt["form-tarea"]||[];
   if(fotos.length){

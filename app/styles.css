@@ -969,3 +969,18 @@ table.rtable input.inl[type=date]{width:140px}
   .m-filters .seg button{flex:1;white-space:nowrap}
   .m-filters select{flex:1 1 100%}
 }
+/* Tareas: tarjeta entera tocable, tachito separado, vencidas marcadas */
+.task{cursor:pointer;transition:border-color .12s,box-shadow .12s}
+.task:hover{border-color:var(--line-2,#cfd6d2)}
+.task .acts .del-t{margin-left:auto}
+
+@media (max-width:900px){
+  .etabs{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));margin:0 0 12px!important;padding:2px 0 4px!important}
+  .etabs button{justify-content:center;padding:8px 6px!important;min-width:0}
+  .tarea-det{display:flex;flex-direction:column;align-items:stretch}
+  .tarea-det .t-info{order:-1;padding:14px}
+  .tarea-det .t-info h2{display:none}
+  .tarea-det .t-info .ficha{grid-template-columns:1fr 1fr;gap:10px 14px}
+  .tarea-det .t-info .ficha dd{font-size:14px}
+  .tarea-det .thread{height:min(560px,68vh)}
+}
