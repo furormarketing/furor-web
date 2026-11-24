@@ -985,15 +985,11 @@ table.rtable input.inl[type=date]{width:140px}
   .tarea-det .thread{height:min(560px,68vh)}
 }
 /* Agenda: hecho, actividades y lista */
-.ev.act{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-left:3px solid var(--sc,var(--brand));font-weight:600}
-.ev.done{opacity:.55;text-decoration:line-through}
-.ev.task.done{border-style:solid;border-color:var(--line);color:var(--muted)}
 .ckh{flex:none;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:7px;border:1.5px solid var(--line);background:var(--surface);color:transparent;cursor:pointer;padding:0}
 .ckh .ico{width:15px;height:15px}
 .ckh:hover{border-color:var(--ok)}
 .ckh.on{background:var(--ok);border-color:var(--ok);color:#fff}
 span.ckh{cursor:default}
-.evrow.hecho .t{text-decoration:line-through;color:var(--muted)}
 .ag-tb input[type=search]{flex:1 1 240px;min-width:0}
 .agl-fil{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
 .agl-fil button{font:inherit;font-size:12.5px;font-weight:600;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
@@ -1014,10 +1010,8 @@ span.ckh{cursor:default}
 .agl-t{flex:1 1 180px;min-width:0;text-align:left;font:inherit;font-weight:600;color:var(--ink);background:none;border:0;padding:0;cursor:pointer;text-decoration:none;overflow-wrap:anywhere}
 .agl-t:hover{text-decoration:underline}
 .agl-tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:1px 8px 1px 7px;border-radius:99px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2);margin-right:7px}
-.agl-tag::before{content:"";width:7px;height:7px;border-radius:99px;background:var(--sc,var(--muted))}
-.agl-tag.tarea::before{background:none;border:1.5px dashed var(--warn);width:5px;height:5px}
+.agl-tag::before{content:"";width:7px;height:7px;border-radius:99px;background:var(--tc,var(--muted))}
 .agl-s{flex:1 1 100%;font-size:12.5px;color:var(--muted);padding-left:86px;display:flex;align-items:center;flex-wrap:wrap;row-gap:4px}
-.agl-row.hecho .agl-t{text-decoration:line-through;color:var(--muted)}
 @media (max-width:900px){
   .agl-dia{grid-template-columns:48px minmax(0,1fr)}
   .agl-items{padding:4px 10px}
@@ -1028,4 +1022,18 @@ span.ckh{cursor:default}
   .ag-tb .seg{flex:1 1 100%;display:flex}
   .ag-tb .seg button{flex:1}
   .ag-tb select{flex:1 1 100%}
+}
+
+/* Colores por tipo en el calendario (fondo suave + barra del color, texto legible) */
+.ev.tp{background:color-mix(in srgb,var(--tc) 14%,var(--surface));color:color-mix(in srgb,var(--tc) 82%,#000);border-left:3px solid var(--tc);font-weight:600;border-radius:4px}
+.ev.tp.tarea{border:1px dashed color-mix(in srgb,var(--tc) 60%,transparent);border-left:3px solid var(--tc)}
+.ev.tp .okm{font-weight:800;margin-right:3px}
+.agl-tag{background:color-mix(in srgb,var(--tc,#888) 10%,var(--surface));border-color:color-mix(in srgb,var(--tc,#888) 30%,transparent);color:color-mix(in srgb,var(--tc,#555) 80%,#000)}
+.qtipos button:not(.fer-t)::before{content:"";width:8px;height:8px;border-radius:99px;background:var(--tc);order:-1}
+.qtipos button:not(.fer-t) .ico{display:none}
+.qtipos button.on:not(.fer-t){background:var(--tc);border-color:var(--tc);color:#fff}
+.qtipos button.on:not(.fer-t)::before{background:#fff}
+@media (prefers-color-scheme:dark){
+  .ev.tp{background:color-mix(in srgb,var(--tc) 28%,var(--surface));color:color-mix(in srgb,var(--tc) 35%,#fff)}
+  .agl-tag{color:color-mix(in srgb,var(--tc,#aaa) 40%,#fff)}
 }
