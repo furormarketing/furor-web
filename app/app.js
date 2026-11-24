@@ -67,7 +67,7 @@ const ROLES = {admin:"Dirección",cm:"Community Manager",setter:"Setter",diseno:
 const AREAS = ["General","Ventas / Setter","Community","Diseño","Ads","Web","Administración"];
 const ESTADOS_CLI = ["Activo","Onboarding","En pausa","Baja"];
 const PLANES = ["Plan base","Plan expansión","Solo gestión de ads","Desarrollo web","Otro"];
-const TIPOS_EV = ["Reunión","Llamada","Videollamada","Visita","Feriado"];
+const TIPOS_EV = ["Actividad","Reunión","Llamada","Videollamada","Visita","Feriado"];
 const esFer = e => e.tipo==="Feriado";
 const feriadosDe = (fecha, sede) => S.eventos.filter(e=>esFer(e)&&e.fecha===fecha&&(!sede||!e.sede||e.sede===sede));
 const FORMATOS = ["Feed","Reel","Carrusel","Historia"];
@@ -365,7 +365,7 @@ function render(){
   hidratarImagenes();
 }
 function navBadges(){
-  return { chat:unreadTotal(), tareas:overdue(openTasks().filter(t=>t.asignado===S.me.id)).length, contenido:pendingToday(S.me.rol==="cm").length+(isAdmin()?S.publicados.filter(p=>!p.enviado).length:0), prospectos:0, publicados:(S.me.rol==="admin"?S.publicados.filter(p=>!p.enviado).length:0) };
+  return { chat:unreadTotal(), tareas:overdue(openTasks().filter(t=>t.asignado===S.me.id)).length, contenido:pendingToday(S.me.rol==="cm").length+(isAdmin()?S.publicados.filter(porEnviar).length:0), prospectos:0, publicados:(S.me.rol==="admin"?S.publicados.filter(porEnviar).length:0) };
 }
 function renderNav(){
   const b=navBadges(); let html="", grp="";
@@ -410,14 +410,22 @@ function evRow(e){
   <div class="main"><div class="t">${!e.titulo||e.titulo==="Feriado"?`<span class="pill bad">Feriado</span>`:`${esc(e.titulo)} <span class="pill bad">Feriado</span>`}</div><div class="s">${esc([e.sede||"Todas las sedes", relDays(e.fecha), e.notas].filter(Boolean).join(" · "))}</div></div>
   <button class="btn sm ghost" onclick="formEvento('${e.id}')">Editar</button></div>`; }
   const d=parseYmd(e.fecha), parts=(e.participantes||[]).map(memName).join(", "), link=safeUrl(e.link);
-  return `<div class="row"><div class="when" style="--sc:${sedeColor(e.sede)}"><b>${d.getDate()}</b><span>${MES_C[d.getMonth()]}</span></div>
+  return `<div class="row evrow ${e.hecho?"hecho":""}"><div class="when" style="--sc:${sedeColor(e.sede)}"><b>${d.getDate()}</b><span>${MES_C[d.getMonth()]}</span></div>
   <div class="main"><div class="t">${esc(e.titulo)}</div>
   <div class="s">${esc([e.tipo, hhmm(e.hora)?hhmm(e.hora)+" hs":"", relDays(e.fecha), e.cliente_id?cliName(e.cliente_id):e.contacto, e.sede].filter(Boolean).join(" · "))}</div>
   ${parts?`<div class="s">Con: ${esc(parts)}</div>`:""}
   ${link?`<div class="s"><a href="${esc(link)}" target="_blank" rel="noopener">Unirse a la videollamada</a></div>`:(e.lugar?`<div class="s">${esc(e.lugar)}</div>`:"")}
-  </div><button class="btn sm ghost" onclick="formEvento('${e.id}')">Editar</button></div>`;
+  </div>${ckHecho(e)}<button class="btn sm ghost" onclick="formEvento('${e.id}')">Editar</button></div>`;
+}
+const ckHecho = e => `<button type="button" class="ckh ${e.hecho?"on":""}" onclick="event.stopPropagation();toggleHecho('${e.id}')" title="${e.hecho?"Hecho · tocá para desmarcar":"Marcar como hecho"}" aria-label="${e.hecho?"Desmarcar":"Marcar como hecho"}">${icon("ok")}</button>`;
+async function toggleHecho(id){
+  const e=S.eventos.find(x=>x.id===id); if(!e) return; e.hecho=!e.hecho; render();
+  const { error } = await sb.from("eventos").update({hecho:e.hecho}).eq("id",id);
+  if(error){ e.hecho=!e.hecho; render(); toast("No se pudo guardar."); }
 }
 function taskRow(t){
+  if(t.estado==="hecha") return `<div class="row evrow hecho"><div class="main"><a class="t" href="#tarea-${t.id}" style="color:inherit;text-decoration:none;display:block">${esc(t.titulo)}</a>
+  <div class="s">${esc(["Tarea hecha", t.asignado?memName(t.asignado):"", t.cliente_id?cliName(t.cliente_id):""].filter(Boolean).join(" · "))}</div></div><span class="ckh on" aria-hidden="true">${icon("ok")}</span></div>`;
   const late=t.vence&&t.vence<today();
   return `<div class="row"><div class="main"><a class="t" href="#tarea-${t.id}" style="color:inherit;text-decoration:none;display:block">${esc(t.titulo)}</a>
   <div class="s">${esc([memName(t.asignado), t.cliente_id?cliName(t.cliente_id):"", t.area].filter(Boolean).join(" · "))}</div></div>
@@ -463,7 +471,7 @@ function vInicio(){
     [venc.length,"bad","clock",S.me.rol==="admin"?"Tareas vencidas del equipo":"Tareas tuyas vencidas","#tareas"],
     [ped.length,"warn","chat","Pedidos sin resolver","#chat"],
     [paraRevisar.length,"warn","eye","Piezas esperando revisión","#clientes"],
-    [isAdmin()?S.publicados.filter(p=>!p.enviado).length:0,"warn","send","Links publicados sin enviar al cliente","#publicados"],
+    [isAdmin()?S.publicados.filter(porEnviar).length:0,"warn","send","Links publicados sin enviar al cliente","#publicados"],
     [pend.length,"info","grid","Publicaciones para hoy","#contenido"],
     [evHoy.length,"info","cal","Reuniones, llamadas y visitas hoy","#agenda"]
   ].filter(a=>a[0]);
@@ -506,31 +514,69 @@ function vInicio(){
 }
 
 /* ---------- Agenda ---------- */
-function vAgenda(){
-  const {y,m}=S.cal, first=new Date(y,m,1), start=new Date(first); start.setDate(1-((first.getDay()+6)%7));
-  const t=today(), evs=S.eventos.filter(e=>!S.f.agSede||e.sede===S.f.agSede||(esFer(e)&&!e.sede));
+function tareaFecha(x){ return x.vence || (x.estado==="hecha"&&x.hecha_el ? ymd(new Date(x.hecha_el)) : null); }
+function agendaPorDia(){
+  const evs=S.eventos.filter(e=>!S.f.agSede||e.sede===S.f.agSede||(esFer(e)&&!e.sede));
   const by={}; evs.forEach(e=>(by[e.fecha]=by[e.fecha]||{e:[],t:[]}).e.push(e));
-  openTasks().forEach(x=>{ if(x.vence) (by[x.vence]=by[x.vence]||{e:[],t:[]}).t.push(x); });
+  S.tareas.forEach(x=>{ const f=tareaFecha(x); if(f) (by[f]=by[f]||{e:[],t:[]}).t.push(x); });
+  return by;
+}
+const evChip = e => `<div class="ev ${e.tipo==="Visita"?"visita":""} ${e.tipo==="Actividad"?"act":""} ${e.hecho?"done":""}" style="--sc:${sedeColor(e.sede)}" title="${esc(e.tipo+": "+e.titulo+(e.hecho?" (hecho)":""))}">${e.hecho?"✓ ":""}${esc((hhmm(e.hora)?hhmm(e.hora)+" ":"")+e.titulo)}</div>`;
+function agVistaSeg(){ return `<div class="seg"><button class="${S.agVista!=="lista"?"on":""}" onclick="S.agVista='mes';render()">Mes</button><button class="${S.agVista==="lista"?"on":""}" onclick="S.agVista='lista';render()">Lista</button></div>`; }
+function vAgenda(){
+  if(S.agVista==="lista") return vAgendaLista();
+  const {y,m}=S.cal, first=new Date(y,m,1), start=new Date(first); start.setDate(1-((first.getDay()+6)%7));
+  const t=today(), by=agendaPorDia();
   let cells=DIAS.map(d=>`<div class="dow">${d}</div>`).join("");
   for(let i=0;i<42;i++){
     const d=new Date(start); d.setDate(start.getDate()+i); const k=ymd(d), it=by[k]||{e:[],t:[]}, fer=it.e.filter(esFer);
-    const list=[...it.e.filter(e=>!esFer(e)).sort((a,b)=>String(a.hora||"").localeCompare(String(b.hora||""))).map(e=>`<div class="ev ${e.tipo==="Visita"?"visita":""}" style="--sc:${sedeColor(e.sede)}" title="${esc(e.tipo+": "+e.titulo)}">${esc((hhmm(e.hora)?hhmm(e.hora)+" ":"")+e.titulo)}</div>`), ...it.t.map(x=>`<div class="ev task" title="${esc(x.titulo)}">${esc(x.titulo)}</div>`)];
+    const evs=it.e.filter(e=>!esFer(e)).sort((a,b)=>(!!a.hecho-!!b.hecho)||String(a.hora||"").localeCompare(String(b.hora||"")));
+    const ts=it.t.slice().sort((a,b)=>(a.estado==="hecha")-(b.estado==="hecha"));
+    const list=[...evs.map(evChip), ...ts.map(x=>`<div class="ev task ${x.estado==="hecha"?"done":""}" title="${esc("Tarea: "+x.titulo)}">${x.estado==="hecha"?"✓ ":""}${esc(x.titulo)}</div>`)];
     cells+=`<div class="day ${d.getMonth()!==m?"out":""} ${k===t?"today":""} ${S.f.calSel===k?"sel":""} ${fer.length?"feriado":""}" tabindex="0" onclick="abrirDia('${k}')" onkeydown="if(event.key==='Enter')abrirDia('${k}')"><div class="num">${d.getDate()}</div>${fer.length?`<div class="fer" title="${esc(fer.map(f=>f.titulo+(f.sede?" ("+f.sede+")":"")).join(" · "))}">${esc(fer[0].titulo||"Feriado")}</div>`:""}${list.slice(0,3).join("")}${list.length>3?`<div class="ev more">+${list.length-3} más</div>`:""}</div>`;
   }
   const sel=S.f.calSel||t, si=by[sel]||{e:[],t:[]};
   return `
-  <div class="head"><div><div class="eyebrow">Operación</div><h1>Agenda Furor</h1><p>Reuniones, llamadas, visitas de producción y feriados de Tucumán, Salta y Santiago del Estero</p></div>
+  <div class="head"><div><div class="eyebrow">Operación</div><h1>Agenda Furor</h1><p>Actividades, reuniones, visitas y feriados. Todo queda registrado para revisar después.</p></div>
     <div class="acts"><button class="btn" onclick="calMove(-1)" aria-label="Mes anterior">‹</button><h2 style="min-width:150px;text-align:center;text-transform:capitalize">${MESES[m]} ${y}</h2><button class="btn" onclick="calMove(1)" aria-label="Mes siguiente">›</button><button class="btn" onclick="calToday()">Hoy</button><button class="btn" onclick="toggleFeriado('${sel}')">${(by[sel]||{e:[]}).e.some(esFer)?"Quitar feriado":"Marcar feriado"}</button><button class="btn pri" onclick="formEvento(null,'${sel}')">${icon("plus")}Agendar</button></div></div>
-  <div class="toolbar"><div class="seg">${["",...SEDES.slice(0,3)].map(s=>`<button class="${S.f.agSede===s?"on":""}" onclick="S.f.agSede='${s}';render()">${s||"Todas las sedes"}</button>`).join("")}</div>
-    <div class="legend">${SEDES.slice(0,3).map(s=>`<span><span class="sede-dot" style="--sc:${sedeColor(s)}"></span>${s}</span>`).join("")}<span><span class="sede-dot" style="border:1px solid var(--warn)"></span>Vence tarea</span><span><span class="sede-dot" style="background:var(--danger)"></span>Feriado</span></div></div>
+  <div class="toolbar">${agVistaSeg()}<div class="seg">${["",...SEDES.slice(0,3)].map(s=>`<button class="${S.f.agSede===s?"on":""}" onclick="S.f.agSede='${s}';render()">${s||"Todas las sedes"}</button>`).join("")}</div>
+    <div class="legend">${SEDES.slice(0,3).map(s=>`<span><span class="sede-dot" style="--sc:${sedeColor(s)}"></span>${s}</span>`).join("")}<span><span class="sede-dot" style="border:1px solid var(--warn)"></span>Tarea</span><span><span class="sede-dot" style="background:var(--danger)"></span>Feriado</span><span>✓ Hecho</span></div></div>
   <div class="cal-layout"><div class="cal">${cells}</div>
     ${S.mobile?(S.diaSheet?`<div class="daysheet-bg" onclick="if(event.target===this){S.diaSheet=false;render()}"><section class="card daypanel sheet">${dayPanel(sel,si)}</section></div>`:""):`<section class="card daypanel">${dayPanel(sel,si)}</section>`}</div>`;
 }
-const QA_TIPOS=[["Reunión","users"],["Llamada","phone"],["Videollamada","eye"],["Visita","image"],["Tarea","check"]];
+/* Lista / historial: ver qué se hizo y cuándo, con buscador */
+const AG_FIL=[["","Todo"],["Actividad","Actividades"],["reu","Reuniones y llamadas"],["Visita","Visitas"],["tarea","Tareas"]];
+function vAgendaLista(){
+  const {y,m}=S.cal, q=(S.agQ||"").trim().toLowerCase(), fil=S.agFil||"", t=today();
+  const mes=`${y}-${pad(m+1)}`;
+  const items=[];
+  S.eventos.forEach(e=>{ if(esFer(e)) return; if(S.f.agSede&&e.sede!==S.f.agSede) return;
+    if(fil==="tarea"||(fil==="reu"&&!["Reunión","Llamada","Videollamada"].includes(e.tipo))||(fil&&fil!=="reu"&&e.tipo!==fil)) return;
+    items.push({f:e.fecha,h:hhmm(e.hora)||"",k:"e",o:e,txt:[e.titulo,e.tipo,e.notas,e.contacto,e.lugar,e.cliente_id?cliName(e.cliente_id):""].join(" ")}); });
+  if(!fil||fil==="tarea") S.tareas.forEach(x=>{ const f=tareaFecha(x); if(!f) return; items.push({f,h:"",k:"t",o:x,txt:[x.titulo,x.detalle,x.area,x.cliente_id?cliName(x.cliente_id):""].join(" ")}); });
+  let list = q ? items.filter(i=>i.txt.toLowerCase().includes(q)) : items.filter(i=>i.f.slice(0,7)===mes);
+  list.sort((a,b)=> q ? (b.f.localeCompare(a.f)||a.h.localeCompare(b.h)) : (a.f.localeCompare(b.f)||a.h.localeCompare(b.h)));
+  const grupos=[]; list.forEach(i=>{ const g=grupos[grupos.length-1]; if(g&&g.f===i.f) g.it.push(i); else grupos.push({f:i.f,it:[i]}); });
+  const hechos=list.filter(i=>i.k==="e"?i.o.hecho:i.o.estado==="hecha").length;
+  const fila=i=>{ if(i.k==="t"){ const x=i.o, ok=x.estado==="hecha";
+      return `<div class="agl-row ${ok?"hecho":""}"><button type="button" class="ckh ${ok?"on":""}" onclick="tareaHecha('${x.id}')" title="${ok?"Hecha · tocá para reabrir":"Marcar como hecha"}" aria-label="${ok?"Reabrir tarea":"Marcar tarea como hecha"}">${icon("ok")}</button><span class="agl-h"></span><a class="agl-t" href="#tarea-${x.id}">${esc(x.titulo)}</a><div class="agl-s"><span class="agl-tag tarea">Tarea</span>${esc([x.asignado?memName(x.asignado):"",x.cliente_id?cliName(x.cliente_id):""].filter(Boolean).join(" · "))}</div></div>`; }
+    const e=i.o; return `<div class="agl-row ${e.hecho?"hecho":""}">${ckHecho(e)}<span class="agl-h">${esc(i.h)}</span><button type="button" class="agl-t" onclick="formEvento('${e.id}')">${esc(e.titulo)}</button><div class="agl-s"><span class="agl-tag" style="--sc:${sedeColor(e.sede)}">${esc(e.tipo)}</span>${esc([e.cliente_id?cliName(e.cliente_id):e.contacto,e.sede].filter(Boolean).join(" · "))}</div></div>`; };
+  const head = S.mobile ? `<div class="m-head"><div><div class="eyebrow">Operación</div><h1>Agenda</h1></div></div>`
+    : `<div class="head"><div><div class="eyebrow">Operación</div><h1>Agenda Furor</h1><p>Todo lo agendado queda registrado. Buscá cuándo se hizo algo o repasá el mes.</p></div><div class="acts"><button class="btn pri" onclick="formEvento(null,'${today()}')">${icon("plus")}Agendar</button></div></div>`;
+  return `${head}
+  <div class="toolbar ag-tb">${agVistaSeg()}<input type="search" id="agQ" placeholder="Buscar: campaña, cliente, reunión…" value="${esc(S.agQ||"")}" oninput="S.agQ=this.value;render()">
+    <select id="agSede" aria-label="Sede" onchange="S.f.agSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.slice(0,3).map(s=>`<option ${S.f.agSede===s?"selected":""}>${s}</option>`).join("")}</select></div>
+  <div class="agl-fil">${AG_FIL.map(([k,l])=>`<button class="${fil===k?"on":""}" onclick="S.agFil='${k}';render()">${l}</button>`).join("")}</div>
+  ${q?`<div class="ns-bar"><b>${list.length} resultado${list.length===1?"":"s"} para “${esc(S.agQ.trim())}”</b><span style="flex:1"></span><button class="btn" onclick="S.agQ='';render()">Limpiar</button></div>`
+     :`<div class="ns-bar"><button class="btn" onclick="calMove(-1)" aria-label="Mes anterior">‹</button><b style="text-transform:capitalize">${MESES[m]} ${y}</b><button class="btn" onclick="calMove(1)" aria-label="Mes siguiente">›</button>${mes!==t.slice(0,7)?`<button class="btn" onclick="calToday()">Este mes</button>`:""}<span style="flex:1"></span><span class="s">${list.length} en el mes${hechos?` · ${hechos} hecho${hechos>1?"s":""}`:""}</span></div>`}
+  ${grupos.length?`<div class="card agl">${grupos.map(g=>`<div class="agl-dia ${g.f===t?"hoy":""} ${g.f<t?"pasado":""}"><div class="agl-fecha"><b>${parseYmd(g.f).getDate()}</b><span>${q?MES_C[parseYmd(g.f).getMonth()]+" "+g.f.slice(2,4):["dom","lun","mar","mié","jue","vie","sáb"][parseYmd(g.f).getDay()]}</span>${g.f===t?`<i>hoy</i>`:""}</div><div class="agl-items">${g.it.map(fila).join("")}</div></div>`).join("")}</div>`
+     :`<div class="card">${emptyMsg(q?"No encontré nada con esa búsqueda.":"No hay nada agendado este mes.","cal")}</div>`}`;
+}
+const QA_TIPOS=[["Actividad","target"],["Reunión","users"],["Llamada","phone"],["Videollamada","eye"],["Visita","image"],["Tarea","check"]];
 function dayPanel(sel, si){
-  if(S.qa==="Feriado") S.qa="Reunión";
-  const tp=S.qa||"Reunión", conHora=tp!=="Tarea", esF=si.e.some(esFer);
-  const ph={Reunión:"Ej: Reunión con Cálido",Llamada:"Ej: Llamar a prospecto de Salta",Videollamada:"Ej: Presentación de propuesta",Tarea:"Ej: Diseñar placas de DG Service",Visita:"Qué se produce (opcional)",Feriado:"Ej: Día de la Soberanía Nacional"}[tp];
+  if(S.qa==="Feriado") S.qa="Actividad";
+  const tp=S.qa||"Actividad", conHora=tp!=="Tarea", esF=si.e.some(esFer);
+  const ph={Actividad:"Ej: Campaña diciembre, lanzamiento, grabación",Reunión:"Ej: Reunión con Cálido",Llamada:"Ej: Llamar a prospecto de Salta",Videollamada:"Ej: Presentación de propuesta",Tarea:"Ej: Diseñar placas de DG Service",Visita:"Qué se produce (opcional)",Feriado:"Ej: Día de la Soberanía Nacional"}[tp];
   return `<div class="dp-h"><h2>${esc(fmtDayLong(sel))}</h2>${S.mobile?`<button class="btn sm ghost" onclick="S.diaSheet=false;render()" aria-label="Cerrar">✕</button>`:""}</div>
   <form class="qadd" onsubmit="quickAdd(event,'${sel}')">
     <div class="qtipos">${QA_TIPOS.map(([t,ic])=>`<button type="button" class="${tp===t?"on":""}" onclick="S.qa='${t}';render();setTimeout(()=>{const i=document.getElementById('qaTit');if(i&&!S.mobile)i.focus()})">${icon(ic)}${t}</button>`).join("")}<button type="button" class="fer-t ${esF?"on":""}" onclick="toggleFeriado('${sel}')" title="${esF?"Quitar el feriado de este día":"Marcar este día como feriado"}">${icon("cal")}${esF?"Es feriado · quitar":"Feriado"}</button></div>
@@ -543,7 +589,7 @@ function dayPanel(sel, si){
   <div class="dp-list">
   ${si.e.length||si.t.length?"":`<div class="empty">Nada para este día todavía.</div>`}
   ${si.e.length?`<div class="list">${si.e.map(evRow).join("")}</div>`:""}
-  ${si.t.length?`<h3 style="margin:14px 0 4px">Vencen</h3><div class="list">${si.t.map(taskRow).join("")}</div>`:""}</div>`;
+  ${si.t.length?`<h3 style="margin:14px 0 4px">Tareas</h3><div class="list">${si.t.slice().sort((a,b)=>(a.estado==="hecha")-(b.estado==="hecha")).map(taskRow).join("")}</div>`:""}</div>`;
 }
 async function toggleFeriado(fecha){
   const ex=S.eventos.filter(e=>esFer(e)&&e.fecha===fecha);
@@ -564,14 +610,14 @@ function abrirDia(k){
   if(!S.mobile) setTimeout(()=>{ const i=document.getElementById("qaTit"); if(i) i.focus(); });
 }
 function qaMas(fecha){
-  const tp=S.qa||"Reunión", tit=S.qaTxt||"";
+  const tp=S.qa||"Actividad", tit=S.qaTxt||"";
   if(tp==="Tarea"){ formTarea(null,null,fecha); }
   else { formEvento(null,fecha); const sel=document.getElementById("eTipo"); if(sel){ sel.value=tp; } const ec=document.getElementById("eCli"); if(ec&&S.qaCli) ec.value=S.qaCli; const h=document.getElementById("eHora"); if(h&&S.qaHora) h.value=S.qaHora; }
   const ti=document.getElementById(tp==="Tarea"?"tTit":"eTit"); if(ti&&tit) ti.value=tit;
 }
 async function quickAdd(e, fecha){
   e.preventDefault();
-  const tp=S.qa||"Reunión"; let titulo=(S.qaTxt||"").trim();
+  const tp=S.qa||"Actividad"; let titulo=(S.qaTxt||"").trim();
   const cliV = tp==="Visita" ? (S.qaCli||"") : "";
   if(tp==="Visita"){ if(!cliV){ toast("Elegí el cliente de la visita"); return; } const cn=cliName(cliV); titulo = titulo ? `Visita ${cn} · ${titulo}` : `Visita a ${cn}`; }
   if(!titulo) return;
@@ -582,7 +628,7 @@ async function quickAdd(e, fecha){
   if(btn) btn.disabled=false;
   if(res.error){ toast("No se pudo guardar: "+res.error.message); return; }
   applyChange(tp==="Tarea"?"tareas":"eventos",{eventType:"INSERT",new:res.data});
-  S.qaTxt=""; S.qaHora=""; S.qaCli=""; render(); toast(tp==="Tarea"?"Tarea agregada":tp==="Visita"?"Visita agendada":"Agendado");
+  S.qaTxt=""; S.qaHora=""; S.qaCli=""; render(); toast(tp==="Tarea"?"Tarea agregada":tp==="Visita"?"Visita agendada":tp==="Actividad"?"Actividad registrada":"Agendado");
   if(!S.mobile) setTimeout(()=>{ const i=document.getElementById("qaTit"); if(i) i.focus(); });
 }
 function calMove(n){ let {y,m}=S.cal; m+=n; if(m<0){m=11;y--;} if(m>11){m=0;y++;} S.cal={y,m}; render(); }
@@ -590,7 +636,7 @@ function calToday(){ const d=new Date(); S.cal={y:d.getFullYear(),m:d.getMonth()
 
 /* ---------- Calendario de contenido ---------- */
 function ctTabs(){
-  const pend=S.publicados.filter(p=>!p.enviado).length;
+  const pend=S.publicados.filter(porEnviar).length;
   return `<div class="tabs" style="margin-bottom:14px"><button class="${S.ctTab!=="pub"?"on":""}" onclick="S.ctTab='cal';render()">Calendario</button><button class="${S.ctTab==="pub"?"on":""}" onclick="S.ctTab='pub';render()">Links publicados${pend?` <span class="badge">${pend}</span>`:""}</button></div>`;
 }
 function vContenido(){ return S.ctTab==="pub" ? vPublicadosCont() : vCalendarioCont(); }
@@ -631,7 +677,7 @@ function ctMobile(list,days,t){
 async function togglePub(cid,fecha,formato){
   const ex=S.publicaciones.find(p=>p.cliente_id===cid&&p.fecha===fecha&&p.formato===formato);
   if(ex){ S.publicaciones=S.publicaciones.filter(p=>p!==ex); render(); await run(sb.from("publicaciones").delete().eq("id",ex.id)); }
-  else { const row={cliente_id:cid,fecha,formato,hecho_por:S.me.id}; S.publicaciones.push(Object.assign({id:"tmp"},row)); render(); if(await run(sb.from("publicaciones").insert(row))) formPublicado(null,cid,fecha,formato,true); }
+  else { const row={cliente_id:cid,fecha,formato,hecho_por:S.me.id}; S.publicaciones.push(Object.assign({id:"tmp"},row)); render(); if(await run(sb.from("publicaciones").insert(row)) && formato!=="Historia") formPublicado(null,cid,fecha,formato,true); }
 }
 
 /* ---------- Clientes ---------- */
@@ -1164,6 +1210,12 @@ function taskCard(t){
   ${nCom?`<div class="meta"><span class="pill ${un?"bad":""}">${icon("chat")}${nCom} mensaje${nCom>1?"s":""}${un?" · "+un+" sin leer":""}</span>${nImg?`<span class="pill">${icon("image")}${nImg}</span>`:""}</div>`:""}
   <div class="acts">${t.vence?`<span class="pill ${late?"bad":t.vence===today()?"warn":""}">${esc(late?"Venció "+fmtDate(t.vence):"Vence "+fmtDate(t.vence))}</span>`:""}<button class="btn sm" onclick="advance('${t.id}')">${t.estado==="hecha"?"Reabrir":t.estado==="curso"?"Terminar":"Empezar"}</button><button class="btn sm ghost ic del-t" onclick="borrarTarea('${t.id}')" title="Borrar tarea" aria-label="Borrar tarea">${icon("trash")}</button></div></div>`;
 }
+async function tareaHecha(id){
+  const t=S.tareas.find(x=>x.id===id); if(!t) return;
+  const prev={estado:t.estado,hecha_el:t.hecha_el}, cambio=t.estado==="hecha"?{estado:"pendiente",hecha_el:null}:{estado:"hecha",hecha_el:new Date().toISOString()};
+  Object.assign(t,cambio); render();
+  if(!await run(sb.from("tareas").update(cambio).eq("id",id), cambio.estado==="hecha"?"Tarea terminada":"Tarea reabierta")){ Object.assign(t,prev); render(); }
+}
 const _avanzando={};
 async function advance(id){
   const t=S.tareas.find(x=>x.id===id); if(!t||_avanzando[id]) return;
@@ -1602,15 +1654,17 @@ async function saveMaterial(e,id){
 
 /* ---------- Publicados (links para enviar al cliente) ---------- */
 const FMT_PUB = ["Reel","Post","Carrusel","Historia","Video","Otro"];
+// las historias no se mandan al cliente: nunca quedan "sin enviar"
+const porEnviar = p => !p.enviado && p.formato!=="Historia";
 const REDES = ["Instagram","Facebook","TikTok","YouTube","Otra"];
 const shortUrl = u => String(u).replace(/^https?:\/\/(www\.)?/,"").replace(/\/$/,"").slice(0,48)+(String(u).length>55?"…":"");
 function vPublicadosCont(){
   const q=S.f.pubQ.toLowerCase();
-  let list=S.publicados.filter(p=>(S.f.pubEst!=="pendientes"||!p.enviado)&&(!S.f.pubCli||p.cliente_id===S.f.pubCli));
+  let list=S.publicados.filter(p=>(S.f.pubEst!=="pendientes"||porEnviar(p))&&(!S.f.pubCli||p.cliente_id===S.f.pubCli));
   if(q) list=list.filter(p=>[cliName(p.cliente_id),p.url,p.nota,p.formato].join(" ").toLowerCase().includes(q));
   const byCli={}; list.forEach(p=>(byCli[p.cliente_id]=byCli[p.cliente_id]||[]).push(p));
   const ids=Object.keys(byCli).sort((a,b)=>cliName(a).localeCompare(cliName(b)));
-  const pend=S.publicados.filter(p=>!p.enviado).length;
+  const pend=S.publicados.filter(porEnviar).length;
   return `${pageHead("Cuentas","Contenido","La CM carga el link de cada publicación. Después se los mandás al cliente por WhatsApp, todos juntos en un solo mensaje.",`<button class="btn pri" onclick="formPublicado()">${icon("plus")}Cargar link</button>`)}
   ${ctTabs()}
   <div class="toolbar">
@@ -1629,10 +1683,10 @@ function pubGroup(c, items, inCard){
     <input type="checkbox" aria-label="Seleccionar" ${S.selPub[p.id]?"checked":""} onchange="S.selPub['${p.id}']=this.checked;render()" style="width:17px;height:17px;accent-color:var(--brand)">
     <div class="main"><div class="t">${esc(p.formato)} · ${esc(p.red)} <span class="s" style="font-weight:400">· ${fmtDate(p.fecha)}</span></div>
       <div class="s">${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(shortUrl(p.url))}</a>`:esc(p.url)}${p.nota?" · "+esc(p.nota):""}</div></div>
-    <button class="btn sm envbtn ${p.enviado?"on":""}" onclick="toggleEnviado('${p.id}')" title="${p.enviado?"Tocá para desmarcar":"Marcar como enviado al cliente"}">${p.enviado?icon("ok")+"Enviado":"Ya lo envié"}</button>
+    ${p.formato==="Historia"?`<span class="pill">No se envía</span>`:`<button class="btn sm envbtn ${p.enviado?"on":""}" onclick="toggleEnviado('${p.id}')" title="${p.enviado?"Tocá para desmarcar":"Marcar como enviado al cliente"}">${p.enviado?icon("ok")+"Enviado":"Ya lo envié"}</button>`}
     <button class="btn sm ghost" data-v="${esc(p.url)}" onclick="copyText(this.dataset.v)" aria-label="Copiar link">${icon("copy")}</button>
     <button class="btn sm ghost" onclick="formPublicado('${p.id}')">Editar</button></div>`; }).join("");
-  const unsent=items.filter(p=>!p.enviado).map(p=>p.id);
+  const unsent=items.filter(porEnviar).map(p=>p.id);
   return `${inCard?"":`<div class="card">`}<div class="list">${rows}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
       <button class="btn wa" onclick="enviarPublicados('${c.id}')">${icon("wa")}Enviar ${sel?sel+" seleccionado"+(sel>1?"s":""):unsent.length?"los "+unsent.length+" sin enviar":"todos"}</button>
@@ -1649,7 +1703,7 @@ async function toggleEnviado(id){
   else if(enviado) toast("Marcado como enviado");
 }
 async function marcarTodosEnviados(cid){
-  const ids=S.publicados.filter(p=>p.cliente_id===cid&&!p.enviado).map(p=>p.id); if(!ids.length) return;
+  const ids=S.publicados.filter(p=>p.cliente_id===cid&&porEnviar(p)).map(p=>p.id); if(!ids.length) return;
   const now=new Date().toISOString();
   S.publicados.forEach(p=>{ if(ids.includes(p.id)) Object.assign(p,{enviado:true,enviado_el:now,enviado_por:S.me.id}); }); render();
   await run(sb.from("publicados").update({enviado:true,enviado_el:now,enviado_por:S.me.id}).in("id",ids), ids.length>1?ids.length+" links marcados como enviados":"Marcado como enviado");
@@ -1657,7 +1711,7 @@ async function marcarTodosEnviados(cid){
 function enviarPublicados(cid){
   const c=cli(cid)||{}; const all=S.publicados.filter(p=>p.cliente_id===cid);
   let items=all.filter(p=>S.selPub[p.id]);
-  if(!items.length) items=all.filter(p=>!p.enviado);
+  if(!items.length) items=all.filter(porEnviar);
   if(!items.length) items=all;
   items=items.sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
   S.envio={cid,ids:items.map(p=>p.id)};

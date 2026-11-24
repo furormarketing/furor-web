@@ -78,7 +78,7 @@ Sin build, sin dependencias, sin `npm`. Es copiar archivos.
 ## 6. Base de datos (Supabase)
 
 ### Tablas del equipo (todas con RLS `es_miembro()`)
-`miembros`, `clientes`, `tareas`, `eventos` (tipo: Reunión, Llamada, Videollamada, Visita, Feriado), `entregas`, `publicaciones` (lo marcado como publicado en el calendario), `publicados` (links), `mensajes` (chat; `tarea_id` para chats de tareas, `adjuntos` jsonb para fotos/audios), `lecturas` (visto por canal), `novedades`, `config`, `material` (escritura solo admin), `plantillas` (escritura solo admin), `prospectos`, `ads_campanas`, `ads_saldos`, `ads_reportes`.
+`miembros`, `clientes`, `tareas`, `eventos` (tipo: Actividad, Reunión, Llamada, Videollamada, Visita, Feriado; `hecho` boolean: queda registrado y tachado, nunca se borra solo), `entregas`, `publicaciones` (lo marcado como publicado en el calendario), `publicados` (links; las Historias no cuentan como "sin enviar" y marcarlas en el calendario no pide link), `mensajes` (chat; `tarea_id` para chats de tareas, `adjuntos` jsonb para fotos/audios), `lecturas` (visto por canal), `novedades`, `config`, `material` (escritura solo admin), `plantillas` (escritura solo admin), `prospectos`, `ads_campanas`, `ads_saldos`, `ads_reportes`.
 
 ### Tabla personal
 `notas_semana` (pizarra "Mi semana" de Tareas): RLS `miembro_id = mi_id()`, cada uno ve solo sus notas. Hoy la pestaña solo se muestra al admin.
