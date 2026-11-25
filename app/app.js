@@ -1663,34 +1663,34 @@ function vPublicadosCont(){
   const byCli={}; list.forEach(p=>(byCli[p.cliente_id]=byCli[p.cliente_id]||[]).push(p));
   const ids=Object.keys(byCli).sort((a,b)=>cliName(a).localeCompare(cliName(b)));
   const pend=S.publicados.filter(porEnviar).length;
-  return `${pageHead("Cuentas","Contenido","La CM carga el link de cada publicación. Después se los mandás al cliente por WhatsApp, todos juntos en un solo mensaje.",`<button class="btn pri" onclick="formPublicado()">${icon("plus")}Cargar link</button>`)}
+  return `${pageHead("Cuentas","Contenido","La CM carga el link de cada publicación. Copiás el mensaje listo, lo pegás en el chat del cliente y tocás Enviado.",`<button class="btn pri" onclick="formPublicado()">${icon("plus")}Cargar link</button>`)}
   ${ctTabs()}
   <div class="toolbar">
     <div class="seg"><button class="${S.f.pubEst==="pendientes"?"on":""}" onclick="S.f.pubEst='pendientes';render()">Sin enviar <span class="count" style="margin-left:4px">${pend}</span></button><button class="${S.f.pubEst==="todos"?"on":""}" onclick="S.f.pubEst='todos';render()">Todos</button></div>
     <select id="pubCli" aria-label="Cliente" onchange="S.f.pubCli=this.value;render()"><option value="">Todos los clientes</option>${S.clientes.filter(c=>S.publicados.some(p=>p.cliente_id===c.id)).map(c=>`<option value="${c.id}" ${S.f.pubCli===c.id?"selected":""}>${esc(c.nombre)}</option>`).join("")}</select>
     <input type="search" id="pubQ" placeholder="Buscar…" value="${esc(S.f.pubQ)}" oninput="S.f.pubQ=this.value;render()">
   </div>
-  <div class="grid">${ids.map(id=>`<section class="card">${cardH(`<a href="#cliente-${id}" style="color:inherit;text-decoration:none">${esc(cliName(id))}</a> <span class="count">${byCli[id].length}</span>`, cli(id)?.whatsapp?`<span class="s">${icon("phone")} ${esc(cli(id).whatsapp)}</span>`:"")}${pubGroup(cli(id)||{id}, byCli[id], true)}</section>`).join("")
+  <div class="grid">${ids.map(id=>`<section class="card">${cardH(`<a href="#cliente-${id}" style="color:inherit;text-decoration:none">${esc(cliName(id))}</a> <span class="count">${byCli[id].length}</span>`, "")}${pubGroup(cli(id)||{id}, byCli[id], true)}</section>`).join("")
     || `<div class="card">${emptyMsg(S.f.pubEst==="pendientes"?"No hay links pendientes de enviar. Todo al día.":"Todavía no hay links cargados.","link")}</div>`}</div>`;
+}
+function msgPub(c, items){
+  const saludo=(c.contacto||"").split(" ")[0];
+  return `Hola${saludo?" "+saludo:""}! 👋 Te compartimos lo que publicamos para ${c.nombre||"tu cuenta"}:\n\n${items.map(p=>`▸ ${p.formato} (${fmtDate(p.fecha)}): ${p.url}`).join("\n")}\n\nCualquier comentario o idea, nos avisás. ¡Seguimos!`;
 }
 function pubGroup(c, items, inCard){
   items=items.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
   if(!items.length) return `<div class="${inCard?"":"card"}">${emptyMsg("Sin links cargados para este cliente.","link")}</div>`;
-  const sel=items.filter(p=>S.selPub[p.id]).length;
-  const rows=items.map(p=>{ const u=safeUrl(p.url); return `<div class="row prow">
-    <input type="checkbox" aria-label="Seleccionar" ${S.selPub[p.id]?"checked":""} onchange="S.selPub['${p.id}']=this.checked;render()" style="width:17px;height:17px;accent-color:var(--brand)">
-    <div class="main"><div class="t">${esc(p.formato)} · ${esc(p.red)} <span class="s" style="font-weight:400">· ${fmtDate(p.fecha)}</span></div>
-      <div class="s">${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(shortUrl(p.url))}</a>`:esc(p.url)}${p.nota?" · "+esc(p.nota):""}</div></div>
-    ${p.formato==="Historia"?`<span class="pill">No se envía</span>`:`<button class="btn sm envbtn ${p.enviado?"on":""}" onclick="toggleEnviado('${p.id}')" title="${p.enviado?"Tocá para desmarcar":"Marcar como enviado al cliente"}">${p.enviado?icon("ok")+"Enviado":"Ya lo envié"}</button>`}
-    <button class="btn sm ghost" data-v="${esc(p.url)}" onclick="copyText(this.dataset.v)" aria-label="Copiar link">${icon("copy")}</button>
-    <button class="btn sm ghost" onclick="formPublicado('${p.id}')">Editar</button></div>`; }).join("");
-  const unsent=items.filter(porEnviar).map(p=>p.id);
-  return `${inCard?"":`<div class="card">`}<div class="list">${rows}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
-      <button class="btn wa" onclick="enviarPublicados('${c.id}')">${icon("wa")}Enviar ${sel?sel+" seleccionado"+(sel>1?"s":""):unsent.length?"los "+unsent.length+" sin enviar":"todos"}</button>
-      ${unsent.length?`<button class="btn" onclick="marcarTodosEnviados('${c.id}')">${icon("ok")}Marcar ${unsent.length>1?"los "+unsent.length:"el link"} como enviado${unsent.length>1?"s":""}</button>`:""}
-      ${sel?`<button class="btn ghost" onclick="${items.map(p=>`S.selPub['${p.id}']=false;`).join("")}render()">Quitar selección</button>`:""}
-    </div>${inCard?"":"</div>"}`;
+  const unsent=items.filter(porEnviar).sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
+  const msg=unsent.length?msgPub(c||{},unsent):"";
+  const rows=items.map(p=>{ const u=safeUrl(p.url); return `<div class="plink ${porEnviar(p)?"":"sent"}">
+    <div class="plink-m"><b>${esc(p.formato)}</b><span>${fmtDate(p.fecha)}</span>${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(shortUrl(p.url))}</a>`:`<span>${esc(p.url)}</span>`}</div>
+    ${p.formato==="Historia"?`<span class="pill">No se envía</span>`:p.enviado?`<span class="plink-ok">${icon("ok")}Enviado</span>`:""}
+    <button class="btn sm ghost ic" data-v="${esc(p.url)}" onclick="copyText(this.dataset.v)" title="Copiar link" aria-label="Copiar link">${icon("copy")}</button>
+    <button class="btn sm ghost ic" onclick="formPublicado('${p.id}')" title="Editar" aria-label="Editar">${icon("edit")}</button></div>`; }).join("");
+  return `${inCard?"":`<div class="card">`}
+    ${unsent.length?`<div class="pmsg"><div class="pmsg-t" id="pmsg-${c.id}">${esc(msg)}</div>
+      <div class="pmsg-a"><button class="btn pri" data-v="${esc(msg)}" onclick="copyText(this.dataset.v)">${icon("copy")}Copiar mensaje</button><button class="btn ok-btn" onclick="marcarTodosEnviados('${c.id}')">${icon("ok")}Enviado</button></div></div>`:""}
+    <div class="plinks">${rows}</div>${inCard?"":"</div>"}`;
 }
 async function toggleEnviado(id){
   const p=S.publicados.find(x=>x.id===id); if(!p) return;
@@ -1705,41 +1705,6 @@ async function marcarTodosEnviados(cid){
   const now=new Date().toISOString();
   S.publicados.forEach(p=>{ if(ids.includes(p.id)) Object.assign(p,{enviado:true,enviado_el:now,enviado_por:S.me.id}); }); render();
   await run(sb.from("publicados").update({enviado:true,enviado_el:now,enviado_por:S.me.id}).in("id",ids), ids.length>1?ids.length+" links marcados como enviados":"Marcado como enviado");
-}
-function enviarPublicados(cid){
-  const c=cli(cid)||{}; const all=S.publicados.filter(p=>p.cliente_id===cid);
-  let items=all.filter(p=>S.selPub[p.id]);
-  if(!items.length) items=all.filter(porEnviar);
-  if(!items.length) items=all;
-  items=items.sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
-  S.envio={cid,ids:items.map(p=>p.id)};
-  const saludo=(c.contacto||"").split(" ")[0];
-  const txt=`Hola${saludo?" "+saludo:""}! 👋 Te compartimos lo que publicamos para ${c.nombre||"tu cuenta"}:\n\n${items.map(p=>`▸ ${p.formato} (${fmtDate(p.fecha)}): ${p.url}`).join("\n")}\n\nCualquier comentario o idea, nos avisás. ¡Seguimos!`;
-  const n=waNumber(c.whatsapp);
-  openModal(`<h2>Enviar a ${esc(c.nombre||"cliente")}</h2><div class="form">
-    <label class="f full" for="envTxt">Mensaje (lo podés editar)<textarea id="envTxt" style="min-height:220px" oninput="refreshEnvio()">${esc(txt)}</textarea></label>
-    <label class="check full"><input type="checkbox" id="envMark" checked><span>Marcar ${items.length} link${items.length>1?"s":""} como enviado${items.length>1?"s":""}</span></label>
-    ${n?"":`<p class="full s" style="margin:0">Este cliente no tiene WhatsApp cargado en su ficha: usá "Elegir chat" y seleccionalo en WhatsApp.</p>`}
-    <div class="actions"><button type="button" class="btn" onclick="closeModal()">Cerrar</button><div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button type="button" class="btn" onclick="confirmarEnvio('copiar')">${icon("copy")}Copiar</button>
-      <a class="btn ${n?"":"wa"}" id="envElegir" href="#" target="_blank" rel="noopener" onclick="confirmarEnvio('wa')">${icon("wa")}Elegir chat</a>
-      ${n?`<a class="btn wa" id="envDirecto" href="#" target="_blank" rel="noopener" onclick="confirmarEnvio('wa')">${icon("wa")}WhatsApp de ${esc(c.nombre)}</a>`:""}
-    </div></div></div>`);
-  refreshEnvio();
-}
-function refreshEnvio(){
-  const t=encodeURIComponent($("#envTxt").value), c=cli(S.envio.cid)||{}, n=waNumber(c.whatsapp);
-  $("#envElegir").href="https://wa.me/?text="+t;
-  const d=$("#envDirecto"); if(d) d.href="https://wa.me/"+n+"?text="+t;
-}
-async function confirmarEnvio(modo){
-  refreshEnvio();
-  if(modo==="copiar") await copyText($("#envTxt").value);
-  if($("#envMark").checked){
-    $("#envMark").checked=false;
-    const ids=S.envio.ids; ids.forEach(id=>S.selPub[id]=false);
-    await run(sb.from("publicados").update({enviado:true,enviado_el:new Date().toISOString(),enviado_por:S.me.id}).in("id",ids),"Marcados como enviados");
-  }
 }
 function formPublicado(id, cid, fecha, formato, desdeCalendario){
   const p=id?S.publicados.find(x=>x.id===id)||{}:{cliente_id:cid||S.f.pubCli||"",fecha:fecha||today(),formato:{"Feed":"Post"}[formato]||formato||"Reel",red:"Instagram"};
