@@ -59,7 +59,7 @@ const etapaL = e => ETAPA_L[e]||e;
 const SERV_MAT = [["Sistemas MKT","target"],["Desarrollo web","grid"],["Gestión Ads","mega"],["General","file"]];
 const servMat = m => m.servicio||"General";
 const CAT_MAT = ["Honorarios","Propuestas","Contratos","Presentaciones","Guías y procesos","General"];
-const ETAPAS_TPL = ["Primer contacto","Seguimiento","Reunión","Propuesta","Cierre","Recuperar","Otro"];
+const ETAPAS_TPL = ["Primer contacto","Seguimiento","Reunión","Propuesta","Pendiente avanzar","Cierre","Recuperar","Otro"];
 const ORIGENES = ["Anuncio Meta","Instagram orgánico","Referido","Búsqueda en frío","Google","Web","Otro"];
 const SEDES = ["Tucumán","Salta","Santiago del Estero","Otra provincia"];
 const SEDE_VAR = {"Tucumán":"--s-tuc","Salta":"--s-sal","Santiago del Estero":"--s-sde"};
