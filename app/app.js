@@ -1383,7 +1383,8 @@ function prospRow(p){
 function vProspectos(){
   const t=today(), q=S.f.pQ.toLowerCase();
   let list=S.prospectos.slice();
-  if(S.f.pScope==="mios") list=list.filter(p=>p.setter===S.me.id);
+  // cada setter entra directo a su provincia (una sola vez; después puede cambiarla)
+  if(!S._pSedeIni){ S._pSedeIni=true; if(!isAdmin() && SEDES.slice(0,3).includes(S.me.sede)) S.f.pSede=S.me.sede; }
   if(S.f.pSede) list=list.filter(p=>p.sede===S.f.pSede);
   if(q) list=list.filter(p=>[p.nombre,p.negocio,p.rubro,p.whatsapp,p.instagram].join(" ").toLowerCase().includes(q));
   const mesDe = p => String(p.creado||p.actualizado||"").slice(0,7);
@@ -1408,7 +1409,7 @@ function vProspectos(){
   if(S.mobile){
     return `<div class="m-head"><div><div class="eyebrow">Ventas</div><h1>Prospectos</h1></div><a class="btn sm" href="#plantillas">${icon("message")}Plantillas</a></div>
     <div class="m-kpis"><div><b>${act.length}</b><span>En seguimiento</span></div><div><b>${cargMes}</b><span>Cargados este mes</span></div><div class="ok"><b>${ganMes}</b><span>Clientes nuevos</span></div></div>
-    <div class="m-filters"><div class="seg"><button class="${S.f.pScope==="todos"?"on":""}" onclick="S.f.pScope='todos';render()">Todos</button><button class="${S.f.pScope==="mios"?"on":""}" onclick="S.f.pScope='mios';render()">Míos</button></div>
+    <div class="m-filters">
       <select id="pSedeM" aria-label="Sede" onchange="S.f.pSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.slice(0,3).map(x=>`<option ${S.f.pSede===x?"selected":""}>${x}</option>`).join("")}</select></div>
     <div style="margin-bottom:8px">${mesSel}</div>
     <input type="search" id="pQ" placeholder="Buscar por nombre, negocio o número…" value="${esc(S.f.pQ)}" oninput="S.f.pQ=this.value;render()" style="margin-bottom:10px">
@@ -1422,7 +1423,7 @@ function vProspectos(){
     <div class="kpi"><div class="v">${cerrados?Math.round(ganTot/cerrados*100)+"%":"—"}</div><div class="l">Tasa de cierre</div></div>
   </div>
   <div class="toolbar">
-    <div class="seg"><button class="${S.f.pScope==="todos"?"on":""}" onclick="S.f.pScope='todos';render()">Todos</button><button class="${S.f.pScope==="mios"?"on":""}" onclick="S.f.pScope='mios';render()">Míos</button></div>
+    
     <div class="seg">${["",...SEDES.slice(0,3)].map(s=>`<button class="${S.f.pSede===s?"on":""}" onclick="S.f.pSede='${s}';render()">${s||"Todas las sedes"}</button>`).join("")}</div>
     ${mesSel}
     <input type="search" id="pQ" placeholder="Buscar por nombre, negocio o número…" value="${esc(S.f.pQ)}" oninput="S.f.pQ=this.value;render()">
@@ -1464,7 +1465,7 @@ async function moverEtapa(id, etapa){
   if(!await run(sb.from("prospectos").update(data).eq("id",id), etapa==="Ganado"?"¡Cliente nuevo!":"Movido a "+etapaL(etapa))){ Object.assign(p,prev); render(); }
 }
 function formProspecto(id){
-  const p=id?S.prospectos.find(x=>x.id===id)||{}:{etapa:"Contactado",setter:S.me.id,sede:S.me.sede||""};
+  const p=id?S.prospectos.find(x=>x.id===id)||{}:{etapa:"Contactado",setter:S.me.id,sede:S.f.pSede||S.me.sede||""};
   openModal(`<h2>${id?esc(p.nombre):"Nuevo prospecto"}</h2><form class="form" onsubmit="saveProspecto(event,'${id||""}')">
     <label class="f" for="pNom">Nombre del contacto<input type="text" id="pNom" required value="${esc(p.nombre)}"></label>
     <label class="f" for="pNeg">Negocio<input type="text" id="pNeg" value="${esc(p.negocio)}"></label>
