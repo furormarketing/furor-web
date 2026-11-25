@@ -1988,7 +1988,26 @@ const campsDe = cid => S.ads_campanas.filter(c=>c.cliente_id===cid).sort((a,b)=>
 const saldosDe = cid => S.ads_saldos.filter(x=>x.cliente_id===cid).sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
 const repsDe = cid => S.ads_reportes.filter(x=>x.cliente_id===cid).sort((a,b)=>String(b.hasta).localeCompare(String(a.hasta))||String(b.creado).localeCompare(String(a.creado)));
 const invDiaActiva = cid => S.ads_campanas.filter(c=>c.cliente_id===cid&&c.estado==="Activa").reduce((a,c)=>a+Number(c.inversion_diaria||0),0);
-const saldoDisp = cid => saldosDe(cid).filter(x=>!x.usado).reduce((a,x)=>a+Number(x.monto||0),0);
+/* Consumo estimado: inversión por día × días que la campaña estuvo activa.
+   "acumulado" guarda lo ya cerrado (antes de una pausa o de un cambio de presupuesto);
+   "tramo_desde" es desde cuándo corre el tramo actual (null = inicio). */
+function consumoCamp(k, hasta){
+  hasta=hasta||today();
+  let dias=0;
+  if(k.estado==="Activa"){
+    const desde=k.tramo_desde||k.inicio, fin=k.fin&&k.fin<hasta?k.fin:hasta;
+    if(desde&&desde<=fin) dias=diasEntre(desde,fin)+1;
+  }
+  return Number(k.acumulado||0)+dias*Number(k.inversion_diaria||0);
+}
+function plataCli(cid){
+  const cargado=saldosDe(cid).reduce((a,x)=>a+Number(x.monto||0),0);
+  const consumido=campsDe(cid).reduce((a,k)=>a+consumoCamp(k),0);
+  const queda=cargado-consumido, porDia=invDiaActiva(cid);
+  const dias=porDia>0&&queda>0?Math.floor(queda/porDia):(porDia>0?0:null);
+  return {cargado,consumido,queda,porDia,dias,hasta:dias!=null?addDays(today(),dias):null,poco:porDia>0&&dias!=null&&dias<=5};
+}
+const saldoDisp = cid => Math.max(0,plataCli(cid).queda);
 
 function periodoCamp(c){
   const t=today(), d=diasEntre(c.inicio,t)+1;
@@ -1998,65 +2017,91 @@ function periodoCamp(c){
 }
 
 function vAds(){
-  const q=(S.adsQ||"").toLowerCase();
+  const q=(S.adsQ||"").toLowerCase(), fil=S.adsFil||"activas";
   const act=S.ads_campanas.filter(c=>c.estado==="Activa");
-  const cids=[...new Set([...S.ads_campanas.map(c=>c.cliente_id),...S.ads_saldos.map(x=>x.cliente_id)])]
-    .filter(id=>S.adsAll||act.some(c=>c.cliente_id===id))
-    .map(id=>cli(id)).filter(Boolean).filter(c=>!q||[c.nombre,c.contacto].join(" ").toLowerCase().includes(q))
+  const todos=[...new Set([...S.ads_campanas.map(c=>c.cliente_id),...S.ads_saldos.map(x=>x.cliente_id)])].map(id=>cli(id)).filter(Boolean);
+  const pocos=todos.filter(c=>plataCli(c.id).poco);
+  const cids=todos.filter(c=>fil==="todos"||(fil==="poco"?plataCli(c.id).poco:act.some(k=>k.cliente_id===c.id)))
+    .filter(c=>!q||[c.nombre,c.contacto].join(" ").toLowerCase().includes(q))
     .sort((a,b)=>a.nombre.localeCompare(b.nombre));
   const invTot=act.reduce((a,c)=>a+Number(c.inversion_diaria||0),0);
-  const dispTot=[...new Set(S.ads_saldos.map(x=>x.cliente_id))].reduce((a,id)=>a+saldoDisp(id),0);
+  const dispTot=todos.reduce((a,c)=>a+saldoDisp(c.id),0);
   const head = S.mobile
     ? `<div class="m-head"><div><div class="eyebrow">Cuentas</div><h1>Ads clientes</h1></div></div>`
     : pageHead("Cuentas","Ads clientes","Campañas de cada cliente, la inversión que te carga y los reportes para mandar por WhatsApp.",`<button class="btn pri" onclick="formCampAds()">${icon("plus")}Nueva campaña</button>`);
   return `${head}
-  <div class="kpis pk" style="margin-bottom:14px">
+  <div class="kpis pk ads-kpis" style="margin-bottom:14px">
     <div class="kpi"><div class="v">${act.length}</div><div class="l">Campañas activas</div></div>
-    <div class="kpi"><div class="v">${pesos(invTot)}</div><div class="l">Inversión por día (activas)</div></div>
-    <div class="kpi"><div class="v">${pesos(dispTot)}</div><div class="l">Saldo de clientes sin usar</div></div>
+    <div class="kpi"><div class="v">${pesos(invTot)}</div><div class="l">Inversión por día</div></div>
+    <div class="kpi"><div class="v">${pesos(dispTot)}</div><div class="l">Saldo que les queda</div></div>
+    <div class="kpi ${pocos.length?"bad":""}"><div class="v">${pocos.length}</div><div class="l">Por agotarse (5 días o menos)</div></div>
   </div>
-  <div class="toolbar"><div class="seg"><button class="${!S.adsAll?"on":""}" onclick="S.adsAll=false;render()">Con campañas activas</button><button class="${S.adsAll?"on":""}" onclick="S.adsAll=true;render()">Todos</button></div>
+  <div class="toolbar"><div class="seg ads-fil"><button class="${fil==="activas"?"on":""}" onclick="S.adsFil='activas';render()">Activas</button><button class="${fil==="poco"?"on":""}" onclick="S.adsFil='poco';render()">Por agotarse${pocos.length?` (${pocos.length})`:""}</button><button class="${fil==="todos"?"on":""}" onclick="S.adsFil='todos';render()">Todos</button></div>
     <input type="search" id="adsQ" placeholder="Buscar cliente…" value="${esc(S.adsQ||"")}" oninput="S.adsQ=this.value;render()"></div>
-  ${cids.length?cids.map(c=>adsCard(c)).join(""):`<div class="card">${emptyMsg(S.adsAll?"Todavía no hay campañas cargadas.":"No hay campañas activas. Tocá “Nueva campaña” para cargar la primera.","mega")}</div>`}`;
+  ${cids.length?cids.map(c=>adsCard(c)).join(""):`<div class="card">${emptyMsg(fil==="poco"?"Ningún cliente está por quedarse sin saldo.":fil==="todos"?"Todavía no hay campañas cargadas.":"No hay campañas activas. Tocá “Nueva campaña” para cargar la primera.","mega")}</div>`}`;
 }
 
+function adsCampRow(k){
+  const t=today(), act=k.estado==="Activa", gastado=consumoCamp(k);
+  let info=[k.plataforma, k.objetivo].filter(Boolean).join(" · ");
+  if(!act && k.tramo_desde && k.tramo_desde<=addDays(t,1)) info+=` · ${k.estado==="Pausada"?"pausada":"terminada"} el ${fmtDate(addDays(k.tramo_desde,-1))}`;
+  else info+=" · "+periodoCamp(k).replace(/^Desde /,"desde ").replace(/^Arranca /,"arranca ");
+  return `<div class="acamp ${act?"on":""} est-${esc((k.estado||"").toLowerCase())}">
+    <div class="acamp-m"><div class="acamp-n">${esc(k.nombre||k.objetivo||"Campaña")}</div><div class="acamp-s">${esc(info)}${k.link?` · <a href="${esc(safeUrl(k.link)||"#")}" target="_blank" rel="noopener">Administrador</a>`:""}</div></div>
+    <div class="acamp-inv"><b>${pesos(k.inversion_diaria)}</b><span>por día${gastado>0?` · lleva ${pesos(gastado)}`:""}</span></div>
+    <div class="acamp-est" role="group" aria-label="Estado de la campaña">${EST_ADS.map(([e])=>`<button type="button" class="${k.estado===e?"on":""} e-${e.toLowerCase()}" onclick="setCampAds('${k.id}','estado','${e}')">${e}</button>`).join("")}</div>
+    <button class="btn sm ghost ic acamp-ed" onclick="formCampAds('${k.id}')" title="Editar campaña" aria-label="Editar campaña">${icon("edit")}</button>
+  </div>`;
+}
 function adsCard(c, enFicha){
-  const camps=campsDe(c.id), sal=saldosDe(c.id), reps=repsDe(c.id), disp=saldoDisp(c.id), inv=invDiaActiva(c.id);
-  const dias = inv>0 ? Math.floor(disp/inv) : null;
+  const camps=campsDe(c.id), sal=saldosDe(c.id), reps=repsDe(c.id), p=plataCli(c.id);
   const hist=S.adsHist[c.id];
-  return `<section class="card adsc" style="--sc:${sedeColor(c.sede)}">
-    <div class="adsc-h">${enFicha?"":`<a class="adsc-cli" href="#cliente-${c.id}" onclick="S.cliTab='ads'">${cliAv(c)}<div><b>${esc(c.nombre)}</b><div class="s">${esc([c.sede,c.contacto].filter(Boolean).join(" · "))}</div></div></a>`}
-      <div class="adsc-acts"><button class="btn pri" onclick="abrirReporte('${c.id}')" ${camps.length?"":"disabled"}>${icon("send")}Armar reporte</button><button class="btn" onclick="formSaldoAds('${c.id}')">${icon("plus")}Cargar inversión</button><button class="btn" onclick="formCampAds(null,'${c.id}')">${icon("plus")}Campaña</button></div></div>
-    <div class="adsc-camps">${camps.map(k=>`<div class="camp">
-        <div class="camp-m"><div class="camp-n">${esc(k.nombre||k.objetivo)} <span class="pill ${k.plataforma==="Google"?"info":""}">${esc(k.plataforma)} · ${esc(k.objetivo)}</span></div>
-          <div class="s">${periodoCamp(k)}${k.link?` · <a href="${esc(safeUrl(k.link)||"#")}" target="_blank" rel="noopener">Administrador</a>`:""}</div></div>
-        <div class="camp-inv"><b>${pesos(k.inversion_diaria)}</b><span class="s">por día</span></div>
-        <div class="estsel">${EST_ADS.map(([e,cl])=>`<button type="button" class="${cl} ${k.estado===e?"on":""}" onclick="setCampAds('${k.id}','estado','${e}')">${e}</button>`).join("")}</div>
-        <button class="btn sm ghost ic" onclick="formCampAds('${k.id}')" title="Editar campaña" aria-label="Editar campaña">${icon("edit")}</button>
-      </div>`).join("")||`<div class="s" style="padding:6px 0">Sin campañas cargadas.</div>`}</div>
-    <div class="adsc-saldo">
-      <div class="sal-h"><b>Inversión cargada por el cliente</b>${sal.length?`<span class="sal-disp">Sin usar: <b>${pesos(disp)}</b>${dias!=null&&disp>0?` · alcanza para unos <b>${dias} día${dias===1?"":"s"}</b> a ${pesos(inv)}/día`:""}</span>`:""}</div>
-      <div class="sal-list">${sal.map(x=>`<div class="sal ${x.usado?"used":""}"><div><b>${pesos(x.monto)}</b><span class="s">${fmtDate(x.fecha)}${x.banco?" · "+esc(x.banco):""}</span></div>
-        <button type="button" class="sal-tg ${x.usado?"on":""}" onclick="setSaldoUsado('${x.id}',${!x.usado})" title="${x.usado?"Marcar como sin usar":"Marcar como usado"}">${x.usado?icon("ok")+"Usado":"Sin usar"}</button>
-        <button class="btn sm ghost ic" onclick="formSaldoAds('${c.id}','${x.id}')" aria-label="Editar" title="Editar">${icon("edit")}</button></div>`).join("")||`<span class="s">Todavía no cargó inversión.</span>`}</div>
+  const ini=String(c.nombre||"?").replace(/[^\p{L}\p{N} ]/gu,"").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"?";
+  return `<section class="adsc2 ${p.poco?"poco":""}">
+    <div class="adsc2-h">
+      ${enFicha?`<div class="adsc2-cli"><b>Campañas y pauta</b></div>`:`<a class="adsc2-cli" href="#cliente-${c.id}" onclick="S.cliTab='ads'"><span class="adsc2-av">${esc(ini)}</span><b>${esc(c.nombre)}</b></a>`}
+      <div class="adsc2-acts"><button class="btn adsc2-rep" onclick="abrirReporte('${c.id}')" ${camps.length?"":"disabled"}>${icon("send")}Armar reporte</button><button class="btn adsc2-b" onclick="formSaldoAds('${c.id}')">${icon("plus")}Inversión</button><button class="btn adsc2-b" onclick="formCampAds(null,'${c.id}')">${icon("plus")}Campaña</button></div>
     </div>
-    ${reps.length?`<div class="adsc-reps"><button class="linkbtn" onclick="S.adsHist['${c.id}']=!S.adsHist['${c.id}'];render()">${icon("clock")}Último reporte: ${fmtDate(reps[0].desde)} – ${fmtDate(reps[0].hasta)}${reps[0].enviado_el?" · enviado":" · sin enviar"} · ${hist?"ocultar historial":`ver historial (${reps.length})`}</button>
+    <div class="adsc2-body">
+      <div class="acamps">${camps.map(adsCampRow).join("")||`<div class="s" style="padding:4px 0 8px">Sin campañas cargadas. Tocá “Campaña” para sumar la primera.</div>`}</div>
+      <div class="aplata ${p.poco?"poco":""}">
+        <div class="aplata-t">Inversión del cliente</div>
+        ${sal.length||p.consumido>0?`<div class="aplata-g">
+          <div><small>Cargó</small><b>${pesos(p.cargado)}</b></div>
+          <div><small>Consumido</small><b>${pesos(p.consumido)}</b></div>
+          <div><small>Queda</small><b class="q">${pesos(Math.max(0,p.queda))}</b></div>
+          <div><small>Alcanza hasta</small><b class="q">${p.porDia>0?(p.queda>0?fmtLargo(p.hasta):"Sin saldo"):"—"}</b></div>
+        </div>
+        <div class="aplata-n">${p.queda<0?`<span class="bad">Se consumió ${pesos(-p.queda)} más de lo cargado. </span>`:p.poco?`<span class="bad">${p.dias===0?"Hoy se termina el saldo. ":`Quedan ${p.dias} día${p.dias===1?"":"s"} de pauta. `}</span>`:p.porDia>0&&p.dias!=null?`A ${pesos(p.porDia)}/día quedan unos ${p.dias} días. `:p.porDia===0?"Sin campañas activas: no se descuenta. ":""}
+          ${sal.length?`Cargas: ${sal.map(x=>`<button type="button" class="aplata-c" onclick="formSaldoAds('${c.id}','${x.id}')" title="Editar carga">${pesos(x.monto)} el ${fmtDate(x.fecha)}${x.banco?" ("+esc(x.banco)+")":""}</button>`).join(", ")}`:"Todavía no cargó inversión."}</div>`
+        :`<div class="aplata-n">Todavía no cargó inversión. Tocá “Inversión” cuando te mande plata para la pauta.</div>`}
+      </div>
+      ${reps.length?`<div class="adsc-reps"><button class="linkbtn" onclick="S.adsHist['${c.id}']=!S.adsHist['${c.id}'];render()">${icon("clock")}Último reporte: ${fmtDate(reps[0].desde)} – ${fmtDate(reps[0].hasta)}${reps[0].enviado_el?" · enviado":" · sin enviar"} · ${hist?"ocultar historial":`ver historial (${reps.length})`}</button>
       ${hist?`<div class="rep-list">${reps.map(r=>`<div class="rep"><div><b>${fmtDate(r.desde)} – ${fmtDate(r.hasta)}</b><span class="s">${r.enviado_el?"Enviado "+fmtDate(String(r.enviado_el).slice(0,10)):"Guardado sin enviar"}</span></div><button class="btn sm" onclick="verReporte('${r.id}')">Ver mensaje</button></div>`).join("")}</div>`:""}</div>`:""}
+    </div>
   </section>`;
 }
 
+function cambioTramo(c, nuevo){
+  // cierra lo consumido hasta hoy y arranca el tramo nuevo, para que pausas y cambios de presupuesto no reescriban lo ya gastado
+  const t=today(), out={};
+  if("estado" in nuevo && nuevo.estado!==c.estado){
+    if(c.estado==="Activa"){ out.acumulado=consumoCamp(c); out.tramo_desde=addDays(t,1); }
+    else if(nuevo.estado==="Activa"){ out.tramo_desde = c.tramo_desde&&c.tramo_desde>t ? c.tramo_desde : (c.inicio>t?c.inicio:t); }
+  }
+  if("inversion_diaria" in nuevo && Number(nuevo.inversion_diaria)!==Number(c.inversion_diaria) && c.estado==="Activa" && (nuevo.estado||c.estado)==="Activa" && c.inicio<=t){
+    out.acumulado=consumoCamp(c); out.tramo_desde=addDays(t,1);
+  }
+  return out;
+}
 async function setCampAds(id,k,val){
   const c=S.ads_campanas.find(x=>x.id===id); if(!c||c[k]===val) return;
-  const prev=c[k]; c[k]=val; render();
-  const { error } = await sb.from("ads_campanas").update({[k]:val,actualizado:new Date().toISOString()}).eq("id",id);
-  if(error){ c[k]=prev; render(); toast("No se pudo guardar."); } else if(k==="estado") toast("Campaña "+val.toLowerCase());
+  const cambio=Object.assign({[k]:val},cambioTramo(c,{[k]:val}));
+  const prev={}; Object.keys(cambio).forEach(x=>prev[x]=c[x]);
+  Object.assign(c,cambio); render();
+  const { error } = await sb.from("ads_campanas").update(Object.assign({actualizado:new Date().toISOString()},cambio)).eq("id",id);
+  if(error){ Object.assign(c,prev); render(); toast("No se pudo guardar."); } else if(k==="estado") toast("Campaña "+val.toLowerCase());
 }
-async function setSaldoUsado(id,val){
-  const x=S.ads_saldos.find(y=>y.id===id); if(!x) return; const prev=x.usado; x.usado=val; render();
-  const { error } = await sb.from("ads_saldos").update({usado:val}).eq("id",id);
-  if(error){ x.usado=prev; render(); toast("No se pudo guardar."); }
-}
-
 function formCampAds(id, cid){
   const k=id?S.ads_campanas.find(x=>x.id===id)||{}:{cliente_id:cid||(S.view==="clientes"?S.cliId:"")||"",plataforma:"Meta",objetivo:"Mensajes",inicio:today(),estado:"Activa",texto_objetivo:OBJ_TXT["Mensajes"]};
   openModal(`<h2>${id?"Editar campaña":"Nueva campaña"}</h2><form class="form" onsubmit="saveCampAds(event,'${id||""}')">
@@ -2069,6 +2114,7 @@ function formCampAds(id, cid){
     <label class="f" for="caIni">Inicio<input type="date" id="caIni" value="${esc(k.inicio)}" required></label>
     <label class="f" for="caFin">Fin (opcional)<input type="date" id="caFin" value="${esc(k.fin||"")}"></label>
     <div class="full dur-q"><span class="s">Duración rápida:</span>${[7,15,30,60].map(n=>`<button type="button" class="btn sm" onclick="const i=document.getElementById('caIni').value||today(); document.getElementById('caFin').value=addDays(i,${n}-1)">${n} días</button>`).join("")}<button type="button" class="btn sm ghost" onclick="document.getElementById('caFin').value=''">Sin fin</button></div>
+    ${id&&k.inicio&&k.inicio<=today()?`<label class="f full" for="caCons">Consumido hasta hoy<input ${MONTO_IN} id="caCons" value="${esc(montoVal(Math.round(consumoCamp(k))))}" data-orig="${Math.round(consumoCamp(k))}"><span class="s" style="font-weight:400">Lo calcula la app (inversión por día × días activa). Si en Meta gastó otra cifra, corregila acá.</span></label>`:""}
     <label class="f full" for="caTxt">Texto del objetivo (va en el reporte)<textarea id="caTxt" style="min-height:80px">${esc(k.texto_objetivo||"")}</textarea></label>
     <label class="f full" for="caLink">Link del Administrador de anuncios (opcional)<input type="url" id="caLink" value="${esc(k.link||"")}" placeholder="https://adsmanager.facebook.com/…"></label>
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('ads_campanas','${id}','esta campaña')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div>
@@ -2078,6 +2124,10 @@ async function saveCampAds(e,id){
   e.preventDefault();
   const data={cliente_id:v("caCli"),objetivo:v("caObj"),plataforma:v("caPla"),nombre:v("caNom"),inversion_diaria:parseMonto(v("caInv")),estado:v("caEst"),inicio:v("caIni")||today(),fin:nz(v("caFin")),texto_objetivo:v("caTxt"),link:v("caLink"),actualizado:new Date().toISOString()};
   if(data.fin && data.fin<data.inicio){ toast("El fin no puede ser antes del inicio"); return; }
+  if(id){ const prev=S.ads_campanas.find(x=>x.id===id);
+    if(prev){ Object.assign(data,cambioTramo(prev,data));
+      const ce=document.getElementById("caCons");
+      if(ce && String(parseMonto(ce.value))!==ce.dataset.orig){ data.acumulado=parseMonto(ce.value)||0; data.tramo_desde=addDays(today(),1); } } }
   let res;
   if(id) res=await sb.from("ads_campanas").update(data).eq("id",id).select().single();
   else res=await sb.from("ads_campanas").insert(Object.assign({creado_por:S.me.id},data)).select().single();
@@ -2095,14 +2145,12 @@ function formSaldoAds(cid, id){
     <label class="f" for="saFec">Fecha<input type="date" id="saFec" value="${esc(x.fecha)}"></label>
     <label class="f" for="saBan">Banco / medio<input type="text" id="saBan" list="dlBancos" value="${esc(x.banco||"")}"></label><datalist id="dlBancos">${bancos.map(b=>`<option value="${esc(b)}">`).join("")}</datalist>
     <label class="f" for="saNot">Nota (opcional)<input type="text" id="saNot" value="${esc(x.notas||"")}"></label>
-    ${id?`<label class="check full"><input type="checkbox" id="saUso" ${x.usado?"checked":""}><span>Ya se usó</span></label>`:""}
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('ads_saldos','${id}','esta carga')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div>
   </form>`);
 }
 async function saveSaldoAds(e,cid,id){
   e.preventDefault();
   const data={cliente_id:cid,monto:parseMonto(v("saMon")),fecha:v("saFec")||today(),banco:v("saBan"),notas:v("saNot")};
-  if(id) data.usado=!!document.getElementById("saUso")?.checked;
   let res;
   if(id) res=await sb.from("ads_saldos").update(data).eq("id",id).select().single();
   else res=await sb.from("ads_saldos").insert(Object.assign({creado_por:S.me.id},data)).select().single();
