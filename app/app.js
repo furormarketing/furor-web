@@ -1433,18 +1433,11 @@ const ETAPA_CORTA = {"Contactado":"Contactado","Honorarios enviados":"Honorarios
 function pRow(p){
   const wa=waNumber(p.whatsapp||""), idx=ETAPAS.indexOf(p.etapa);
   const steps=ETAPAS.map((e,i)=>`<button type="button" class="${e===p.etapa?"on":""} ${e!=="Perdido"&&i<idx&&p.etapa!=="Perdido"?"done":""} ${e==="Perdido"?"lost":""}" style="--c:${ETAPA_C[e]}" title="${e===p.etapa?"Etapa actual":"Mover a "+e}" onclick="moverEtapa('${p.id}','${e}')">${ETAPA_CORTA[e]}</button>`).join("");
-  return `<div class="prow2" style="--c:var(--brand)">
-    <div class="pr-main" onclick="formProspecto('${p.id}')" title="Ver / editar">
-      <div class="pr-nom">${esc(p.nombre)}</div>
-      <div class="pr-neg">${p.negocio?esc(p.negocio):`<span class="nodata">Sin negocio</span>`}${p.rubro?` <span class="s">· ${esc(p.rubro)}</span>`:""}</div>
-    </div>
-    <div class="pr-tel">${wa?`<a class="tel" href="https://wa.me/${wa}" target="_blank" rel="noopener" title="Abrir WhatsApp">${icon("wa")}<span>${esc(p.whatsapp)}</span></a>
-      <a class="btn sm ghost ic" href="tel:+${wa}" title="Llamar" aria-label="Llamar">${icon("phone")}</a>
-      <button class="btn sm ghost ic" onclick="usarPlantilla(null,'${p.id}')" title="Mensaje con plantilla" aria-label="Mensaje con plantilla">${icon("message")}</button>`
-      :`<span class="nodata">Sin número</span>`}</div>
-    <div class="pr-meta">
-      <span class="s">${p.sede?`<span class="sede-dot" style="--sc:${sedeColor(p.sede)}"></span>${esc(p.sede)} · `:""}${esc(p.setter?memName(p.setter):"Sin setter")}</span>
-      ${p.etapa==="Ganado"&&!p.cliente_id?`<button class="btn sm pri" onclick="pasarACliente('${p.id}')">Pasar a cliente</button>`:""}</div>
+  return `<div class="prow3">
+    <div class="pr3-id"><button type="button" class="pr3-nom" onclick="formProspecto('${p.id}')" title="Ver / editar">${esc(p.nombre)}</button>
+    <span class="pr3-neg" title="${esc([p.negocio,p.rubro].filter(Boolean).join(" · "))}">${p.negocio?esc(p.negocio):`<span class="nodata">Sin negocio</span>`}</span></div>
+    <span class="pr3-tel">${wa?`<a href="https://wa.me/${wa}" target="_blank" rel="noopener" title="Abrir WhatsApp">${icon("wa")}${esc(p.whatsapp)}</a>`:`<span class="nodata">Sin número</span>`}</span>
+    <span class="pr3-sede">${p.sede?`<span class="sede-dot" style="--sc:${sedeColor(p.sede)}"></span><span title="${esc(p.sede)}">${esc(p.sede==="Santiago del Estero"?"Sgo. del Estero":p.sede)}</span>`:`<span class="nodata">Sin provincia</span>`}${p.etapa==="Ganado"&&!p.cliente_id?` <button class="btn sm pri" onclick="pasarACliente('${p.id}')">Pasar a cliente</button>`:""}</span>
     <div class="pr-steps">${steps}</div>
   </div>`;
 }

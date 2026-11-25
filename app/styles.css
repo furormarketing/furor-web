@@ -1107,3 +1107,28 @@ span.ckh{cursor:default}
   .aplata-g b.q{color:#8fb4f7}
 }
 @media (max-width:900px){ .pr-steps button.lost{grid-column:1/-1} }
+/* Prospectos: todo en una línea — nombre · negocio · número · provincia · seguimiento (columnas alineadas entre filas) */
+.prow3{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 140px 118px auto;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:10px;padding:7px 8px 7px 14px;margin-bottom:6px}
+.pr3-nom{font:inherit;font-size:14.5px;font-weight:800;color:var(--ink);background:none;border:0;padding:0;text-align:left;cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr3-nom:hover{text-decoration:underline;text-underline-offset:3px}
+.pr3-neg{font-size:13.5px;font-weight:600;color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr3-tel{min-width:0}
+.pr3-tel a{display:inline-flex;align-items:center;gap:5px;font-size:14px;font-weight:700;color:var(--ink);text-decoration:none;font-variant-numeric:tabular-nums;padding:4px 8px;border-radius:8px;background:var(--ok-soft);white-space:nowrap}
+.pr3-tel a .ico{width:14px;height:14px;color:#1fa855}
+.pr3-tel a:hover{background:color-mix(in srgb,var(--ok) 18%,var(--surface))}
+.pr3-tel .nodata,.pr3-sede .nodata{font-size:13px}
+.pr3-sede{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink-2);white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.prow3 .pr-steps{grid-column:auto;justify-self:end}
+.prow3 .pr-steps button{padding:4px 5px;font-size:11px}
+@media (max-width:1180px){ .prow3{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 140px 118px} .prow3 .pr-steps{grid-column:1/-1;justify-self:start} }
+.pr3-id{display:contents}
+@media (max-width:900px){
+  .prow3{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:10px 12px}
+  .pr3-id{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;grid-column:1/-1;min-width:0}
+  .pr3-nom{white-space:normal;font-size:15px}
+  .pr3-neg{white-space:normal}
+  .pr3-neg::before{content:"· ";color:var(--muted)}
+  .pr3-tel{grid-column:1} .pr3-sede{grid-column:2;justify-self:end}
+  .prow3 .pr-steps{grid-column:1/-1;justify-self:stretch;display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+  .prow3 .pr-steps button{padding:8px 4px;font-size:12.5px}
+}
