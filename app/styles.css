@@ -1157,3 +1157,28 @@ span.ckh{cursor:default}
 .cal .day.feriado.today .num{background:#0b8043;color:#fff}
 .agl-s{padding-left:50px}
 @media (max-width:900px){ .agl-s{padding-left:0} }
+/* Dirección · Resumen: fechas de cobro en bloque de color lleno */
+.when.solid{background:var(--sc);border-color:var(--sc);color:#fff}
+.when.solid::before{display:none}
+.when.solid b{color:#fff}
+.when.solid span{color:rgba(255,255,255,.88)}
+/* Ventas por sede con zócalo + total */
+.vsede.sede-cards.rows .sede-card{border-left:1px solid var(--line)}
+.vsede .sc-h{min-height:40px!important;padding:8px 14px!important;margin-bottom:10px!important}
+.vsede .sc-m{grid-template-columns:repeat(5,minmax(0,1fr))!important;padding-bottom:12px!important}
+.vsede .sede-card:last-child .sc-h{background:#2c3530}
+@media (max-width:1700px){ .vsede .sc-m{grid-template-columns:repeat(3,minmax(0,1fr))!important} }
+@media (max-width:420px){ .vsede .sc-m{grid-template-columns:repeat(2,minmax(0,1fr))!important} }
+/* Gastos por categoría */
+.gtot{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:10px 12px;border-radius:10px;background:var(--surface-2);margin-bottom:14px}
+.gtot small{display:block;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+.gtot b{font-family:var(--font-display);font-size:18px;font-variant-numeric:tabular-nums}
+.gtot .gd{font-size:15px}
+.g2b{gap:12px}
+.hb2-t{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:14px;font-weight:600}
+.hb2-t b{font-variant-numeric:tabular-nums}
+.hb2-b{height:10px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin:5px 0 4px}
+.hb2-b i{display:block;height:100%;background:var(--brand);border-radius:99px}
+.hb2-s{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.gd{font-weight:700;font-variant-numeric:tabular-nums}
+.gd.sube{color:var(--danger)} .gd.baja{color:var(--ok)} .gd.nuevo{color:var(--muted);font-weight:600}

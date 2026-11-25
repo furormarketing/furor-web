@@ -120,7 +120,7 @@ function vResumen(){
 }
 function filaCobrar(x){
   const c=x.cuenta, hoy=today(), late=x.fecha<hoy;
-  return `<div class="row"><div class="when" style="--sc:${late?"var(--danger)":"var(--warn)"}"><b>${parseYmd(x.fecha).getDate()}</b><span>${MES_C[parseYmd(x.fecha).getMonth()]}</span></div>
+  return `<div class="row"><div class="when solid" style="--sc:${late?"var(--danger)":"var(--warn)"}"><b>${parseYmd(x.fecha).getDate()}</b><span>${MES_C[parseYmd(x.fecha).getMonth()]}</span></div>
     <div class="main"><div class="t">${esc(c.negocio)}</div><div class="s">${esc(c.titular||"")}${c.id&&incluyeTxt(c)?` · <b>${esc(incluyeTxt(c))}</b>`:""}</div><div class="cob-m"><b>${money(x.monto)}</b>${late?`<span class="pill bad">Vencido</span>`:`<span class="pill warn">Pendiente</span>`}</div></div>
     <button class="btn sm wa" onclick="DIR.recordar('${c.id||""}','${x.fecha}',${x.monto})" title="Recordar pago por WhatsApp">${icon("wa")}</button>
     <button class="btn sm pri" onclick="DIR.cobrar('${c.id||""}','${x.cobro?x.cobro.id:""}',${x.monto})">Cobrado</button></div>`;
@@ -141,28 +141,37 @@ function grafico(m){
   </svg>`;
 }
 function ventasSede(m){
-  const sedes=["Tucumán","Salta","Santiago del Estero"];
-  const rows=sedes.map(s=>{
-    const c=D.fin_campanas.find(x=>ym(x.mes)===m&&x.sede===s)||{};
-    const pr=S.prospectos.filter(p=>p.sede===s&&ym(p.creado)===m);
-    const ganados=S.prospectos.filter(p=>p.sede===s&&p.etapa==="Ganado"&&ym(p.actualizado)===m).length;
-    const prospectos=Math.max(c.prospectos||0, pr.length), nuevos=Math.max(c.clientes_nuevos||0, ganados);
-    const altas=D.fin_cuentas.filter(x=>x.alta&&ym(x.alta)===m&&(x.sede||"Tucumán")===s);
-    return {s,prospectos,nuevos,ingresos:Number(c.ingresos)||altas.reduce((a,x)=>a+Number(x.pack),0),inv:Number(c.inversion)||0};
+  // mismos números que Comercial (automáticos desde Prospectos cuando corresponde) + lo cobrado del mes por sede
+  const rows=SEDES3.map(sd=>{
+    const c=efectiva(sd,m)||{};
+    const altas=D.fin_cuentas.filter(x=>x.alta&&ym(x.alta)===m&&(x.sede||"Tucumán")===sd);
+    const cobrado=D.fin_cobros.filter(x=>ym(x.fecha)===m&&x.estado!=="Pendiente"&&((cuenta(x.cuenta_id)||{}).sede||"Tucumán")===sd).reduce((a,x)=>a+Number(x.monto),0);
+    const prospectos=Number(c.prospectos)||0, nuevos=Number(c.clientes_nuevos)||0;
+    return {sd,prospectos,nuevos,ingresos:Number(c.ingresos)||altas.reduce((a,x)=>a+Number(x.pack||0),0),cobrado};
   });
-  return `<div class="sede-cards rows">${rows.map(r=>sedeCard(r.s,[["Prospectos",r.prospectos||"—"],["Cierres",r.nuevos||0,true],["Conversión",r.prospectos?Math.round(r.nuevos/r.prospectos*100)+"%":"—"],["Ingresos nuevos",r.ingresos?money(r.ingresos):"—",true]])).join("")}</div>`;
+  const tot=rows.reduce((a,r)=>({prospectos:a.prospectos+r.prospectos,nuevos:a.nuevos+r.nuevos,ingresos:a.ingresos+r.ingresos,cobrado:a.cobrado+r.cobrado}),{prospectos:0,nuevos:0,ingresos:0,cobrado:0});
+  const card=(n,r)=>sedeCard(n,[["Prospectos",r.prospectos||"—"],["Clientes nuevos",r.nuevos||0,true],["Conversión",r.prospectos?Math.round(r.nuevos/r.prospectos*1000)/10+"%":"—"],["Ingresos nuevos",r.ingresos?money(r.ingresos):"—"],["Cobrado del mes",r.cobrado?money(r.cobrado):"—",true]]);
+  return `<div class="sede-cards rows zocalo vsede">${rows.map(r=>card(r.sd,r)).join("")}${card("Total",tot)}</div>`;
 }
 function sedeCard(nombre, mets, extra){
   return `<div class="sede-card" style="--sc:${nombre==="Total"?"var(--ink-2)":sedeColor(nombre)}"><div class="sc-h"><span class="sede-dot" style="--sc:${nombre==="Total"?"var(--ink-2)":sedeColor(nombre)}"></span><b>${esc(nombre)}</b>${extra||""}</div>
     <div class="sc-m">${mets.map(([l,v,strong])=>`<div><span>${l}</span>${strong?`<b>${v}</b>`:`<em>${v}</em>`}</div>`).join("")}</div></div>`;
 }
-function barrasCat(m){
-  const g=D.fin_gastos.filter(x=>ym(x.fecha)===m), by={};
-  g.forEach(x=>by[x.categoria]=(by[x.categoria]||0)+Number(x.monto));
+function gastosPorCat(m){
+  const by={};
+  D.fin_gastos.filter(x=>ym(x.fecha)===m).forEach(x=>by[x.categoria||"Otros"]=(by[x.categoria||"Otros"]||0)+Number(x.monto));
   const eq=D.fin_equipo.filter(x=>ym(x.fecha)===m&&x.concepto!=="Retiro").reduce((a,x)=>a+Number(x.monto),0);
-  if(eq) by["Equipo"]=eq;
-  const arr=Object.entries(by).sort((a,b)=>b[1]-a[1]), max=Math.max(1,...arr.map(a=>a[1]));
-  return arr.length?`<div class="hbars">${arr.map(([k,v])=>`<div class="hb"><span>${esc(k)}</span><div><i style="width:${v/max*100}%"></i></div><b>${money(v)}</b></div>`).join("")}</div>`:emptyMsg("Sin gastos cargados este mes.","file");
+  if(eq) by["Equipo"]=(by["Equipo"]||0)+eq;
+  return by;
+}
+function barrasCat(m){
+  const by=gastosPorCat(m), prev=gastosPorCat(addMes(m,-1));
+  const arr=Object.entries(by).sort((a,b)=>b[1]-a[1]), tot=arr.reduce((a,x)=>a+x[1],0), totPrev=Object.values(prev).reduce((a,x)=>a+x,0);
+  if(!arr.length) return emptyMsg("Sin gastos cargados este mes.","file");
+  const dlt=(a,b)=>{ if(!b) return `<span class="gd nuevo">nuevo</span>`; const p=Math.round((a-b)/b*100); return p===0?`<span class="gd">=</span>`:`<span class="gd ${p>0?"sube":"baja"}">${p>0?"▲":"▼"} ${Math.abs(p)}%</span>`; };
+  const mp=MES_L[Number(addMes(m,-1).slice(5))-1].toLowerCase();
+  return `<div class="gtot"><div><small>Total gastado</small><b>${money(tot)}</b></div><div><small>vs ${mp}</small>${totPrev?dlt(tot,totPrev):"<b>—</b>"}</div><div><small>Categorías</small><b>${arr.length}</b></div></div>
+  <div class="hbars g2b">${arr.map(([k,v])=>`<div class="hb2"><div class="hb2-t"><span>${esc(k)}</span><b>${money(v)}</b></div><div class="hb2-b"><i style="width:${Math.max(2,v/tot*100)}%"></i></div><div class="hb2-s"><span>${Math.round(v/tot*100)}% del total</span>${dlt(v,prev[k]||0)}</div></div>`).join("")}</div>`;
 }
 
 /* ---------- Cobros ---------- */
