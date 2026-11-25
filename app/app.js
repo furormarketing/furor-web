@@ -649,7 +649,6 @@ const DKEYS_LAB = DKEYS.slice(0,5); // lunes a viernes
 function vCalendarioCont(){
   const ws=weekStart(S.weekOff), days=[...Array(5)].map((_,i)=>addDays(ws,i)), t=today();
   let list=pautaClients();
-  if(S.f.ctScope==="mias") list=list.filter(c=>c.responsable===S.me.id);
   const late=lateThisWeek();
   const rows=list.map(c=>`<tr><td class="cli"><a href="#cliente-${c.id}" onclick="S.cliTab='pauta'"><b>${esc(c.nombre)}</b></a><div class="s">${esc(c.instagram||"")}${c.responsable?" · "+esc(memName(c.responsable)):""}</div></td>
     ${days.map(d=>{
@@ -660,7 +659,7 @@ function vCalendarioCont(){
   return `
   <div class="head"><div><div class="eyebrow">Cuentas</div><h1>Contenido</h1><p>Qué se publica en cada cuenta, día por día. Tocá cada casilla para marcarla como publicada.</p></div>
     <div class="acts"><button class="btn" onclick="S.weekOff--;render()" aria-label="Semana anterior">‹</button><h2 style="min-width:170px;text-align:center">${fmtDate(days[0])} – ${fmtDate(days[4])}</h2><button class="btn" onclick="S.weekOff++;render()" aria-label="Semana siguiente">›</button><button class="btn" onclick="S.weekOff=0;render()">Esta semana</button></div></div>
-  ${ctTabs()}<div class="toolbar"><div class="seg"><button class="${S.f.ctScope==="todas"?"on":""}" onclick="S.f.ctScope='todas';render()">Todas las cuentas</button><button class="${S.f.ctScope==="mias"?"on":""}" onclick="S.f.ctScope='mias';render()">Mis cuentas</button></div>
+  ${ctTabs()}<div class="toolbar">
     ${late?`<span class="pill bad">${late} publicaciones atrasadas esta semana</span>`:`<span class="pill ok">Semana al día</span>`}
     <span class="s">Verde: publicado · Rojo: atrasado · Línea punteada: pieza programada</span></div>
   ${list.length&&(S.mobile||innerWidth<=1250)?ctMobile(list,days,t):list.length?`<div class="week"><table><thead><tr><th>Cuenta</th>${days.map((d,i)=>{ const f=feriadosDe(d); return `<th class="${d===t?"today":""} ${f.length?"ferth":""}">${DIAS[i]} ${parseYmd(d).getDate()}${f.length?`<span class="pill bad" title="${esc(f.map(x=>x.titulo+(x.sede?" ("+x.sede+")":"")).join(" · "))}">Feriado</span>`:""}</th>`; }).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`
