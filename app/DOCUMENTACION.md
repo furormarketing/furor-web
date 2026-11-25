@@ -71,7 +71,7 @@ Sin build, sin dependencias, sin `npm`. Es copiar archivos.
 | Contenido | Pestañas **Calendario** (sale de las pautas) y **Links publicados** (los carga la CM; botón "Ya lo envié" y envío por WhatsApp). |
 | Ads clientes | Campañas por cliente (objetivo, inversión diaria, inicio/fin, estado), inversión cargada por el cliente (con "Usado / Sin usar") y **reporte para WhatsApp** con el formato de Marcelo. Cada reporte queda guardado. |
 | Tareas | Pestañas **Mi semana** (solo admin: pizarra lunes a viernes + "para esta semana", tachar, pasar pendientes), **Mías** y **Todas** (tareas asignadas con estados). |
-| Prospectos | Lista agrupada por mes de carga. Etapas: Contactado, Honorarios enviados, Llamada, Reunión, Cliente nuevo (`Ganado` en la base), Perdido. **Sin alertas de seguimiento** (pedido explícito). |
+| Prospectos | Lista agrupada por mes de carga. Etapas: Contactado, Honorarios enviados, Llamada, Reunión, Pendiente avanzar, Cliente nuevo (`Ganado` en la base), Perdido. **Sin alertas de seguimiento** (pedido explícito). La franja de cada prospecto es siempre verde Furor; solo las celdas de etapa llevan color. |
 | Material | Separado por servicio: Sistemas MKT, Desarrollo web, Gestión Ads, General. Sin indicador de vigente. |
 | Dirección (solo admin) | Resumen (cobrado, por cobrar, gastos + equipo, **Sueldo Marcelo**), Cobros, Visitas (filmaker; el pago a modelo lo abona el cliente y es solo registro), Gastos, Equipo, Comercial. Edición en línea. Meses pasados muestran solo lo registrado; mes actual suma clientes activos sin pago. |
 
