@@ -302,10 +302,6 @@ function hecha(id,n){ const v=D.fin_visitas.find(x=>x.id===id); if(!v) return; c
 function vComercial(){
   const y=D.mes.slice(0,4);
   const rows=D.fin_campanas.filter(c=>String(c.mes).startsWith(y)).sort((a,b)=>String(b.mes).localeCompare(String(a.mes))||a.sede.localeCompare(b.sede));
-  const live=["Tucumán","Salta","Santiago del Estero"].map(s=>{ const m=D.mes; const pr=S.prospectos.filter(p=>p.sede===s&&ym(p.creado)===m);
-    return {s, total:pr.length, contact:pr.length, hon:pr.filter(p=>["Honorarios enviados","Llamada","Reunión","Pendiente avanzar","Ganado"].includes(p.etapa)).length, llam:pr.filter(p=>["Llamada","Reunión","Pendiente avanzar","Ganado"].includes(p.etapa)).length, reun:pr.filter(p=>["Reunión","Pendiente avanzar","Ganado"].includes(p.etapa)).length, gan:pr.filter(p=>p.etapa==="Ganado").length, perd:pr.filter(p=>p.etapa==="Perdido").length}; });
-  const setters=S.miembros.filter(mb=>mb.rol==="setter"||S.prospectos.some(p=>p.setter===mb.id)).map(mb=>{ const pr=S.prospectos.filter(p=>p.setter===mb.id&&ym(p.creado)===D.mes); const cerr=pr.filter(p=>!["Ganado","Perdido"].includes(p.etapa)===false).length; const gan=pr.filter(p=>p.etapa==="Ganado").length;
-    return {n:mb.nombre||mb.email, sede:mb.sede, total:pr.length, contactos:pr.reduce((a,p)=>a+(p.contactos||0),0), gan, tasa:cerr?Math.round(gan/cerr*100):null}; });
   const f=(v)=>v==null||v===""?"—":v;
   const meses=[...new Set(rows.map(c=>ym(c.mes)))].sort().reverse();
   if(D.camMes==null) D.camMes = meses.includes(D.mes) ? D.mes : (meses[0]||"");
@@ -317,11 +313,7 @@ function vComercial(){
   const cards = sel
     ? sedesOrden.map(sd=>{ const c=sub.find(x=>x.sede===sd); return c?sedeCard(sd,mets(c),`<button class="btn sm ghost ic" style="margin-left:auto" onclick="DIR.formCampana('${c.id}')" title="Editar" aria-label="Editar">${icon("edit")}</button>`):sedeCard(sd,[["Sin datos cargados",""]]); }).join("") + (sub.length>1?sedeCard("Total",mets(agg(sub))):"")
     : sedesOrden.map(sd=>sedeCard(sd,mets(agg(rows.filter(c=>c.sede===sd))))).join("") + sedeCard("Total",mets(agg(rows)));
-  return `<section class="card" style="margin-bottom:16px">${cardH("En vivo · "+mesLabel(D.mes)+" (desde la app)")}
-    <div class="sede-cards">${live.map(r=>sedeCard(r.s,[["Prospectos",r.total,true],["Honorarios enviados",r.hon],["Llamada",r.llam],["Reunión",r.reun],["Clientes nuevos",r.gan,true],["Perdidos",r.perd]])).join("")}</div>
-    ${setters.length?`<h3 style="margin:16px 0 8px">Por setter</h3><div class="sede-cards">${setters.map(r=>sedeCard(r.sede||"Total",[["Prospectos del mes",r.total,true],["Mensajes enviados",r.contactos],["Clientes nuevos",r.gan,true],["Tasa de cierre",r.tasa!=null?r.tasa+"%":"—"]]).replace(`<b>${esc(r.sede||"Total")}</b>`,`<b>${esc(r.n)}</b><span class="s">${esc(r.sede||"")}</span>`)).join("")}</div>`:""}
-  </section>
-  <section class="card">${cardH("Campañas "+y, `<button class="btn sm pri" onclick="DIR.formCampana()">${icon("plus")}Cargar mes</button>`)}
+  return `<section class="card">${cardH("Campañas "+y, `<button class="btn sm pri" onclick="DIR.formCampana()">${icon("plus")}Cargar mes</button>`)}
     <div class="cam-meses"><button class="${!sel?"on":""}" onclick="DIR._camMes('')">Año ${y}</button>${meses.map(m=>`<button class="${sel===m?"on":""}" onclick="DIR._camMes('${m}')">${MES_L[Number(m.slice(5,7))-1]}</button>`).join("")}</div>
     <p class="s" style="margin:0 0 10px">${sel?"Análisis de "+MES_L[Number(sel.slice(5,7))-1].toLowerCase()+" por sede.":"Suma de todo el año por sede."}</p>
     ${rows.length?`<div class="sede-cards">${cards}</div>`:emptyMsg("Todavía no hay meses cargados.","chart")}
@@ -467,7 +459,6 @@ function formCampana(id){
     <label class="f" for="caM">Mes<input type="month" id="caM" required value="${esc(String(c.mes).slice(0,7))}"></label>
     <label class="f" for="caS">Sede<select id="caS">${opts(SEDES.slice(0,3),c.sede)}</select></label>
     ${f("prospectos","Prospectos")}${f("llamadas","Llamadas")}${f("pdf","PDF enviados")}${f("no_interesados","No interesados")}${f("clientes_nuevos","Clientes nuevos")}${f("pendientes","Pendiente avanzar")}${f("inversion","Inversión ads")}${f("ingresos","Ingresos")}${f("dias","Días de campaña")}
-    <p class="full s" style="margin:0">Tip: Prospectos, clientes nuevos e ingresos se pueden completar con los datos "En vivo" de arriba.</p>
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="DIR.borrar('fin_campanas','${id}')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
 }
 async function saveCampana(e,id){
