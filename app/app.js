@@ -1394,7 +1394,8 @@ function vProspectos(){
   const cerrados=list.filter(p=>!activeProsp(p)).length, ganTot=list.filter(p=>p.etapa==="Ganado").length;
   const et=S.f.pEt||"";
   let rows = et==="" ? act : et==="todos" ? list : list.filter(p=>p.etapa===et);
-  rows = rows.sort((a,b)=> String(b.creado||"").localeCompare(String(a.creado||"")));
+  // como en el Excel: dentro de cada mes, del primero que se anotó al último (el nuevo va abajo)
+  rows = rows.sort((a,b)=> String(a.creado||"").localeCompare(String(b.creado||"")));
   const cells=`<div class="etcells">
     <button class="${et===""?"on":""}" style="--c:var(--brand)" onclick="S.f.pEt='';render()">En seguimiento<b>${act.length}</b></button>
     ${ETAPAS.map(e=>`<button class="${et===e?"on":""}" style="--c:${ETAPA_C[e]}" onclick="S.f.pEt='${e}';render()"><span class="dot"></span>${ETAPA_CORTA[e]}<b>${list.filter(p=>p.etapa===e).length}</b></button>`).join("")}
