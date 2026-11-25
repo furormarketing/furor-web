@@ -2073,7 +2073,7 @@ function adsCard(c, enFicha){
           <div><small>Alcanza hasta</small><b class="q">${p.porDia>0?(p.queda>0?fmtLargo(p.hasta):"Sin saldo"):"—"}</b></div>
         </div>
         <div class="aplata-n">${p.queda<0?`<span class="bad">Se consumió ${pesos(-p.queda)} más de lo cargado. </span>`:p.poco?`<span class="bad">${p.dias===0?"Hoy se termina el saldo. ":`Quedan ${p.dias} día${p.dias===1?"":"s"} de pauta. `}</span>`:p.porDia>0&&p.dias!=null?`A ${pesos(p.porDia)}/día quedan unos ${p.dias} días. `:p.porDia===0?"Sin campañas activas: no se descuenta. ":""}
-          ${sal.length?`Cargas: ${sal.map(x=>`<button type="button" class="aplata-c" onclick="formSaldoAds('${c.id}','${x.id}')" title="Editar carga">${pesos(x.monto)} el ${fmtDate(x.fecha)}${x.banco?" ("+esc(x.banco)+")":""}</button>`).join(", ")}`:"Todavía no cargó inversión."}</div>`
+          ${sal.length?`Cargas: ${sal.map(x=>`<button type="button" class="aplata-c" onclick="formSaldoAds('${c.id}','${x.id}')" title="Editar carga">${pesos(x.monto)}</button>`).join(" + ")}`:"Todavía no cargó inversión."}</div>`
         :`<div class="aplata-n">Todavía no cargó inversión. Tocá “Inversión” cuando te mande plata para la pauta.</div>`}
       </div>
       ${reps.length?`<div class="adsc-reps"><button class="linkbtn" onclick="S.adsHist['${c.id}']=!S.adsHist['${c.id}'];render()">${icon("clock")}Último reporte: ${fmtDate(reps[0].desde)} – ${fmtDate(reps[0].hasta)}${reps[0].enviado_el?" · enviado":" · sin enviar"} · ${hist?"ocultar historial":`ver historial (${reps.length})`}</button>
@@ -2136,20 +2136,17 @@ async function saveCampAds(e,id){
 }
 
 function formSaldoAds(cid, id){
-  const x=id?S.ads_saldos.find(y=>y.id===id)||{}:{cliente_id:cid,fecha:today(),banco:(saldosDe(cid)[0]||{}).banco||"Ualá"};
-  const bancos=[...new Set(["Ualá","Mercado Pago","Efectivo",...S.ads_saldos.map(y=>y.banco).filter(Boolean)])];
+  const x=id?S.ads_saldos.find(y=>y.id===id)||{}:{cliente_id:cid};
   openModal(`<h2>${id?"Editar inversión":"Cargar inversión del cliente"}</h2><p class="s" style="margin:-8px 0 14px">${esc(cliName(cid))}: plata que te mandó para la pauta.</p>
   <form class="form" onsubmit="saveSaldoAds(event,'${cid}','${id||""}')">
-    <label class="f" for="saMon">Monto<input ${MONTO_IN} id="saMon" value="${esc(montoVal(x.monto||""))}" required placeholder="$ 50.000"></label>
-    <label class="f" for="saFec">Fecha<input type="date" id="saFec" value="${esc(x.fecha)}"></label>
-    <label class="f" for="saBan">Banco / medio<input type="text" id="saBan" list="dlBancos" value="${esc(x.banco||"")}"></label><datalist id="dlBancos">${bancos.map(b=>`<option value="${esc(b)}">`).join("")}</datalist>
-    <label class="f" for="saNot">Nota (opcional)<input type="text" id="saNot" value="${esc(x.notas||"")}"></label>
+    <label class="f full" for="saMon">Monto<input ${MONTO_IN} id="saMon" value="${esc(montoVal(x.monto||""))}" required placeholder="$ 50.000"></label>
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('ads_saldos','${id}','esta carga')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div>
   </form>`);
 }
 async function saveSaldoAds(e,cid,id){
   e.preventDefault();
-  const data={cliente_id:cid,monto:parseMonto(v("saMon")),fecha:v("saFec")||today(),banco:v("saBan"),notas:v("saNot")};
+  const data={cliente_id:cid,monto:parseMonto(v("saMon"))};
+  if(!id) data.fecha=today();
   let res;
   if(id) res=await sb.from("ads_saldos").update(data).eq("id",id).select().single();
   else res=await sb.from("ads_saldos").insert(Object.assign({creado_por:S.me.id},data)).select().single();
