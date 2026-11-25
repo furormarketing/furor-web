@@ -410,12 +410,12 @@ const emptyMsg = (txt, ic) => `<div class="empty">${icon(ic||"ok")}<span>${txt}<
 /* ---------- Piezas comunes ---------- */
 function evRow(e){
   if(esFer(e)){ const d=parseYmd(e.fecha); return `<div class="row ferrow"><div class="when" style="--sc:var(--danger)"><b>${d.getDate()}</b><span>${MES_C[d.getMonth()]}</span></div>
-  <div class="main"><div class="t">${!e.titulo||e.titulo==="Feriado"?`<span class="pill bad">Feriado</span>`:`${esc(e.titulo)} <span class="pill bad">Feriado</span>`}</div><div class="s">${esc([e.sede||"Todas las sedes", relDays(e.fecha), e.notas].filter(Boolean).join(" · "))}</div></div>
+  <div class="main"><div class="t">${!e.titulo||e.titulo==="Feriado"?`<span class="pill bad">Feriado</span>`:`${esc(e.titulo)} <span class="pill bad">Feriado</span>`}</div><div class="s">${esc([relDays(e.fecha), e.notas].filter(Boolean).join(" · "))}</div></div>
   <button class="btn sm ghost" onclick="formEvento('${e.id}')">Editar</button></div>`; }
   const d=parseYmd(e.fecha), parts=(e.participantes||[]).map(memName).join(", "), link=safeUrl(e.link);
   return `<div class="row evrow ${e.hecho?"hecho":""}"><div class="when" style="--sc:${tcol(e.tipo)}"><b>${d.getDate()}</b><span>${MES_C[d.getMonth()]}</span></div>
   <div class="main"><div class="t">${esc(e.titulo)}</div>
-  <div class="s">${esc([e.tipo, hhmm(e.hora)?hhmm(e.hora)+" hs":"", relDays(e.fecha), e.cliente_id?cliName(e.cliente_id):e.contacto, e.sede].filter(Boolean).join(" · "))}</div>
+  <div class="s">${esc([e.tipo, hhmm(e.hora)?hhmm(e.hora)+" hs":"", relDays(e.fecha), e.cliente_id?cliName(e.cliente_id):e.contacto].filter(Boolean).join(" · "))}</div>
   ${parts?`<div class="s">Con: ${esc(parts)}</div>`:""}
   ${link?`<div class="s"><a href="${esc(link)}" target="_blank" rel="noopener">Unirse a la videollamada</a></div>`:(e.lugar?`<div class="s">${esc(e.lugar)}</div>`:"")}
   </div>${ckHecho(e)}<button class="btn sm ghost" onclick="formEvento('${e.id}')">Editar</button></div>`;
@@ -519,12 +519,12 @@ function vInicio(){
 /* ---------- Agenda ---------- */
 function tareaFecha(x){ return x.vence || (x.estado==="hecha"&&x.hecha_el ? ymd(new Date(x.hecha_el)) : null); }
 function agendaPorDia(){
-  const evs=S.eventos.filter(e=>!S.f.agSede||e.sede===S.f.agSede||(esFer(e)&&!e.sede));
+  const evs=S.eventos; // agenda general: sin filtro por provincia
   const by={}; evs.forEach(e=>(by[e.fecha]=by[e.fecha]||{e:[],t:[]}).e.push(e));
   S.tareas.forEach(x=>{ const f=tareaFecha(x); if(f) (by[f]=by[f]||{e:[],t:[]}).t.push(x); });
   return by;
 }
-const evChip = e => `<div class="ev tp" style="--tc:${tcol(e.tipo)}" title="${esc(e.tipo+": "+e.titulo+(e.sede?" · "+e.sede:"")+(e.hecho?" (hecho)":""))}">${e.hecho?`<span class="okm">✓</span>`:""}${esc((hhmm(e.hora)?hhmm(e.hora)+" ":"")+e.titulo)}</div>`;
+const evChip = e => `<div class="ev tp" style="--tc:${tcol(e.tipo)}" title="${esc(e.tipo+": "+e.titulo+(e.hecho?" (hecho)":""))}">${e.hecho?`<span class="okm">✓</span>`:""}${esc((hhmm(e.hora)?hhmm(e.hora)+" ":"")+e.titulo)}</div>`;
 function agVistaSeg(){ return `<div class="seg"><button class="${S.agVista!=="lista"?"on":""}" onclick="S.agVista='mes';render()">Mes</button><button class="${S.agVista==="lista"?"on":""}" onclick="S.agVista='lista';render()">Lista</button></div>`; }
 function vAgenda(){
   if(S.agVista==="lista") return vAgendaLista();
@@ -542,7 +542,7 @@ function vAgenda(){
   return `
   <div class="head"><div><div class="eyebrow">Operación</div><h1>Agenda Furor</h1><p>Actividades, reuniones, visitas y feriados. Todo queda registrado para revisar después.</p></div>
     <div class="acts"><button class="btn" onclick="calMove(-1)" aria-label="Mes anterior">‹</button><h2 style="min-width:150px;text-align:center;text-transform:capitalize">${MESES[m]} ${y}</h2><button class="btn" onclick="calMove(1)" aria-label="Mes siguiente">›</button><button class="btn" onclick="calToday()">Hoy</button><button class="btn" onclick="toggleFeriado('${sel}')">${(by[sel]||{e:[]}).e.some(esFer)?"Quitar feriado":"Marcar feriado"}</button><button class="btn pri" onclick="formEvento(null,'${sel}')">${icon("plus")}Agendar</button></div></div>
-  <div class="toolbar">${agVistaSeg()}<div class="seg">${["",...SEDES.slice(0,3)].map(s=>`<button class="${S.f.agSede===s?"on":""}" onclick="S.f.agSede='${s}';render()">${s||"Todas las sedes"}</button>`).join("")}</div>
+  <div class="toolbar">${agVistaSeg()}
     <div class="legend">${Object.keys(TIPO_COL).map(t=>`<span><span class="sede-dot" style="background:${tcol(t)}"></span>${t}</span>`).join("")}<span>✓ Hecho</span></div></div>
   <div class="cal-layout"><div class="cal">${cells}</div>
     ${S.mobile?(S.diaSheet?`<div class="daysheet-bg" onclick="if(event.target===this){S.diaSheet=false;render()}"><section class="card daypanel sheet">${dayPanel(sel,si)}</section></div>`:""):`<section class="card daypanel">${dayPanel(sel,si)}</section>`}</div>`;
@@ -553,7 +553,7 @@ function vAgendaLista(){
   const {y,m}=S.cal, q=(S.agQ||"").trim().toLowerCase(), fil=S.agFil||"", t=today();
   const mes=`${y}-${pad(m+1)}`;
   const items=[];
-  S.eventos.forEach(e=>{ if(esFer(e)) return; if(S.f.agSede&&e.sede!==S.f.agSede) return;
+  S.eventos.forEach(e=>{ if(esFer(e)) return;
     if(fil==="tarea"||(fil==="reu"&&!["Reunión","Llamada","Videollamada"].includes(e.tipo))||(fil&&fil!=="reu"&&e.tipo!==fil)) return;
     items.push({f:e.fecha,h:hhmm(e.hora)||"",k:"e",o:e,txt:[e.titulo,e.tipo,e.notas,e.contacto,e.lugar,e.cliente_id?cliName(e.cliente_id):""].join(" ")}); });
   if(!fil||fil==="tarea") S.tareas.forEach(x=>{ const f=tareaFecha(x); if(!f) return; items.push({f,h:"",k:"t",o:x,txt:[x.titulo,x.detalle,x.area,x.cliente_id?cliName(x.cliente_id):""].join(" ")}); });
@@ -563,12 +563,11 @@ function vAgendaLista(){
   const hechos=list.filter(i=>i.k==="e"?i.o.hecho:i.o.estado==="hecha").length;
   const fila=i=>{ if(i.k==="t"){ const x=i.o, ok=x.estado==="hecha";
       return `<div class="agl-row ${ok?"hecho":""}"><button type="button" class="ckh ${ok?"on":""}" onclick="tareaHecha('${x.id}')" title="${ok?"Hecha · tocá para reabrir":"Marcar como hecha"}" aria-label="${ok?"Reabrir tarea":"Marcar tarea como hecha"}">${icon("ok")}</button><span class="agl-h"></span><a class="agl-t" href="#tarea-${x.id}">${esc(x.titulo)}</a><div class="agl-s"><span class="agl-tag" style="--tc:${tcol("Tarea")}">Tarea</span>${esc([x.asignado?memName(x.asignado):"",x.cliente_id?cliName(x.cliente_id):""].filter(Boolean).join(" · "))}</div></div>`; }
-    const e=i.o; return `<div class="agl-row ${e.hecho?"hecho":""}">${ckHecho(e)}<span class="agl-h">${esc(i.h)}</span><button type="button" class="agl-t" onclick="formEvento('${e.id}')">${esc(e.titulo)}</button><div class="agl-s"><span class="agl-tag" style="--tc:${tcol(e.tipo)}">${esc(e.tipo)}</span>${esc([e.cliente_id?cliName(e.cliente_id):e.contacto,e.sede].filter(Boolean).join(" · "))}</div></div>`; };
+    const e=i.o; return `<div class="agl-row ${e.hecho?"hecho":""}">${ckHecho(e)}<span class="agl-h">${esc(i.h)}</span><button type="button" class="agl-t" onclick="formEvento('${e.id}')">${esc(e.titulo)}</button><div class="agl-s"><span class="agl-tag" style="--tc:${tcol(e.tipo)}">${esc(e.tipo)}</span>${esc([e.cliente_id?cliName(e.cliente_id):e.contacto].filter(Boolean).join(" · "))}</div></div>`; };
   const head = S.mobile ? `<div class="m-head"><div><div class="eyebrow">Operación</div><h1>Agenda</h1></div></div>`
     : `<div class="head"><div><div class="eyebrow">Operación</div><h1>Agenda Furor</h1><p>Todo lo agendado queda registrado. Buscá cuándo se hizo algo o repasá el mes.</p></div><div class="acts"><button class="btn pri" onclick="formEvento(null,'${today()}')">${icon("plus")}Agendar</button></div></div>`;
   return `${head}
-  <div class="toolbar ag-tb">${agVistaSeg()}<input type="search" id="agQ" placeholder="Buscar: campaña, cliente, reunión…" value="${esc(S.agQ||"")}" oninput="S.agQ=this.value;render()">
-    <select id="agSede" aria-label="Sede" onchange="S.f.agSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.slice(0,3).map(s=>`<option ${S.f.agSede===s?"selected":""}>${s}</option>`).join("")}</select></div>
+  <div class="toolbar ag-tb">${agVistaSeg()}<input type="search" id="agQ" placeholder="Buscar: campaña, cliente, reunión…" value="${esc(S.agQ||"")}" oninput="S.agQ=this.value;render()"></div>
   <div class="agl-fil">${AG_FIL.map(([k,l])=>`<button class="${fil===k?"on":""}" onclick="S.agFil='${k}';render()">${l}</button>`).join("")}</div>
   ${q?`<div class="ns-bar"><b>${list.length} resultado${list.length===1?"":"s"} para “${esc(S.agQ.trim())}”</b><span style="flex:1"></span><button class="btn" onclick="S.agQ='';render()">Limpiar</button></div>`
      :`<div class="ns-bar"><button class="btn" onclick="calMove(-1)" aria-label="Mes anterior">‹</button><b style="text-transform:capitalize">${MESES[m]} ${y}</b><button class="btn" onclick="calMove(1)" aria-label="Mes siguiente">›</button>${mes!==t.slice(0,7)?`<button class="btn" onclick="calToday()">Este mes</button>`:""}<span style="flex:1"></span><span class="s">${list.length} en el mes${hechos?` · ${hechos} hecho${hechos>1?"s":""}`:""}</span></div>`}
