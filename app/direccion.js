@@ -337,7 +337,7 @@ function vComercial(){
   return `<section class="card">${cardH("Campañas "+y, `<button class="btn sm pri" onclick="DIR.formCampana()">${icon("plus")}Cargar mes</button>`)}
     <div class="cam-meses"><button class="${!sel?"on":""}" onclick="DIR._camMes('')">Año ${y}</button>${meses.map(m=>`<button class="${sel===m?"on":""}" onclick="DIR._camMes('${m}')">${MES_L[Number(m.slice(5,7))-1]}</button>`).join("")}</div>
     <p class="s" style="margin:0 0 10px">${sel?"Análisis de "+MES_L[Number(sel.slice(5,7))-1].toLowerCase()+" por sede.":"Suma de todo el año por sede."}${hayAuto?" Las sedes marcadas como <b>Auto</b> toman prospectos, llamadas, honorarios y clientes nuevos de la sección Prospectos; la inversión y los ingresos los cargás con el lápiz.":""}</p>
-    ${efs.length?`<div class="sede-cards">${cards}</div>`:emptyMsg("Todavía no hay meses cargados.","chart")}
+    ${efs.length?`<div class="sede-cards zocalo">${cards}</div>`:emptyMsg("Todavía no hay meses cargados.","chart")}
   </section>`;
 }
 
