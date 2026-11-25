@@ -1470,14 +1470,11 @@ function formProspecto(id){
     <label class="f" for="pNeg">Negocio<input type="text" id="pNeg" value="${esc(p.negocio)}"></label>
     <label class="f" for="pWa">Número de contacto (WhatsApp)<input type="tel" id="pWa" value="${esc(p.whatsapp)}" placeholder="381 555 1234" inputmode="tel"></label>
     <label class="f" for="pRub">Rubro<input type="text" id="pRub" value="${esc(p.rubro)}"></label>
-    <label class="f" for="pIg">Instagram<input type="text" id="pIg" value="${esc(p.instagram)}" placeholder="@negocio"></label>
     <label class="f" for="pOri">Origen<select id="pOri"><option value="">—</option>${opts(ORIGENES,p.origen)}</select></label>
     <div class="sep">Seguimiento</div>
     <label class="f" for="pEt">Etapa<select id="pEt">${ETAPAS.map(e=>`<option value="${e}" ${p.etapa===e?"selected":""}>${esc(etapaL(e))}</option>`).join("")}</select></label>
     <label class="f" for="pSede">Sede<select id="pSede"><option value="">—</option>${opts(SEDES,p.sede)}</select></label>
-    <label class="f" for="pSet">Setter<select id="pSet">${memOptions(p.setter)}</select></label>
     <label class="f" for="pPlan">Plan de interés<select id="pPlan"><option value="">—</option>${opts(PLANES,p.plan)}</select></label>
-    <label class="f" for="pMot">Motivo si se perdió<input type="text" id="pMot" value="${esc(p.motivo_perdida)}" placeholder="Precio, no responde, ya tiene agencia…"></label>
     <label class="f full" for="pNot">Notas<textarea id="pNot" placeholder="Qué necesita, objeciones, presupuesto…">${esc(p.notas)}</textarea></label>
     ${id&&p.ultimo_contacto?`<p class="full s" style="margin:0">Último contacto: ${esc(new Date(p.ultimo_contacto).toLocaleString("es-AR",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}))} · ${p.contactos} en total</p>`:""}
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('prospectos','${id}','este prospecto')">Borrar</button>`:""}</div><div style="display:flex;gap:8px">${id?`<button type="button" class="btn wa" onclick="usarPlantilla(null,'${id}')">${icon("wa")}Escribir</button>`:""}<button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
@@ -1485,7 +1482,8 @@ function formProspecto(id){
 async function saveProspecto(e,id){
   e.preventDefault();
   const etapa=v("pEt");
-  const data={nombre:v("pNom"),negocio:v("pNeg"),rubro:v("pRub"),whatsapp:v("pWa"),instagram:v("pIg"),origen:v("pOri"),etapa,sede:v("pSede"),setter:nz(v("pSet")),plan:v("pPlan"),motivo_perdida:v("pMot"),notas:v("pNot"),actualizado:new Date().toISOString()};
+  const data={nombre:v("pNom"),negocio:v("pNeg"),rubro:v("pRub"),whatsapp:v("pWa"),origen:v("pOri"),etapa,sede:v("pSede"),plan:v("pPlan"),notas:v("pNot"),actualizado:new Date().toISOString()};
+  if(!id) data.setter=S.me.id; // quien lo carga queda como responsable (para el filtro "Míos")
   const ok = id ? await run(sb.from("prospectos").update(data).eq("id",id),"Prospecto actualizado") : await run(sb.from("prospectos").insert(data),"Prospecto cargado");
   if(ok) closeModal();
 }
