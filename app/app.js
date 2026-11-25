@@ -2106,23 +2106,22 @@ function formCampAds(id, cid){
   const k=id?S.ads_campanas.find(x=>x.id===id)||{}:{cliente_id:cid||(S.view==="clientes"?S.cliId:"")||"",plataforma:"Meta",objetivo:"Mensajes",inicio:today(),estado:"Activa",texto_objetivo:OBJ_TXT["Mensajes"]};
   openModal(`<h2>${id?"Editar campaña":"Nueva campaña"}</h2><form class="form" onsubmit="saveCampAds(event,'${id||""}')">
     <label class="f full" for="caCli">Cliente<select id="caCli" required><option value="">Elegí el cliente</option>${S.clientes.filter(c=>c.estado!=="Baja"||c.id===k.cliente_id).map(c=>`<option value="${c.id}" ${k.cliente_id===c.id?"selected":""}>${esc(c.nombre)}</option>`).join("")}</select></label>
-    <label class="f" for="caObj">Objetivo<select id="caObj" onchange="const t=document.getElementById('caTxt'); if(t&&(!t.value||Object.values(OBJ_TXT).includes(t.value))) t.value=OBJ_TXT[this.value]||'';">${opts(OBJ_ADS,k.objetivo)}</select></label>
+    <label class="f" for="caObj">Objetivo<select id="caObj">${opts(OBJ_ADS,k.objetivo)}</select></label>
     <label class="f" for="caPla">Plataforma<select id="caPla">${opts(["Meta","Google"],k.plataforma)}</select></label>
-    <label class="f full" for="caNom">Nombre (opcional)<input type="text" id="caNom" value="${esc(k.nombre)}" placeholder="Ej: Mensajes WhatsApp · Tucumán"></label>
     <label class="f" for="caInv">Inversión por día<input ${MONTO_IN} id="caInv" value="${esc(montoVal(k.inversion_diaria||""))}" placeholder="$ 8.000" required></label>
     <label class="f" for="caEst">Estado<select id="caEst">${opts(EST_ADS.map(e=>e[0]),k.estado)}</select></label>
     <label class="f" for="caIni">Inicio<input type="date" id="caIni" value="${esc(k.inicio)}" required></label>
     <label class="f" for="caFin">Fin (opcional)<input type="date" id="caFin" value="${esc(k.fin||"")}"></label>
-    <div class="full dur-q"><span class="s">Duración rápida:</span>${[7,15,30,60].map(n=>`<button type="button" class="btn sm" onclick="const i=document.getElementById('caIni').value||today(); document.getElementById('caFin').value=addDays(i,${n}-1)">${n} días</button>`).join("")}<button type="button" class="btn sm ghost" onclick="document.getElementById('caFin').value=''">Sin fin</button></div>
     ${id&&k.inicio&&k.inicio<=today()?`<label class="f full" for="caCons">Consumido hasta hoy<input ${MONTO_IN} id="caCons" value="${esc(montoVal(Math.round(consumoCamp(k))))}" data-orig="${Math.round(consumoCamp(k))}"><span class="s" style="font-weight:400">Lo calcula la app (inversión por día × días activa). Si en Meta gastó otra cifra, corregila acá.</span></label>`:""}
-    <label class="f full" for="caTxt">Texto del objetivo (va en el reporte)<textarea id="caTxt" style="min-height:80px">${esc(k.texto_objetivo||"")}</textarea></label>
-    <label class="f full" for="caLink">Link del Administrador de anuncios (opcional)<input type="url" id="caLink" value="${esc(k.link||"")}" placeholder="https://adsmanager.facebook.com/…"></label>
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="askDel('ads_campanas','${id}','esta campaña')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div>
   </form>`);
 }
 async function saveCampAds(e,id){
   e.preventDefault();
-  const data={cliente_id:v("caCli"),objetivo:v("caObj"),plataforma:v("caPla"),nombre:v("caNom"),inversion_diaria:parseMonto(v("caInv")),estado:v("caEst"),inicio:v("caIni")||today(),fin:nz(v("caFin")),texto_objetivo:v("caTxt"),link:v("caLink"),actualizado:new Date().toISOString()};
+  const prevK=id?S.ads_campanas.find(x=>x.id===id)||{}:{}, obj=v("caObj");
+  const data={cliente_id:v("caCli"),objetivo:obj,plataforma:v("caPla"),inversion_diaria:parseMonto(v("caInv")),estado:v("caEst"),inicio:v("caIni")||today(),fin:nz(v("caFin")),actualizado:new Date().toISOString()};
+  // el texto del objetivo para el reporte sale solo según el objetivo elegido
+  if(!id || obj!==prevK.objetivo || !prevK.texto_objetivo) data.texto_objetivo=OBJ_TXT[obj]||"";
   if(data.fin && data.fin<data.inicio){ toast("El fin no puede ser antes del inicio"); return; }
   if(id){ const prev=S.ads_campanas.find(x=>x.id===id);
     if(prev){ Object.assign(data,cambioTramo(prev,data));
