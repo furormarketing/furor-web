@@ -1106,3 +1106,4 @@ span.ckh{cursor:default}
   .acamp.on .acamp-s,.acamp.on .acamp-inv span{color:#a9c4f5}
   .aplata-g b.q{color:#8fb4f7}
 }
+@media (max-width:900px){ .pr-steps button.lost{grid-column:1/-1} }

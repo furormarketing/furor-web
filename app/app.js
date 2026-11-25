@@ -52,8 +52,8 @@ const ICONS = {
   send:'<path d="M21 3 3 10.5l7 3 3 7z"/><path d="m10 13.5 4.5-4.5"/>'
 };
 const icon = n => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]||""}</svg>`;
-const ETAPAS = ["Contactado","Honorarios enviados","Llamada","Reunión","Ganado","Perdido"];
-const ETAPA_C = {"Contactado":"var(--info)","Honorarios enviados":"var(--s-sde)","Llamada":"var(--warn)","Reunión":"#7a4fd0","Ganado":"var(--ok)","Perdido":"var(--danger)"};
+const ETAPAS = ["Contactado","Honorarios enviados","Llamada","Reunión","Pendiente avanzar","Ganado","Perdido"];
+const ETAPA_C = {"Contactado":"var(--info)","Honorarios enviados":"var(--s-sde)","Llamada":"var(--warn)","Reunión":"#7a4fd0","Pendiente avanzar":"#0e7c86","Ganado":"var(--ok)","Perdido":"var(--danger)"};
 const ETAPA_L = {"Ganado":"Cliente nuevo"};
 const etapaL = e => ETAPA_L[e]||e;
 const SERV_MAT = [["Sistemas MKT","target"],["Desarrollo web","grid"],["Gestión Ads","mega"],["General","file"]];
@@ -1304,7 +1304,7 @@ function vDireccion(){
   if(window.DIR) return DIR.vista();
   if(!_dirCargando){
     _dirCargando=true;
-    const sc=document.createElement("script"); sc.src="direccion.js?v=14"; sc.onload=()=>render();
+    const sc=document.createElement("script"); sc.src="direccion.js?v=15"; sc.onload=()=>render();
     sc.onerror=()=>{ _dirCargando=false; toast("No se pudo abrir Dirección. Revisá la conexión."); };
     document.body.appendChild(sc);
   }
@@ -1428,11 +1428,11 @@ function vProspectos(){
   </div>
   ${cells}${body}`;
 }
-const ETAPA_CORTA = {"Contactado":"Contactado","Honorarios enviados":"Honorarios","Llamada":"Llamada","Reunión":"Reunión","Ganado":"Cliente nuevo","Perdido":"Perdido"};
+const ETAPA_CORTA = {"Contactado":"Contactado","Honorarios enviados":"Honorarios","Llamada":"Llamada","Reunión":"Reunión","Pendiente avanzar":"Pend. avanzar","Ganado":"Cliente nuevo","Perdido":"Perdido"};
 function pRow(p){
   const wa=waNumber(p.whatsapp||""), idx=ETAPAS.indexOf(p.etapa);
   const steps=ETAPAS.map((e,i)=>`<button type="button" class="${e===p.etapa?"on":""} ${e!=="Perdido"&&i<idx&&p.etapa!=="Perdido"?"done":""} ${e==="Perdido"?"lost":""}" style="--c:${ETAPA_C[e]}" title="${e===p.etapa?"Etapa actual":"Mover a "+e}" onclick="moverEtapa('${p.id}','${e}')">${ETAPA_CORTA[e]}</button>`).join("");
-  return `<div class="prow2" style="--c:${ETAPA_C[p.etapa]||"var(--line)"}">
+  return `<div class="prow2" style="--c:var(--brand)">
     <div class="pr-main" onclick="formProspecto('${p.id}')" title="Ver / editar">
       <div class="pr-nom">${esc(p.nombre)}</div>
       <div class="pr-neg">${p.negocio?esc(p.negocio):`<span class="nodata">Sin negocio</span>`}${p.rubro?` <span class="s">· ${esc(p.rubro)}</span>`:""}</div>

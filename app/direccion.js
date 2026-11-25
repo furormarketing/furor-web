@@ -303,7 +303,7 @@ function vComercial(){
   const y=D.mes.slice(0,4);
   const rows=D.fin_campanas.filter(c=>String(c.mes).startsWith(y)).sort((a,b)=>String(b.mes).localeCompare(String(a.mes))||a.sede.localeCompare(b.sede));
   const live=["Tucumán","Salta","Santiago del Estero"].map(s=>{ const m=D.mes; const pr=S.prospectos.filter(p=>p.sede===s&&ym(p.creado)===m);
-    return {s, total:pr.length, contact:pr.length, hon:pr.filter(p=>["Honorarios enviados","Llamada","Reunión","Ganado"].includes(p.etapa)).length, llam:pr.filter(p=>["Llamada","Reunión","Ganado"].includes(p.etapa)).length, reun:pr.filter(p=>["Reunión","Ganado"].includes(p.etapa)).length, gan:pr.filter(p=>p.etapa==="Ganado").length, perd:pr.filter(p=>p.etapa==="Perdido").length}; });
+    return {s, total:pr.length, contact:pr.length, hon:pr.filter(p=>["Honorarios enviados","Llamada","Reunión","Pendiente avanzar","Ganado"].includes(p.etapa)).length, llam:pr.filter(p=>["Llamada","Reunión","Pendiente avanzar","Ganado"].includes(p.etapa)).length, reun:pr.filter(p=>["Reunión","Pendiente avanzar","Ganado"].includes(p.etapa)).length, gan:pr.filter(p=>p.etapa==="Ganado").length, perd:pr.filter(p=>p.etapa==="Perdido").length}; });
   const setters=S.miembros.filter(mb=>mb.rol==="setter"||S.prospectos.some(p=>p.setter===mb.id)).map(mb=>{ const pr=S.prospectos.filter(p=>p.setter===mb.id&&ym(p.creado)===D.mes); const cerr=pr.filter(p=>!["Ganado","Perdido"].includes(p.etapa)===false).length; const gan=pr.filter(p=>p.etapa==="Ganado").length;
     return {n:mb.nombre||mb.email, sede:mb.sede, total:pr.length, contactos:pr.reduce((a,p)=>a+(p.contactos||0),0), gan, tasa:cerr?Math.round(gan/cerr*100):null}; });
   const f=(v)=>v==null||v===""?"—":v;
