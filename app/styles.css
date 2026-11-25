@@ -1203,3 +1203,5 @@ span.ckh{cursor:default}
 .plinks{grid-template-columns:minmax(0,1fr)}
 .plink{min-width:0}
 .plink-m a{display:block;flex:1 1 100%}
+.pmsg-ed{margin-left:auto;color:var(--muted)!important}
+.pmsg .plinks{background:var(--surface);border-radius:9px;padding:2px 8px}

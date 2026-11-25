@@ -1675,22 +1675,27 @@ function vPublicadosCont(){
 }
 function msgPub(c, items){
   const saludo=(c.contacto||"").split(" ")[0];
-  return `Hola${saludo?" "+saludo:""}! 👋 Te compartimos lo que publicamos para ${c.nombre||"tu cuenta"}:\n\n${items.map(p=>`▸ ${p.formato} (${fmtDate(p.fecha)}): ${p.url}`).join("\n")}\n\nCualquier comentario o idea, nos avisás. ¡Seguimos!`;
+  const uno=items.length===1, f=uno?items[0].fecha:null;
+  const cuando = uno ? (f===today()?"de hoy":`del ${fmtDate(f)}`) : "";
+  return `Hola${saludo?" "+saludo:""}! 👋\nTe adjuntamos ${uno?`link publicación ${cuando}`:"links de las publicaciones"}:\n${items.map(p=>p.url).join("\n")}`;
 }
 function pubGroup(c, items, inCard){
   items=items.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
   if(!items.length) return `<div class="${inCard?"":"card"}">${emptyMsg("Sin links cargados para este cliente.","link")}</div>`;
   const unsent=items.filter(porEnviar).sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
   const msg=unsent.length?msgPub(c||{},unsent):"";
-  const rows=items.map(p=>{ const u=safeUrl(p.url); return `<div class="plink ${porEnviar(p)?"":"sent"}">
-    <div class="plink-m"><b>${esc(p.formato)}</b><span>${fmtDate(p.fecha)}</span>${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(shortUrl(p.url))}</a>`:`<span>${esc(p.url)}</span>`}</div>
+  const ed=S.pubEdit&&S.pubEdit[c.id];
+  const fila=p=>{ const u=safeUrl(p.url); return `<div class="plink ${porEnviar(p)?"":"sent"}">
+    <div class="plink-m">${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(shortUrl(p.url))}</a>`:`<span>${esc(p.url)}</span>`}<span>${fmtDate(p.fecha)}</span></div>
     ${p.formato==="Historia"?`<span class="pill">No se envía</span>`:p.enviado?`<span class="plink-ok">${icon("ok")}Enviado</span>`:""}
-    <button class="btn sm ghost ic" data-v="${esc(p.url)}" onclick="copyText(this.dataset.v)" title="Copiar link" aria-label="Copiar link">${icon("copy")}</button>
-    <button class="btn sm ghost ic" onclick="formPublicado('${p.id}')" title="Editar" aria-label="Editar">${icon("edit")}</button></div>`; }).join("");
+    <button class="btn sm ghost ic" onclick="formPublicado('${p.id}')" title="Editar" aria-label="Editar">${icon("edit")}</button></div>`; };
+  const resto=items.filter(p=>!porEnviar(p));
   return `${inCard?"":`<div class="card">`}
-    ${unsent.length?`<div class="pmsg"><div class="pmsg-t" id="pmsg-${c.id}">${esc(msg)}</div>
-      <div class="pmsg-a"><button class="btn pri" data-v="${esc(msg)}" onclick="copyText(this.dataset.v)">${icon("copy")}Copiar mensaje</button><button class="btn ok-btn" onclick="marcarTodosEnviados('${c.id}')">${icon("ok")}Enviado</button></div></div>`:""}
-    <div class="plinks">${rows}</div>${inCard?"":"</div>"}`;
+    ${unsent.length?`<div class="pmsg"><div class="pmsg-t">${esc(msg)}</div>
+      <div class="pmsg-a"><button class="btn pri" data-v="${esc(msg)}" onclick="copyText(this.dataset.v)">${icon("copy")}Copiar mensaje</button><button class="btn ok-btn" onclick="marcarTodosEnviados('${c.id}')">${icon("ok")}Enviado</button>
+      <button class="btn ghost sm pmsg-ed" onclick="S.pubEdit=S.pubEdit||{};S.pubEdit['${c.id}']=!S.pubEdit['${c.id}'];render()">${ed?"Listo":"Corregir link"}</button></div>
+      ${ed?`<div class="plinks" style="margin-top:8px">${unsent.map(fila).join("")}</div>`:""}</div>`:""}
+    ${resto.length?`<div class="plinks">${resto.map(fila).join("")}</div>`:""}${inCard?"":"</div>"}`;
 }
 async function toggleEnviado(id){
   const p=S.publicados.find(x=>x.id===id); if(!p) return;
