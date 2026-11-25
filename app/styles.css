@@ -1132,3 +1132,4 @@ span.ckh{cursor:default}
   .prow3 .pr-steps{grid-column:1/-1;justify-self:stretch;display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
   .prow3 .pr-steps button{padding:8px 4px;font-size:12.5px}
 }
+.auto-tag{margin-left:8px;font-size:10.5px;font-weight:700;padding:1px 7px;background:var(--ok-soft);color:var(--ok);border:0;text-transform:uppercase;letter-spacing:.03em}

@@ -299,24 +299,45 @@ async function desdeAgenda(eid){
 function hecha(id,n){ const v=D.fin_visitas.find(x=>x.id===id); if(!v) return; campo("fin_visitas",id,"hechas", v.hechas>=n ? n-1 : n); }
 
 /* ---------- Comercial ---------- */
+/* Comercial: prospectos, honorarios, llamadas y clientes nuevos salen solos de Prospectos
+   desde el primer mes en que cada sede cargó prospectos en la app. Antes de eso, lo cargado a mano. */
+const SEDES3=["Tucumán","Salta","Santiago del Estero"];
+const ETAPA_ORD=["Contactado","Honorarios enviados","Llamada","Reunión","Pendiente avanzar","Ganado"];
+const mesLocal = ts => ts ? ymd(new Date(ts)).slice(0,7) : "";
+function autoDesde(sede){ const ms=S.prospectos.filter(p=>p.sede===sede).map(p=>mesLocal(p.creado)).filter(Boolean).sort(); return ms[0]||null; }
+function autoCamp(sede,mes){
+  const d=autoDesde(sede); if(!d||mes<d||mes>today().slice(0,7)) return null;
+  const pr=S.prospectos.filter(p=>p.sede===sede&&mesLocal(p.creado)===mes);
+  const lleg=e=>pr.filter(p=>ETAPA_ORD.indexOf(p.etapa)>=ETAPA_ORD.indexOf(e)).length;
+  return {prospectos:pr.length, pdf:lleg("Honorarios enviados"), llamadas:lleg("Llamada"), clientes_nuevos:lleg("Ganado"), pendientes:pr.filter(p=>p.etapa==="Pendiente avanzar").length, no_interesados:pr.filter(p=>p.etapa==="Perdido").length};
+}
+function efectiva(sede,mes){
+  const rec=D.fin_campanas.find(c=>c.sede===sede&&ym(c.mes)===mes)||null, a=autoCamp(sede,mes);
+  if(!rec&&!a) return null;
+  return Object.assign({sede,mes:mes+"-01"},rec||{},a||{},{_rec:rec,_auto:!!a});
+}
 function vComercial(){
-  const y=D.mes.slice(0,4);
-  const rows=D.fin_campanas.filter(c=>String(c.mes).startsWith(y)).sort((a,b)=>String(b.mes).localeCompare(String(a.mes))||a.sede.localeCompare(b.sede));
+  const y=D.mes.slice(0,4), hoyM=today().slice(0,7);
+  const mesesSet=new Set(D.fin_campanas.filter(c=>String(c.mes).startsWith(y)).map(c=>ym(c.mes)));
+  SEDES3.forEach(sd=>{ const d=autoDesde(sd); if(!d) return; for(let m=d;m<=hoyM;m=addMes(m,1)) if(m.startsWith(y)) mesesSet.add(m); });
+  const meses=[...mesesSet].sort().reverse();
+  const efs=meses.flatMap(m=>SEDES3.map(sd=>efectiva(sd,m)).filter(Boolean));
   const f=(v)=>v==null||v===""?"—":v;
-  const meses=[...new Set(rows.map(c=>ym(c.mes)))].sort().reverse();
   if(D.camMes==null) D.camMes = meses.includes(D.mes) ? D.mes : (meses[0]||"");
-  const sel=D.camMes, sub=sel?rows.filter(c=>ym(c.mes)===sel):rows;
+  const sel=D.camMes, sub=sel?efs.filter(c=>ym(c.mes)===sel):efs;
   const agg=list=>{ const t={prospectos:0,llamadas:0,pdf:0,clientes_nuevos:0,inversion:0,ingresos:0}; list.forEach(c=>Object.keys(t).forEach(k=>t[k]+=Number(c[k])||0)); return t; };
   const mets=c=>{ const conv=c.prospectos&&c.clientes_nuevos!=null?Math.round(c.clientes_nuevos/c.prospectos*1000)/10+"%":"—", cpp=c.prospectos&&c.inversion?money(c.inversion/c.prospectos):"—", roas=c.inversion&&c.ingresos?(c.ingresos/c.inversion).toFixed(1)+"x":"—";
-    return [["Prospectos",f(c.prospectos)],["Llamadas",f(c.llamadas)],["PDF enviados",f(c.pdf)],["Clientes nuevos",f(c.clientes_nuevos),true],["Conversión",conv,true],["Inversión ads",c.inversion?money(c.inversion):"—"],["Costo x prospecto",cpp],["Ingresos",c.ingresos?money(c.ingresos):"—",true],["ROAS",roas,true]]; };
-  const sedesOrden=["Tucumán","Salta","Santiago del Estero"];
+    return [["Prospectos",f(c.prospectos)],["Llamadas",f(c.llamadas)],["Honorarios enviados",f(c.pdf)],["Clientes nuevos",f(c.clientes_nuevos),true],["Conversión",conv,true],["Inversión ads",c.inversion?money(c.inversion):"—"],["Costo x prospecto",cpp],["Ingresos",c.ingresos?money(c.ingresos):"—",true],["ROAS",roas,true]]; };
+  const tagAuto=`<span class="pill auto-tag" title="Prospectos, llamadas, honorarios y clientes nuevos se calculan solos desde Prospectos">Auto</span>`;
+  const edBtn=(c,sd)=>`<button class="btn sm ghost ic" style="margin-left:auto" onclick="DIR.formCampana('${c&&c._rec?c._rec.id:""}','${sd}','${sel}')" title="${c&&c._auto?"Cargar inversión e ingresos":"Editar"}" aria-label="Editar">${icon("edit")}</button>`;
   const cards = sel
-    ? sedesOrden.map(sd=>{ const c=sub.find(x=>x.sede===sd); return c?sedeCard(sd,mets(c),`<button class="btn sm ghost ic" style="margin-left:auto" onclick="DIR.formCampana('${c.id}')" title="Editar" aria-label="Editar">${icon("edit")}</button>`):sedeCard(sd,[["Sin datos cargados",""]]); }).join("") + (sub.length>1?sedeCard("Total",mets(agg(sub))):"")
-    : sedesOrden.map(sd=>sedeCard(sd,mets(agg(rows.filter(c=>c.sede===sd))))).join("") + sedeCard("Total",mets(agg(rows)));
+    ? SEDES3.map(sd=>{ const c=sub.find(x=>x.sede===sd); return c?sedeCard(sd,mets(c),(c._auto?tagAuto:"")+edBtn(c,sd)):sedeCard(sd,[["Sin datos cargados",""]],edBtn(null,sd)); }).join("") + (sub.length>1?sedeCard("Total",mets(agg(sub))):"")
+    : SEDES3.map(sd=>sedeCard(sd,mets(agg(efs.filter(c=>c.sede===sd))))).join("") + sedeCard("Total",mets(agg(efs)));
+  const hayAuto=sub.some(c=>c._auto);
   return `<section class="card">${cardH("Campañas "+y, `<button class="btn sm pri" onclick="DIR.formCampana()">${icon("plus")}Cargar mes</button>`)}
     <div class="cam-meses"><button class="${!sel?"on":""}" onclick="DIR._camMes('')">Año ${y}</button>${meses.map(m=>`<button class="${sel===m?"on":""}" onclick="DIR._camMes('${m}')">${MES_L[Number(m.slice(5,7))-1]}</button>`).join("")}</div>
-    <p class="s" style="margin:0 0 10px">${sel?"Análisis de "+MES_L[Number(sel.slice(5,7))-1].toLowerCase()+" por sede.":"Suma de todo el año por sede."}</p>
-    ${rows.length?`<div class="sede-cards">${cards}</div>`:emptyMsg("Todavía no hay meses cargados.","chart")}
+    <p class="s" style="margin:0 0 10px">${sel?"Análisis de "+MES_L[Number(sel.slice(5,7))-1].toLowerCase()+" por sede.":"Suma de todo el año por sede."}${hayAuto?" Las sedes marcadas como <b>Auto</b> toman prospectos, llamadas, honorarios y clientes nuevos de la sección Prospectos; la inversión y los ingresos los cargás con el lápiz.":""}</p>
+    ${efs.length?`<div class="sede-cards">${cards}</div>`:emptyMsg("Todavía no hay meses cargados.","chart")}
   </section>`;
 }
 
@@ -452,20 +473,24 @@ async function copiarEquipo(){
   if(!prev.length){ toast("El mes anterior no tiene sueldos cargados."); return; }
   await run(sb.from("fin_equipo").insert(prev.map(e=>({persona:e.persona,miembro_id:e.miembro_id,concepto:e.concepto,monto:e.monto,fecha:D.mes+"-01",pagado:false,notas:"Copiado del mes anterior"}))), prev.length+" sueldos copiados como 'A pagar'");
 }
-function formCampana(id){
-  const c=id?D.fin_campanas.find(x=>x.id===id)||{}:{mes:D.mes+"-01",sede:"Tucumán"};
+function formCampana(id, sede, mes){
+  const c=id?D.fin_campanas.find(x=>x.id===id)||{}:{mes:(mes||D.mes)+"-01",sede:sede||"Tucumán"};
+  const fijo=!!(sede&&mes)||!!id, auto=fijo&&!!autoCamp(c.sede,String(c.mes).slice(0,7));
   const f=(k,l)=>`<label class="f" for="ca_${k}">${l}<input ${MONTO_IN} id="ca_${k}" value="${c[k]!=null?montoVal(c[k]):""}"></label>`;
-  openModal(`<h2>${id?"Editar campaña":"Cargar campaña del mes"}</h2><form class="form" onsubmit="DIR.saveCampana(event,'${id||""}')">
-    <label class="f" for="caM">Mes<input type="month" id="caM" required value="${esc(String(c.mes).slice(0,7))}"></label>
-    <label class="f" for="caS">Sede<select id="caS">${opts(SEDES.slice(0,3),c.sede)}</select></label>
-    ${f("prospectos","Prospectos")}${f("llamadas","Llamadas")}${f("pdf","PDF enviados")}${f("no_interesados","No interesados")}${f("clientes_nuevos","Clientes nuevos")}${f("pendientes","Pendiente avanzar")}${f("inversion","Inversión ads")}${f("ingresos","Ingresos")}${f("dias","Días de campaña")}
+  openModal(`<h2>${auto?"Inversión e ingresos":id?"Editar campaña":"Cargar campaña del mes"}</h2>${fijo?`<p class="s" style="margin:-8px 0 14px">${esc(c.sede)} · ${esc(MES_L[Number(String(c.mes).slice(5,7))-1])} ${esc(String(c.mes).slice(0,4))}</p>`:""}
+  <form class="form" onsubmit="DIR.saveCampana(event,'${id||""}')">
+    ${fijo?`<input type="hidden" id="caM" value="${esc(String(c.mes).slice(0,7))}"><input type="hidden" id="caS" value="${esc(c.sede)}">`
+      :`<label class="f" for="caM">Mes<input type="month" id="caM" required value="${esc(String(c.mes).slice(0,7))}"></label><label class="f" for="caS">Sede<select id="caS">${opts(SEDES.slice(0,3),c.sede)}</select></label>`}
+    ${auto?`<p class="full s" style="margin:0">Prospectos, llamadas, honorarios enviados y clientes nuevos se calculan solos desde Prospectos.</p>`
+      :`${f("prospectos","Prospectos")}${f("llamadas","Llamadas")}${f("pdf","Honorarios enviados")}${f("no_interesados","No interesados")}${f("clientes_nuevos","Clientes nuevos")}${f("pendientes","Pendiente avanzar")}`}
+    ${f("inversion","Inversión ads")}${f("ingresos","Ingresos")}${f("dias","Días de campaña")}
     <div class="actions"><div>${id?`<button type="button" class="btn danger" onclick="DIR.borrar('fin_campanas','${id}')">Borrar</button>`:""}</div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Guardar</button></div></div></form>`);
 }
 async function saveCampana(e,id){
   e.preventDefault();
-  const g=k=>{ const x=v("ca_"+k); return x===""?null:parseMonto(x); };
-  const data={mes:v("caM")+"-01",sede:v("caS"),prospectos:g("prospectos"),llamadas:g("llamadas"),pdf:g("pdf"),no_interesados:g("no_interesados"),clientes_nuevos:g("clientes_nuevos"),pendientes:g("pendientes"),inversion:g("inversion"),ingresos:g("ingresos"),dias:g("dias")};
-  const ok= id? await run(sb.from("fin_campanas").update(data).eq("id",id),"Campaña actualizada") : await run(sb.from("fin_campanas").upsert(data,{onConflict:"mes,sede"}),"Campaña cargada");
+  const data={mes:v("caM")+"-01",sede:v("caS")};
+  ["prospectos","llamadas","pdf","no_interesados","clientes_nuevos","pendientes","inversion","ingresos","dias"].forEach(k=>{ const el=document.getElementById("ca_"+k); if(el) data[k]=el.value===""?null:parseMonto(el.value); });
+  const ok= id? await run(sb.from("fin_campanas").update(data).eq("id",id),"Guardado") : await run(sb.from("fin_campanas").upsert(data,{onConflict:"mes,sede"}),"Guardado");
   if(ok) closeModal();
 }
 function borrar(t,id){
