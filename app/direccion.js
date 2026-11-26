@@ -295,7 +295,7 @@ function vVisitas(){
   <div class="table-wrap"><table class="rtable vtbl"><thead><tr><th>Cliente</th><th>Visitas</th><th>Fecha</th><th>Filmaker</th><th class="num">Pago filmaker</th><th class="num">Modelo (cliente)</th><th>Pago</th><th></th></tr></thead><tbody>
   ${list.map(v=>`<tr>
     <td class="rt-cli"><b>${esc(v.negocio)}</b>${v.fechas_txt?`<div class="s">${esc(v.fechas_txt)}</div>`:""}${v.notas?`<div class="s">${esc(v.notas)}</div>`:""}</td>
-    <td data-l="Visitas hechas"><div class="vchecks">${[...Array(v.visitas)].map((_,i)=>`<button type="button" class="${i<v.hechas?"on":""}" title="Visita ${i+1}: ${i<v.hechas?"hecha":"pendiente"}" onclick="DIR.hecha('${v.id}',${i+1})">${i<v.hechas?icon("ok"):""}</button>`).join("")}</div></td>
+    <td data-l="Visitas hechas"><div class="vchecks">${[...Array(v.visitas)].map((_,i)=>`<button type="button" class="${i<v.hechas?"on":""}" title="Visita ${i+1}: ${i<v.hechas?"hecha":"pendiente"}" onclick="DIR.hecha('${v.id}',${i+1})">${i<v.hechas?icon("ok"):""}</button>`).join("")}<span class="vcant"><button type="button" class="vmenos" title="Quitar una visita" aria-label="Quitar una visita" onclick="DIR.cantVis('${v.id}',-1)" ${v.visitas<=1?"disabled":""}>−</button><button type="button" class="vmas" title="Agregar una visita" aria-label="Agregar una visita" onclick="DIR.cantVis('${v.id}',1)">+</button></span></div></td>
     <td data-l="Fecha"><input class="inl" type="date" value="${esc(v.fecha||"")}" onchange="DIR.campo('fin_visitas','${v.id}','fecha',this.value||null)"></td>
     <td data-l="Filmaker"><input class="inl" type="text" list="dlFilm" value="${esc(v.filmaker||"")}" placeholder="Nombre…" onchange="DIR.campo('fin_visitas','${v.id}','filmaker',this.value)"></td>
     <td class="num" data-l="Pago filmaker">${inlMonto("fin_visitas",v.id,"pago_filmaker",v.pago_filmaker)}</td>
@@ -326,6 +326,13 @@ async function desdeAgenda(eid){
   if(error){ toast("No se pudo guardar: "+error.message); return; }
   if(data && !D.fin_visitas.some(v=>v.id===data.id)) D.fin_visitas.push(data);
   render(); toast("Visita sumada");
+}
+async function cantVis(id,d){
+  const v=D.fin_visitas.find(x=>x.id===id); if(!v) return;
+  const n=Math.max(1,Math.min(12,(v.visitas||1)+d)); if(n===v.visitas) return;
+  const prev={visitas:v.visitas,hechas:v.hechas}; v.visitas=n; v.hechas=Math.min(v.hechas||0,n); render();
+  const { error } = await sb.from("fin_visitas").update({visitas:v.visitas,hechas:v.hechas}).eq("id",id);
+  if(error){ Object.assign(v,prev); render(); toast("No se pudo guardar."); } else toast(n+" visita"+(n>1?"s":""));
 }
 function hecha(id,n){ const v=D.fin_visitas.find(x=>x.id===id); if(!v) return; campo("fin_visitas",id,"hechas", v.hechas>=n ? n-1 : n); }
 
@@ -533,7 +540,7 @@ window.DIR = {
   tab(k){ D.tab=k; render(); window.scrollTo(0,0); }, sub(k){ D.sub=k; render(); }, anual(b){ D.anual=b; render(); },
   mes(k){ D.mes=addMes(D.mes,k); render(); }, buscar(q){ D.q=q; render(); },
   cobrar, marcarPagado, campo, generar, recordar, formCobro, saveCobro, formCuenta, saveCuenta, formGasto, saveGasto, copiarGastos,
-  formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar, nuevaVisita, desdeAgenda, hecha,
+  formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar, nuevaVisita, desdeAgenda, hecha, cantVis,
   _camMes(m){ D.camMes=m; render(); },
   _cuAnio(y){ D.cuAnio=y; render(); },
   _nv(k,v){ D.nv[k]=v; if(k==="cuenta") render(); },

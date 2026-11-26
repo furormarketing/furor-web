@@ -1247,3 +1247,11 @@ span.ckh{cursor:default}
 .cu-head + .cu-mes{margin-top:0}
 .cu-mes{padding:4px 16px;margin-top:6px}
 .cu-mes b{font-size:12px;line-height:1.4}
+/* Visitas: sumar / quitar visitas a un negocio */
+.vchecks{align-items:center}
+.vcant{display:inline-flex;gap:3px;margin-left:6px;opacity:0;transition:opacity .12s}
+.vtbl tr:hover .vcant,.vcant:focus-within{opacity:1}
+.vcant button{width:24px!important;height:24px!important;border-radius:6px;border:1px solid var(--line)!important;background:var(--surface)!important;color:var(--ink-2)!important;font:700 15px/1 var(--font-body,inherit);display:grid;place-items:center;cursor:pointer;padding:0}
+.vcant button:hover{border-color:var(--brand)!important;color:var(--brand)!important}
+.vcant button[disabled]{opacity:.35;cursor:default}
+@media (hover:none),(max-width:900px){ .vcant{opacity:1} }
