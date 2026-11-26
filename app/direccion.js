@@ -114,9 +114,62 @@ function vResumen(){
       <div class="list">${pc.length?pc.slice(0,8).map(filaCobrar).join("")+(pc.length>8?`<div class="row"><a href="#direccion" onclick="DIR.tab('cobros');return false;">Ver los ${pc.length} pendientes →</a></div>`:"")+[].map(filaCobrar).join(""):emptyMsg("Todo cobrado este mes.","ok")}</div></section>
   </div>
   <div class="grid g2" style="margin-top:16px">
-    <section class="card">${cardH("Ventas por sede · "+MES_L[Number(m.slice(5))-1].toLowerCase())}${ventasSede(m)}</section>
+    <section class="card">${cardH("Deudas de meses anteriores", `<button class="btn sm" onclick="DIR.formDeuda()">${icon("plus")}Agregar deuda</button>`)}${bloqueDeudas()}</section>
     <section class="card">${cardH("Gastos del mes por categoría")}${barrasCat(m)}</section>
   </div>`;
+}
+/* ---------- Deudas de meses anteriores ---------- */
+// Lo que quedó sin pagar antes de este mes (pendientes y lo que resta de los parciales), agrupado por cliente.
+function restaDe(x){
+  if(x.estado==="Pendiente") return Number(x.monto)||0;
+  const m=String(x.obs||"").match(/resta \$\s?([\d.]+)/i); if(m) return Number(m[1].replace(/\./g,""))||0;
+  const c=cuenta(x.cuenta_id); return c&&Number(c.pack)>Number(x.monto)?Number(c.pack)-Number(x.monto):0;
+}
+function deudas(){
+  const mesAct=today().slice(0,7), by={};
+  D.fin_cobros.filter(x=>(x.estado==="Pendiente"||x.estado==="Parcial")&&!x.no_cobra&&ym(x.fecha)<mesAct).forEach(x=>{
+    const r=restaDe(x); if(r<=0) return;
+    const k=x.cuenta_id||("t:"+(x.titular||"?")); const c=cuenta(x.cuenta_id);
+    (by[k]=by[k]||{nombre:c?c.negocio:(x.titular||"Cliente"),cid:x.cuenta_id,items:[],total:0}).items.push({x,r}); by[k].total+=r;
+  });
+  return Object.values(by).map(g=>(g.items.sort((a,b)=>String(a.x.fecha).localeCompare(String(b.x.fecha))),g)).sort((a,b)=>b.total-a.total);
+}
+function bloqueDeudas(){
+  const ds=deudas(), tot=ds.reduce((a,g)=>a+g.total,0);
+  if(!ds.length) return emptyMsg("Nadie debe meses anteriores.","ok");
+  return `<div class="dtot"><span>Total adeudado · ${ds.length} cliente${ds.length>1?"s":""}</span><b>${money(tot)}</b></div>
+  <div class="dlist">${ds.map(g=>`<div class="drow"><div class="dn">${esc(g.nombre)}</div>
+    <div class="dm">${g.items.map(({x,r})=>`<button type="button" class="dchip" onclick="DIR.deudaAcc('${x.id}')" title="Cobrado o ya no se cobra">${MES_C[Number(String(x.fecha).slice(5,7))-1]} ${money(r)}${x.estado==="Parcial"?" · resta":""}</button>`).join("")}</div>
+    <div class="dt"><b>${money(g.total)}</b>${g.cid?`<button class="btn sm wa ic" onclick="DIR.recordar('${g.cid}','${g.items[0].x.fecha}',${g.total})" title="Recordar por WhatsApp" aria-label="Recordar por WhatsApp">${icon("wa")}</button>`:""}</div></div>`).join("")}</div>
+  <p class="s" style="margin:8px 0 0">Tocá un mes para marcarlo cobrado o sacarlo de la lista.</p>`;
+}
+function deudaAcc(id){
+  const x=D.fin_cobros.find(c=>c.id===id); if(!x) return; const c=cuenta(x.cuenta_id), r=restaDe(x);
+  openModal(`<h2>${esc(c?c.negocio:x.titular||"Deuda")}</h2><p class="s" style="margin:-6px 0 14px">${esc(mesLabel(ym(x.fecha)))} · debe ${money(r)}</p>
+  <div class="form"><div class="actions" style="border:0;padding:0;margin:0"><button type="button" class="btn" onclick="DIR._deuda('${id}','nocobra')">Ya no se cobra</button><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button type="button" class="btn pri" onclick="DIR._deuda('${id}','cobrado')">${icon("ok")}Cobrado</button></div></div></div>`);
+}
+async function _deuda(id,acc){
+  const x=D.fin_cobros.find(c=>c.id===id); if(!x) return;
+  const cambio = acc==="cobrado" ? {estado:"Pagado", monto:(x.estado==="Parcial"?Number(x.monto)+restaDe(x):Number(x.monto)), obs:(x.obs?x.obs+" · ":"")+"saldado "+fmtDate(today())} : {no_cobra:true};
+  if(await run(sb.from("fin_cobros").update(cambio).eq("id",id), acc==="cobrado"?"Marcado como cobrado":"Sacado de deudas")){ Object.assign(x,cambio); closeModal(); render(); }
+}
+function formDeuda(){
+  const cs=D.fin_cuentas.slice().sort((a,b)=>a.negocio.localeCompare(b.negocio));
+  openModal(`<h2>Agregar deuda</h2><form class="form" onsubmit="DIR.saveDeuda(event)">
+    <label class="f full" for="deC">Cliente<select id="deC" onchange="document.getElementById('deOtroW').style.display=this.value==='otro'?'':'none'"><option value="">Elegí…</option>${cs.map(c=>`<option value="${c.id}">${esc(c.negocio)}</option>`).join("")}<option value="otro">Otro (escribir)…</option></select></label>
+    <label class="f full" id="deOtroW" style="display:none" for="deO">Nombre del cliente<input type="text" id="deO"></label>
+    <label class="f" for="deM">Mes que debe<input type="month" id="deM" required value="${addMes(today().slice(0,7),-1)}"></label>
+    <label class="f" for="deMo">Monto<input ${MONTO_IN} id="deMo" required></label>
+    <div class="actions"><div></div><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri">Agregar</button></div></div></form>`);
+}
+async function saveDeuda(e){
+  e.preventDefault();
+  const cid=v("deC"), c=cid&&cid!=="otro"?cuenta(cid):null, titular=c?c.titular||c.negocio:v("deO").trim();
+  if(!c&&!titular){ toast("Elegí o escribí el cliente"); return; }
+  const row={cuenta_id:c?c.id:null,titular,fecha:v("deM")+"-01",monto:parseMonto(v("deMo")),estado:"Pendiente"};
+  const { data, error } = await sb.from("fin_cobros").insert(row).select().single();
+  if(error){ toast("No se pudo guardar: "+error.message); return; }
+  if(!D.fin_cobros.some(x=>x.id===data.id)) D.fin_cobros.push(data); closeModal(); render(); toast("Deuda agregada");
 }
 function filaCobrar(x){
   const c=x.cuenta, hoy=today(), late=x.fecha<hoy;
@@ -383,7 +436,7 @@ function vComercial(){
 async function cobrar(cid, cobroId, monto){
   if(cobroId) return marcarPagado(cobroId);
   const c=cuenta(cid); if(!c) return;
-  await run(sb.from("fin_cobros").insert({cuenta_id:c.id,titular:c.titular,fecha:today().slice(0,7)===D.mes?today():`${D.mes}-${pad(Math.min(c.dia_cobro||1,28))}`,monto,estado:"Pagado"}),"Cobro registrado");
+  await run(sb.from("fin_cobros").insert({cuenta_id:c.id,titular:c.titular,fecha:today().slice(0,7)===D.mes?today():`${D.mes}-${pad(Math.min(c.alta?parseYmd(c.alta).getDate():(c.dia_cobro||1),28))}`,monto,estado:"Pagado"}),"Cobro registrado");
 }
 function inlMonto(t,id,campo,val){ return `<label class="inl-m"><span>$</span><input class="inl num" ${MONTO_IN} value="${montoVal(Number(val)||0)}" onchange="DIR.campo('${t}','${id}','${campo}',parseMonto(this.value))"></label>`; }
 function segEstado(id,estado,late){
@@ -540,7 +593,7 @@ window.DIR = {
   tab(k){ D.tab=k; render(); window.scrollTo(0,0); }, sub(k){ D.sub=k; render(); }, anual(b){ D.anual=b; render(); },
   mes(k){ D.mes=addMes(D.mes,k); render(); }, buscar(q){ D.q=q; render(); },
   cobrar, marcarPagado, campo, generar, recordar, formCobro, saveCobro, formCuenta, saveCuenta, formGasto, saveGasto, copiarGastos,
-  formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar, nuevaVisita, desdeAgenda, hecha, cantVis,
+  formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar, nuevaVisita, desdeAgenda, hecha, cantVis, deudaAcc, _deuda, formDeuda, saveDeuda,
   _camMes(m){ D.camMes=m; render(); },
   _cuAnio(y){ D.cuAnio=y; render(); },
   _nv(k,v){ D.nv[k]=v; if(k==="cuenta") render(); },
