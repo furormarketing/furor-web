@@ -1407,7 +1407,7 @@ function vProspectos(){
   const body = rows.length ? grupos : `<div class="card">${emptyMsg(et===""?"No hay prospectos en seguimiento. Cargá el primero con “Nuevo prospecto”.":"No hay prospectos en esta etapa.","target")}</div>`;
   if(S.mobile){
     return `<div class="m-head"><div><div class="eyebrow">Ventas</div><h1>Prospectos</h1></div><a class="btn sm" href="#plantillas">${icon("message")}Plantillas</a></div>
-    <div class="m-kpis"><div><b>${act.length}</b><span>En seguimiento</span></div><div><b>${cargMes}</b><span>Cargados este mes</span></div><div class="ok"><b>${ganMes}</b><span>Clientes nuevos</span></div></div>
+    <div class="m-kpis"><div><b>${cargMes}</b><span>Total prospectos del mes</span></div><div><b>${act.length}</b><span>En seguimiento</span></div><div class="ok"><b>${ganMes}</b><span>Clientes nuevos</span></div></div>
     <div class="m-filters">
       <select id="pSedeM" aria-label="Sede" onchange="S.f.pSede=this.value;render()"><option value="">Todas las sedes</option>${SEDES.slice(0,3).map(x=>`<option ${S.f.pSede===x?"selected":""}>${x}</option>`).join("")}</select></div>
     <div style="margin-bottom:8px">${mesSel}</div>
@@ -1416,8 +1416,8 @@ function vProspectos(){
   }
   return `${pageHead("Ventas","Prospectos","Los datos que ingresan de cada sede y en qué etapa está cada uno. Tocá la etapa para moverlo.",`<a class="btn" href="#plantillas">${icon("message")}Plantillas</a><button class="btn pri" onclick="formProspecto()">${icon("plus")}Nuevo prospecto</button>`)}
   <div class="kpis pk" style="margin-bottom:14px">
+    <div class="kpi"><div class="v">${cargMes}</div><div class="l">Total prospectos del mes</div></div>
     <div class="kpi"><div class="v">${act.length}</div><div class="l">En seguimiento</div></div>
-    <div class="kpi"><div class="v">${cargMes}</div><div class="l">Cargados este mes</div></div>
     <div class="kpi"><div class="v" style="color:var(--ok)">${ganMes}</div><div class="l">Clientes nuevos este mes</div></div>
     <div class="kpi"><div class="v">${cerrados?Math.round(ganTot/cerrados*100)+"%":"—"}</div><div class="l">Tasa de cierre</div></div>
   </div>
