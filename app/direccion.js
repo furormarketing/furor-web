@@ -141,17 +141,34 @@ function bloqueDeudas(){
   <div class="dlist">${ds.map(g=>`<div class="drow"><div class="dn">${esc(g.nombre)}</div>
     <div class="dm">${g.items.map(({x,r})=>`<button type="button" class="dchip" onclick="DIR.deudaAcc('${x.id}')" title="Cobrado o ya no se cobra">${MES_C[Number(String(x.fecha).slice(5,7))-1]} ${money(r)}${x.estado==="Parcial"?" · resta":""}</button>`).join("")}</div>
     <div class="dt"><b>${money(g.total)}</b>${g.cid?`<button class="btn sm wa ic" onclick="DIR.recordar('${g.cid}','${g.items[0].x.fecha}',${g.total})" title="Recordar por WhatsApp" aria-label="Recordar por WhatsApp">${icon("wa")}</button>`:""}</div></div>`).join("")}</div>
-  <p class="s" style="margin:8px 0 0">Tocá un mes para marcarlo cobrado o sacarlo de la lista.</p>`;
+  <p class="s" style="margin:8px 0 0">Tocá un mes para cambiar el monto, marcarlo cobrado o sacarlo de la lista.</p>`;
 }
 function deudaAcc(id){
   const x=D.fin_cobros.find(c=>c.id===id); if(!x) return; const c=cuenta(x.cuenta_id), r=restaDe(x);
-  openModal(`<h2>${esc(c?c.negocio:x.titular||"Deuda")}</h2><p class="s" style="margin:-6px 0 14px">${esc(mesLabel(ym(x.fecha)))} · debe ${money(r)}</p>
-  <div class="form"><div class="actions" style="border:0;padding:0;margin:0"><button type="button" class="btn" onclick="DIR._deuda('${id}','nocobra')">Ya no se cobra</button><div style="display:flex;gap:8px"><button type="button" class="btn" onclick="closeModal()">Cancelar</button><button type="button" class="btn pri" onclick="DIR._deuda('${id}','cobrado')">${icon("ok")}Cobrado</button></div></div></div>`);
+  openModal(`<h2>${esc(c?c.negocio:x.titular||"Deuda")}</h2>
+  <form class="form" onsubmit="DIR._deudaMonto(event,'${id}')">
+    <label class="f" for="dmMes">Mes<input type="month" id="dmMes" value="${esc(ym(x.fecha))}"></label>
+    <label class="f" for="dmMon">Monto que debe<input ${MONTO_IN} id="dmMon" value="${montoVal(r)}"></label>
+    <div class="actions"><div><button type="button" class="btn" onclick="DIR._deuda('${id}','nocobra')">Ya no se cobra</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn">Guardar monto</button><button type="button" class="btn pri" onclick="DIR._deuda('${id}','cobrado')">${icon("ok")}Cobrado</button></div></div>
+  </form>`);
+  setTimeout(()=>{ const i=document.getElementById("dmMon"); if(i){ i.focus(); i.select(); } },50);
 }
 async function _deuda(id,acc){
   const x=D.fin_cobros.find(c=>c.id===id); if(!x) return;
   const cambio = acc==="cobrado" ? {estado:"Pagado", monto:(x.estado==="Parcial"?Number(x.monto)+restaDe(x):Number(x.monto)), obs:(x.obs?x.obs+" · ":"")+"saldado "+fmtDate(today())} : {no_cobra:true};
   if(await run(sb.from("fin_cobros").update(cambio).eq("id",id), acc==="cobrado"?"Marcado como cobrado":"Sacado de deudas")){ Object.assign(x,cambio); closeModal(); render(); }
+}
+async function _deudaMonto(e,id){
+  e.preventDefault();
+  const x=D.fin_cobros.find(c=>c.id===id); if(!x) return;
+  const monto=parseMonto(v("dmMon")), mes=v("dmMes")||ym(x.fecha);
+  if(!(monto>0)){ toast("Escribí el monto"); return; }
+  const fecha = ym(x.fecha)===mes ? x.fecha : mes+"-01";
+  // pendiente: el monto es lo que debe; parcial: se guarda cuánto resta en la observación
+  const cambio = x.estado==="Parcial"
+    ? {fecha, obs:`Pagó ${money(x.monto)} · resta ${money(monto)}`}
+    : {fecha, monto};
+  if(await run(sb.from("fin_cobros").update(cambio).eq("id",id),"Monto actualizado")){ Object.assign(x,cambio); closeModal(); render(); }
 }
 function formDeuda(){
   const cs=D.fin_cuentas.slice().sort((a,b)=>a.negocio.localeCompare(b.negocio));
@@ -593,7 +610,7 @@ window.DIR = {
   tab(k){ D.tab=k; render(); window.scrollTo(0,0); }, sub(k){ D.sub=k; render(); }, anual(b){ D.anual=b; render(); },
   mes(k){ D.mes=addMes(D.mes,k); render(); }, buscar(q){ D.q=q; render(); },
   cobrar, marcarPagado, campo, generar, recordar, formCobro, saveCobro, formCuenta, saveCuenta, formGasto, saveGasto, copiarGastos,
-  formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar, nuevaVisita, desdeAgenda, hecha, cantVis, deudaAcc, _deuda, formDeuda, saveDeuda,
+  formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar, nuevaVisita, desdeAgenda, hecha, cantVis, deudaAcc, _deuda, _deudaMonto, formDeuda, saveDeuda,
   _camMes(m){ D.camMes=m; render(); },
   _cuAnio(y){ D.cuAnio=y; render(); },
   _nv(k,v){ D.nv[k]=v; if(k==="cuenta") render(); },
