@@ -1245,3 +1245,5 @@ span.ckh{cursor:default}
 .cu-mes span{color:rgba(255,255,255,.85);font-size:13px;font-weight:600}
 .cu-mes + .cu-row{border-top:0}
 .cu-head + .cu-mes{margin-top:0}
+.cu-mes{padding:4px 16px;margin-top:6px}
+.cu-mes b{font-size:12px;line-height:1.4}
