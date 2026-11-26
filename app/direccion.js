@@ -219,10 +219,10 @@ function vCuentas(seg){
     <div class="kpi"><div class="v">${delAnio.filter(c=>c.activo).length}</div><div class="l">Siguen activos hoy</div></div>
   </div>
   <div class="card cuentas2">
-    <div class="cu-titulo"><h2>Clientes Furor ${y}</h2><span class="s">Se anota cada cliente cuando contrata. Tocá una fila para editarla.</span></div>
+    <div class="cu-titulo"><h2>Clientes Furor ${y}</h2></div>
     <div class="cu-head"><span>Negocio</span><span>Nombre</span><span>Fecha de pago</span><span>Resp.</span><span class="num">Pack</span><span>Sede</span></div>
     ${Object.keys(porMes).map(m=>{ const it=porMes[m], sum=it.reduce((a,c)=>a+Number(c.pack||0),0);
-      return `<div class="cu-mes"><b>${MES_L[Number(m.slice(5))-1]}</b><span>${it.length} cliente${it.length>1?"s":""} · ${money(sum)}</span></div>${it.map(fila).join("")}`; }).join("")
+      return `<div class="cu-mes"><b>${MES_L[Number(m.slice(5))-1]}</b></div>${it.map(fila).join("")}`; }).join("")
       || `<div style="padding:16px">${emptyMsg(q?"No encontré clientes con esa búsqueda.":"Todavía no hay clientes cargados en "+y+".","users")}</div>`}
   </div>
   ${sinFecha.length?`<p class="s" style="margin:10px 2px 0">Hay ${sinFecha.length} cliente${sinFecha.length>1?"s":""} sin fecha de pago (${sinFecha.map(c=>esc(c.negocio)).join(", ")}). Cargale la fecha con el lápiz para que entre en el registro.</p>`:""}`;
