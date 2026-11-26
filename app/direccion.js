@@ -102,20 +102,24 @@ function vResumen(){
     <div class="kpi big gas"><div class="l">Gastos + equipo</div><div class="v">${money(t.gastos+t.equipo)}</div><div class="s">Operativos ${moneyK(t.gastos)} · Equipo ${moneyK(t.equipo)}</div></div>
     <div class="kpi big ${t.resultado>=0?"res":"bad"}"><div class="l">Sueldo Marcelo</div><div class="v">${money(t.resultado)}</div><div class="s">${t.retiro?`Retiraste ${moneyK(t.retiro)} · queda en caja ${moneyK(t.resultado-t.retiro)}`:`Lo que queda después de gastos y equipo · margen ${margen}%`}</div></div>
   </div>
-  <div class="kpis dir-sub" style="margin-top:12px">
-    <div class="kpi"><div class="v">${activas.length}</div><div class="l">Clientes activos</div></div>
-    <div class="kpi"><div class="v">${moneyK(mrr())}</div><div class="l">Facturación mensual recurrente</div></div>
-    <div class="kpi"><div class="v">${moneyK(activas.filter(c=>!c.cobro_con).length?mrr()/activas.filter(c=>!c.cobro_con).length:0)}</div><div class="l">Ticket promedio por titular</div></div>
-    <div class="kpi"><div class="v">${D.fin_cuentas.filter(c=>c.alta&&ym(c.alta)===m).length}</div><div class="l">Altas del mes</div></div>
+  <div class="rs-strip">
+    <div><b>${activas.length}</b><span>Clientes activos</span></div>
+    <div><b>${moneyK(mrr())}</b><span>Facturación mensual</span></div>
+    <div><b>${moneyK(activas.filter(c=>!c.cobro_con).length?mrr()/activas.filter(c=>!c.cobro_con).length:0)}</b><span>Ticket promedio</span></div>
+    <div><b>${D.fin_cuentas.filter(c=>c.alta&&ym(c.alta)===m).length}</b><span>Altas del mes</span></div>
   </div>
-  <div class="split" style="margin-top:16px">
-    <section class="card">${cardH("Ingresos y egresos · últimos 12 meses", `<span class="legend"><span><span class="sede-dot" style="--sc:var(--ok)"></span>Cobrado</span><span><span class="sede-dot" style="--sc:var(--danger)"></span>Gastos + equipo</span></span>`)}${grafico(m)}</section>
-    <section class="card">${cardH(`${m<today().slice(0,7)?"Sin cobrar en":"Por cobrar en"} ${MES_L[Number(m.slice(5))-1].toLowerCase()} <span class="count">${pc.length}</span>`, `<a href="#direccion" onclick="DIR.tab('cobros');return false;">Cobros →</a>`)}
-      <div class="list">${pc.length?pc.slice(0,8).map(filaCobrar).join("")+(pc.length>8?`<div class="row"><a href="#direccion" onclick="DIR.tab('cobros');return false;">Ver los ${pc.length} pendientes →</a></div>`:"")+[].map(filaCobrar).join(""):emptyMsg("Todo cobrado este mes.","ok")}</div></section>
-  </div>
-  <div class="grid g2" style="margin-top:16px">
-    <section class="card">${cardH("Deudas de meses anteriores", `<button class="btn sm" onclick="DIR.formDeuda()">${icon("plus")}Agregar deuda</button>`)}${bloqueDeudas()}</section>
-    <section class="card">${cardH("Gastos del mes por categoría")}${barrasCat(m)}</section>
+  <div class="rs-grid">
+    <div class="rs-col">
+      <section class="card rs-o3">${cardH("Ingresos y egresos · últimos 12 meses", `<span class="legend"><span><span class="sede-dot" style="--sc:var(--ok)"></span>Cobrado</span><span><span class="sede-dot" style="--sc:var(--danger)"></span>Gastos + equipo</span></span>`)}${grafico(m)}</section>
+      <section class="card rs-cobrar rs-o2">${cardH("Deudas de meses anteriores", `<button class="btn sm ghost" onclick="DIR.formDeuda()">${icon("plus")}Agregar deuda</button>`)}${bloqueDeudas()}</section>
+    </div>
+    <div class="rs-col">
+      <section class="card rs-cobrar rs-o1">${cardH(`${m<today().slice(0,7)?"Quedó sin cobrar en":"Por cobrar en"} ${MES_L[Number(m.slice(5))-1].toLowerCase()}`, `<a href="#direccion" onclick="DIR.tab('cobros');return false;">Cobros →</a>`)}
+        ${pc.length?`<div class="rs-sub"><b>${pc.length} cliente${pc.length>1?"s":""}</b><span>${money(totPC)}</span></div>`:""}
+        <div class="rs-list">${pc.length?pc.slice(0,6).map(filaCobrar).join("")+(pc.length>6?`<a class="rs-more" href="#direccion" onclick="DIR.tab('cobros');return false;">Ver los ${pc.length} en Cobros →</a>`:""):`<div class="rs-ok">${icon("ok")}Todo cobrado este mes</div>`}</div>
+      </section>
+      <section class="card rs-o4">${cardH("Gastos del mes por categoría", `<a href="#direccion" onclick="DIR.tab('gastos');return false;">Gastos →</a>`)}${barrasCat(m)}</section>
+    </div>
   </div>`;
 }
 /* ---------- Deudas de meses anteriores ---------- */
@@ -136,12 +140,12 @@ function deudas(){
 }
 function bloqueDeudas(){
   const ds=deudas(), tot=ds.reduce((a,g)=>a+g.total,0);
-  if(!ds.length) return emptyMsg("Nadie debe meses anteriores.","ok");
+  if(!ds.length) return `<div class="rs-ok">${icon("ok")}Nadie debe meses anteriores</div>`;
   return `<div class="dtot"><span>Total adeudado · ${ds.length} cliente${ds.length>1?"s":""}</span><b>${money(tot)}</b></div>
-  <div class="dlist">${ds.map(g=>`<div class="drow"><div class="dn">${esc(g.nombre)}</div>
+  <div class="dlist">${(D.deuAll?ds:ds.slice(0,5)).map(g=>`<div class="drow"><div class="dn">${esc(g.nombre)}</div>
     <div class="dm">${g.items.map(({x,r})=>`<button type="button" class="dchip" onclick="DIR.deudaAcc('${x.id}')" title="Cobrado o ya no se cobra">${MES_C[Number(String(x.fecha).slice(5,7))-1]} ${money(r)}${x.estado==="Parcial"?" · resta":""}</button>`).join("")}</div>
-    <div class="dt"><b>${money(g.total)}</b>${g.cid?`<button class="btn sm wa ic" onclick="DIR.recordar('${g.cid}','${g.items[0].x.fecha}',${g.total})" title="Recordar por WhatsApp" aria-label="Recordar por WhatsApp">${icon("wa")}</button>`:""}</div></div>`).join("")}</div>
-  <p class="s" style="margin:8px 0 0">Tocá un mes para cambiar el monto, marcarlo cobrado o sacarlo de la lista.</p>`;
+    <div class="dt"><b>${money(g.total)}</b>${g.cid?`<button class="btn sm wa ic" onclick="DIR.recordar('${g.cid}','${g.items[0].x.fecha}',${g.total})" title="Recordar por WhatsApp" aria-label="Recordar por WhatsApp">${icon("wa")}</button>`:""}</div></div>`).join("")}</div>${ds.length>5?`<button class="linkbtn rs-more" onclick="DIR._deuAll()">${D.deuAll?"Ver menos":`Ver los ${ds.length} clientes`}</button>`:""}
+`;
 }
 function deudaAcc(id){
   const x=D.fin_cobros.find(c=>c.id===id); if(!x) return; const c=cuenta(x.cuenta_id), r=restaDe(x);
@@ -189,11 +193,12 @@ async function saveDeuda(e){
   if(!D.fin_cobros.some(x=>x.id===data.id)) D.fin_cobros.push(data); closeModal(); render(); toast("Deuda agregada");
 }
 function filaCobrar(x){
-  const c=x.cuenta, hoy=today(), late=x.fecha<hoy;
-  return `<div class="row"><div class="when solid" style="--sc:${late?"var(--danger)":"var(--warn)"}"><b>${parseYmd(x.fecha).getDate()}</b><span>${MES_C[parseYmd(x.fecha).getMonth()]}</span></div>
-    <div class="main"><div class="t">${esc(c.negocio)}</div><div class="s">${esc(c.titular||"")}${c.id&&incluyeTxt(c)?` · <b>${esc(incluyeTxt(c))}</b>`:""}</div><div class="cob-m"><b>${money(x.monto)}</b>${late?`<span class="pill bad">Vencido</span>`:`<span class="pill warn">Pendiente</span>`}</div></div>
-    <button class="btn sm wa" onclick="DIR.recordar('${c.id||""}','${x.fecha}',${x.monto})" title="Recordar pago por WhatsApp">${icon("wa")}</button>
-    <button class="btn sm pri" onclick="DIR.cobrar('${c.id||""}','${x.cobro?x.cobro.id:""}',${x.monto})">Cobrado</button></div>`;
+  const c=x.cuenta, late=x.fecha<today();
+  return `<div class="rc-row"><div class="rc-d ${late?"late":""}"><b>${parseYmd(x.fecha).getDate()}</b><span>${MES_C[parseYmd(x.fecha).getMonth()]}</span></div>
+    <div class="rc-m"><b>${esc(c.negocio)}</b><span>${late?"Vencido":"Vence pronto"}${c.titular&&c.titular!==c.negocio?" · "+esc(c.titular):""}</span></div>
+    <div class="rc-v">${money(x.monto)}</div>
+    <button class="btn sm wa ic" onclick="DIR.recordar('${c.id||""}','${x.fecha}',${x.monto})" title="Recordar pago por WhatsApp" aria-label="Recordar por WhatsApp">${icon("wa")}</button>
+    <button class="btn sm pri ic" onclick="DIR.cobrar('${c.id||""}','${x.cobro?x.cobro.id:""}',${x.monto})" title="Marcar cobrado" aria-label="Marcar cobrado">${icon("ok")}</button></div>`;
 }
 function grafico(m){
   const meses=[...Array(12)].map((_,i)=>addMes(m,i-11));
@@ -613,6 +618,7 @@ window.DIR = {
   formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar, nuevaVisita, desdeAgenda, hecha, cantVis, deudaAcc, _deuda, _deudaMonto, formDeuda, saveDeuda,
   _camMes(m){ D.camMes=m; render(); },
   _cuAnio(y){ D.cuAnio=y; render(); },
+  _deuAll(){ D.deuAll=!D.deuAll; render(); },
   _nv(k,v){ D.nv[k]=v; if(k==="cuenta") render(); },
   async _del(t,id){ if(await run(sb.from(t).delete().eq("id",id),"Borrado")) closeModal(); },
   _c(id){ return ultimoMonto(id)??cuenta(id)?.pack; }
