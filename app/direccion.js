@@ -176,7 +176,7 @@ function barrasCat(m){
 
 /* ---------- Cobros ---------- */
 function vCobros(){
-  const seg=`<div class="seg"><button class="${D.sub==="mes"?"on":""}" onclick="DIR.sub('mes')">Cobros del mes</button><button class="${D.sub==="cuentas"?"on":""}" onclick="DIR.sub('cuentas')">Clientes y packs</button></div>`;
+  const seg=`<div class="seg"><button class="${D.sub==="mes"?"on":""}" onclick="DIR.sub('mes')">Cobros del mes</button><button class="${D.sub==="cuentas"?"on":""}" onclick="DIR.sub('cuentas')">Clientes Furor</button></div>`;
   if(D.sub==="cuentas") return vCuentas(seg);
   const m=D.mes, list=D.fin_cobros.filter(c=>ym(c.fecha)===m).sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
   const t=totalesMes(m), pc=porCobrar(m), sinGen=pc.filter(x=>!x.cobro).length;
@@ -193,26 +193,39 @@ function vCobros(){
   </tbody></table></div>`;
 }
 function vCuentas(seg){
-  // Registro de clientes como en la planilla: negocio, nombre, sede, monto y fecha del primer pago.
-  const q=D.q.toLowerCase(), verBaja=!!D.verBaja;
-  const base=D.fin_cuentas.filter(c=>verBaja?!c.activo:c.activo);
-  const list=base.filter(c=>!q||[c.negocio,c.titular,c.sede].join(" ").toLowerCase().includes(q))
-    .sort((a,b)=>String(a.alta||"").localeCompare(String(b.alta||""))||a.negocio.localeCompare(b.negocio));
-  const bajas=D.fin_cuentas.filter(c=>!c.activo).length;
-  const nuevosMes=D.fin_cuentas.filter(c=>c.activo&&c.alta&&ym(c.alta)===today().slice(0,7)).length;
-  return `<div class="toolbar">${seg}<input type="search" id="dirQ" placeholder="Buscar cliente…" value="${esc(D.q)}" oninput="DIR.buscar(this.value)"><span style="flex:1"></span><button class="btn pri" onclick="DIR.formCuenta()">${icon("plus")}Nuevo cliente</button></div>
-  <div class="kpis" style="margin-bottom:14px"><div class="kpi"><div class="v">${D.fin_cuentas.filter(c=>c.activo).length}</div><div class="l">Clientes activos</div></div><div class="kpi"><div class="v">${money(mrr())}</div><div class="l">Facturación mensual</div></div><div class="kpi"><div class="v">${nuevosMes}</div><div class="l">Ingresaron este mes</div></div></div>
-  <div class="card cuentas2"><div class="cu-head"><div>Negocio</div><div>Nombre</div><div>Sede</div><div class="num">Monto</div><div>Fecha de pago</div><div></div></div>
-  ${list.map(c=>{ const con=c.cobro_con?cuenta(c.cobro_con):null; return `<div class="cu-row ${c.activo?"":"baja"}">
-    <div class="cu-neg"><b>${esc(c.negocio)}</b>${con?`<span class="s" style="color:var(--info)">Se cobra junto con ${esc(con.negocio)}</span>`:incluyeTxt(c)?`<span class="s" style="color:var(--info)">Incluye: ${esc(incluyeTxt(c))}</span>`:""}</div>
-    <div class="cu-nom">${esc(c.titular||"—")}</div>
-    <div class="cu-sede"><span class="cu-dot" style="--sc:${sedeColor(c.sede)}"></span><select class="inl" aria-label="Sede" onchange="DIR.campo('fin_cuentas','${c.id}','sede',this.value)"><option value="">—</option>${SEDES.slice(0,3).map(x=>`<option ${c.sede===x?"selected":""}>${x}</option>`).join("")}</select></div>
-    <div class="cu-mon num">${inlMonto("fin_cuentas",c.id,"pack",c.pack)}</div>
-    <div class="cu-fec"><input class="inl" type="date" aria-label="Fecha de pago" value="${esc(c.alta||"")}" onchange="DIR.campo('fin_cuentas','${c.id}','alta',this.value||null)"></div>
-    <div class="cu-ed"><button class="btn sm ghost ic" onclick="DIR.formCuenta('${c.id}')" title="Editar" aria-label="Editar">${icon("edit")}</button></div>
-  </div>`; }).join("")||`<div style="padding:16px">${emptyMsg(q?"No encontré clientes con esa búsqueda.":verBaja?"No hay clientes dados de baja.":"Todavía no hay clientes cargados.","users")}</div>`}
+  // "Clientes Furor <año>": registro de altas como la planilla. Cada cliente que contrata queda asentado
+  // con la fecha de su primer pago, aunque después se dé de baja.
+  const anios=[...new Set(D.fin_cuentas.filter(c=>c.alta).map(c=>c.alta.slice(0,4)))].sort().reverse();
+  const y=D.cuAnio||anios[0]||today().slice(0,4);
+  const q=D.q.toLowerCase();
+  const delAnio=D.fin_cuentas.filter(c=>c.alta&&c.alta.startsWith(y));
+  const list=delAnio.filter(c=>!q||[c.negocio,c.titular,c.sede,c.responsable].join(" ").toLowerCase().includes(q))
+    .sort((a,b)=>a.alta.localeCompare(b.alta)||a.negocio.localeCompare(b.negocio));
+  const porMes={}; list.forEach(c=>(porMes[c.alta.slice(0,7)]=porMes[c.alta.slice(0,7)]||[]).push(c));
+  const sinFecha=D.fin_cuentas.filter(c=>!c.alta);
+  const totPack=delAnio.reduce((a,c)=>a+Number(c.pack||0),0);
+  const fila=c=>{ const con=c.cobro_con?cuenta(c.cobro_con):null; return `<button type="button" class="cu-row ${c.activo?"":"baja"}" onclick="DIR.formCuenta('${c.id}')" title="Editar">
+    <span class="cu-neg"><b>${esc(c.negocio)}</b>${!c.activo?`<span class="cu-baja">Baja</span>`:""}${con?`<span class="s">con ${esc(con.negocio)}</span>`:""}</span>
+    <span class="cu-nom">${esc(c.titular||"—")}</span>
+    <span class="cu-fec">${esc(c.alta.slice(8,10)+"-"+c.alta.slice(5,7)+"-"+c.alta.slice(0,4))}</span>
+    <span class="cu-resp">${esc(c.responsable||"MC")}</span>
+    <span class="cu-mon num">${money(c.pack)}</span>
+    <span class="cu-sede"><span class="cu-dot" style="--sc:${sedeColor(c.sede||"Tucumán")}"></span>${esc(c.sede||"Tucumán")}</span>
+  </button>`; };
+  return `<div class="toolbar">${seg}<input type="search" id="dirQ" placeholder="Buscar cliente…" value="${esc(D.q)}" oninput="DIR.buscar(this.value)">${anios.length>1?`<select aria-label="Año" onchange="DIR._cuAnio(this.value)">${anios.map(a=>`<option ${a===y?"selected":""}>${a}</option>`).join("")}</select>`:""}<span style="flex:1"></span><button class="btn pri" onclick="DIR.formCuenta()">${icon("plus")}Nuevo cliente</button></div>
+  <div class="kpis" style="margin-bottom:14px">
+    <div class="kpi"><div class="v">${delAnio.length}</div><div class="l">Clientes que ingresaron en ${y}</div></div>
+    <div class="kpi"><div class="v">${S.mobile?moneyK(totPack):money(totPack)}</div><div class="l">Suma de packs vendidos</div></div>
+    <div class="kpi"><div class="v">${delAnio.filter(c=>c.activo).length}</div><div class="l">Siguen activos hoy</div></div>
   </div>
-  ${bajas||verBaja?`<div style="margin-top:10px"><button class="linkbtn" onclick="DIR._verBaja()">${verBaja?"← Volver a los clientes activos":`Ver dados de baja (${bajas})`}</button></div>`:""}`;
+  <div class="card cuentas2">
+    <div class="cu-titulo"><h2>Clientes Furor ${y}</h2><span class="s">Se anota cada cliente cuando contrata. Tocá una fila para editarla.</span></div>
+    <div class="cu-head"><span>Negocio</span><span>Nombre</span><span>Fecha de pago</span><span>Resp.</span><span class="num">Pack</span><span>Sede</span></div>
+    ${Object.keys(porMes).map(m=>{ const it=porMes[m], sum=it.reduce((a,c)=>a+Number(c.pack||0),0);
+      return `<div class="cu-mes"><b>${MES_L[Number(m.slice(5))-1]}</b><span>${it.length} cliente${it.length>1?"s":""} · ${money(sum)}</span></div>${it.map(fila).join("")}`; }).join("")
+      || `<div style="padding:16px">${emptyMsg(q?"No encontré clientes con esa búsqueda.":"Todavía no hay clientes cargados en "+y+".","users")}</div>`}
+  </div>
+  ${sinFecha.length?`<p class="s" style="margin:10px 2px 0">Hay ${sinFecha.length} cliente${sinFecha.length>1?"s":""} sin fecha de pago (${sinFecha.map(c=>esc(c.negocio)).join(", ")}). Cargale la fecha con el lápiz para que entre en el registro.</p>`:""}`;
 }
 
 /* ---------- Gastos ---------- */
@@ -420,13 +433,14 @@ async function saveCobro(e,id){
   if(ok) closeModal();
 }
 function formCuenta(id){
-  const c=id?cuenta(id)||{}:{activo:true,alta:today()};
+  const c=id?cuenta(id)||{}:{activo:true,alta:today(),sede:"Tucumán",responsable:"MC"};
   openModal(`<h2>${id?"Editar cliente":"Nuevo cliente"}</h2><form class="form" onsubmit="DIR.saveCuenta(event,'${id||""}')">
     <label class="f" for="cuN">Negocio<input type="text" id="cuN" required value="${esc(c.negocio)}"></label>
     <label class="f" for="cuT">Nombre<input type="text" id="cuT" value="${esc(c.titular)}"></label>
     <label class="f" for="cuP">Monto mensual<input ${MONTO_IN} id="cuP" required value="${c.pack!=null?montoVal(c.pack):""}"></label>
     <label class="f" for="cuA">Fecha de pago (primer pago)<input type="date" id="cuA" value="${esc(c.alta)}"></label>
-    <label class="f" for="cuS">Sede<select id="cuS"><option value="">—</option>${opts(SEDES,c.sede)}</select></label>
+    <label class="f" for="cuS">Sede<select id="cuS">${opts(SEDES.slice(0,3),c.sede||"Tucumán")}</select></label>
+    <label class="f" for="cuR">Responsable<input type="text" id="cuR" value="${esc(c.responsable||"MC")}" placeholder="MC"></label>
     <label class="f full" for="cuCon">Se cobra junto con (mismo titular, un solo pago)<select id="cuCon"><option value="">— Se cobra por separado —</option>${D.fin_cuentas.filter(x=>x.id!==c.id&&!x.cobro_con).sort((a,b)=>((b.titular===c.titular)-(a.titular===c.titular))||(b.activo-a.activo)||a.negocio.localeCompare(b.negocio)).map(x=>`<option value="${x.id}" ${c.cobro_con===x.id?"selected":""}>${esc(x.negocio)} · ${esc(x.titular||"")}${x.titular&&x.titular===c.titular?" (mismo titular)":""}</option>`).join("")}</select></label>
     <label class="f full" for="cuNo">Notas<input type="text" id="cuNo" value="${esc(c.notas)}"></label>
     <label class="check full"><input type="checkbox" id="cuAc" ${c.activo?"checked":""}><span>Sigue siendo cliente (destildalo para darlo de baja)</span></label>
@@ -435,7 +449,7 @@ function formCuenta(id){
 }
 async function saveCuenta(e,id){
   e.preventDefault();
-  const data={negocio:v("cuN"),titular:v("cuT"),pack:parseMonto(v("cuP")),alta:nz(v("cuA")),sede:v("cuS"),notas:v("cuNo"),activo:$("#cuAc").checked,cobro_con:nz(v("cuCon"))};
+  const data={negocio:v("cuN"),titular:v("cuT"),pack:parseMonto(v("cuP")),alta:nz(v("cuA")),sede:v("cuS"),responsable:(v("cuR")||"MC").trim(),notas:v("cuNo"),activo:$("#cuAc").checked,cobro_con:nz(v("cuCon"))};
   if(id){ if(await run(sb.from("fin_cuentas").update(data).eq("id",id),"Cliente actualizado")) closeModal(); return; }
   if($("#cuEq")?.checked){
     const { data:cl } = await sb.from("clientes").insert({nombre:data.negocio,contacto:data.titular,sede:data.sede,estado:"Onboarding",inicio:data.alta}).select().single();
@@ -521,7 +535,7 @@ window.DIR = {
   cobrar, marcarPagado, campo, generar, recordar, formCobro, saveCobro, formCuenta, saveCuenta, formGasto, saveGasto, copiarGastos,
   formPago, savePago, copiarEquipo, formCampana, saveCampana, borrar, nuevaVisita, desdeAgenda, hecha,
   _camMes(m){ D.camMes=m; render(); },
-  _verBaja(){ D.verBaja=!D.verBaja; render(); },
+  _cuAnio(y){ D.cuAnio=y; render(); },
   _nv(k,v){ D.nv[k]=v; if(k==="cuenta") render(); },
   async _del(t,id){ if(await run(sb.from(t).delete().eq("id",id),"Borrado")) closeModal(); },
   _c(id){ return ultimoMonto(id)??cuenta(id)?.pack; }

@@ -1205,31 +1205,36 @@ span.ckh{cursor:default}
 .plink-m a{display:block;flex:1 1 100%}
 .pmsg-ed{margin-left:auto;color:var(--muted)!important}
 .pmsg .plinks{background:var(--surface);border-radius:9px;padding:2px 8px}
-/* Dirección · Clientes y packs: registro simple como la planilla */
+/* Dirección · Clientes Furor: registro de altas como la planilla */
 .cuentas2{padding:0;overflow:hidden}
-.cu-head,.cu-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.2fr) 190px 160px 170px 44px;gap:12px;align-items:center;padding:0 16px}
-.cu-head{min-height:44px;background:var(--surface-2);border-bottom:1px solid var(--line);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--brand)}
-.cu-head .num{text-align:right}
-.cu-row{min-height:58px;border-bottom:1px solid var(--line)}
-.cu-row:last-child{border-bottom:0}
-.cu-row:hover{background:color-mix(in srgb,var(--brand) 3%,var(--surface))}
-.cu-row.baja{opacity:.65}
-.cu-neg{min-width:0;display:flex;flex-direction:column}
-.cu-neg b{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cu-neg .s{font-size:12px}
+.cu-titulo{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:14px 16px 10px}
+.cu-titulo h2{margin:0;font-size:18px}
+.cu-head,.cu-row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.4fr) 120px 60px 130px 150px;gap:12px;align-items:center;padding:0 16px}
+.cu-head{min-height:40px;background:var(--brand-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--brand)}
+.cu-head .num,.cu-row .num{text-align:right}
+.cu-mes{display:flex;align-items:baseline;gap:10px;padding:12px 16px 6px;border-top:1px solid var(--line)}
+.cu-mes:first-of-type{border-top:0}
+.cu-mes b{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--brand)}
+.cu-mes span{font-size:12.5px;color:var(--muted)}
+.cu-row{width:100%;min-height:42px;border:0;border-top:1px dashed var(--line);background:none;font:inherit;text-align:left;cursor:pointer;color:var(--ink)}
+.cu-row:hover{background:color-mix(in srgb,var(--brand) 4%,var(--surface))}
+.cu-neg{min-width:0;display:flex;align-items:center;gap:8px}
+.cu-neg b{font-size:14.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cu-neg .s{font-size:12px;white-space:nowrap}
+.cu-baja{flex:none;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:1px 6px;border-radius:99px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.cu-row.baja .cu-neg b{color:var(--ink-2)}
 .cu-nom{font-size:14px;color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cu-sede{display:flex;align-items:center;gap:6px}
+.cu-fec{font-size:14px;font-variant-numeric:tabular-nums}
+.cu-resp{font-size:13px;font-weight:700;color:var(--ink-2)}
+.cu-mon{font-size:14.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.cu-sede{display:flex;align-items:center;gap:6px;font-size:13.5px;font-weight:600;color:var(--ink-2);white-space:nowrap}
 .cu-dot{flex:none;width:9px;height:9px;border-radius:99px;background:var(--sc,var(--muted))}
-.cu-sede select{flex:1;min-width:0}
-.cu-mon{display:flex;justify-content:flex-end}
-.cu-fec input{width:100%}
-.cu-ed{text-align:right}
-@media (max-width:1100px){ .cu-head,.cu-row{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 160px 150px 160px 40px;gap:8px} }
+@media (max-width:1100px){ .cu-head,.cu-row{grid-template-columns:minmax(0,1.4fr) minmax(0,1.1fr) 104px 44px 116px 124px;gap:8px} }
 @media (max-width:900px){
   .cu-head{display:none}
-  .cu-row{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:12px 14px}
-  .cu-neg{grid-column:1} .cu-ed{grid-column:2;grid-row:1}
-  .cu-nom{grid-column:1/-1;margin-top:-4px}
-  .cu-sede{grid-column:1} .cu-mon{grid-column:2;justify-content:flex-end}
-  .cu-fec{grid-column:1/-1}
+  .cu-row{grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;padding:10px 14px}
+  .cu-neg{grid-column:1} .cu-mon{grid-column:2;grid-row:1}
+  .cu-nom{grid-column:1/-1}
+  .cu-fec{grid-column:1;font-size:12.5px;color:var(--muted)} .cu-sede{grid-column:2;justify-self:end;font-size:12.5px}
+  .cu-resp{display:none}
 }
