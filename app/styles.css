@@ -1255,3 +1255,4 @@ span.ckh{cursor:default}
 .vcant button:hover{border-color:var(--brand)!important;color:var(--brand)!important}
 .vcant button[disabled]{opacity:.35;cursor:default}
 @media (hover:none),(max-width:900px){ .vcant{opacity:1} }
+.inl.obs{min-width:220px;background:var(--surface)}

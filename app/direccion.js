@@ -187,7 +187,7 @@ function vCobros(){
   <div class="table-wrap"><table class="rtable"><thead><tr><th>Fecha</th><th>Cliente</th><th>Monto</th><th>Estado</th><th>Observaciones</th><th></th></tr></thead><tbody>
   ${list.map(c=>{ const cu=cuenta(c.cuenta_id); const late=c.estado==="Pendiente"&&c.fecha<today(); return `<tr>
     <td class="rt-fecha">${fmtDate(c.fecha)}</td><td class="rt-cli"><b>${esc(cu?cu.negocio:c.titular)}</b><div class="s">${esc(c.titular||cu?.titular||"")}${cu&&incluyeTxt(cu)?" · "+esc(incluyeTxt(cu)):""}</div></td><td class="num" data-l="Monto">${inlMonto("fin_cobros",c.id,"monto",c.monto)}</td>
-    <td data-l="Estado" class="rt-full">${segEstado(c.id,c.estado,late)}</td><td class="rt-full"><input class="inl obs" type="text" value="${esc(c.obs||"")}" placeholder="Agregar nota…" onchange="DIR.campo('fin_cobros','${c.id}','obs',this.value)"></td>
+    <td data-l="Estado" class="rt-full">${segEstado(c.id,c.estado,late)}</td><td class="rt-full"><input class="inl obs" type="text" maxlength="60" aria-label="Observaciones" value="${esc(c.obs||"")}" onkeydown="if(event.key==='Enter')this.blur()" onchange="DIR.campo('fin_cobros','${c.id}','obs',this.value.trim())"></td>
     <td class="acts-td">${c.estado!=="Pagado"&&cu?`<button class="btn sm wa" onclick="DIR.recordar('${cu.id}','${c.fecha}',${c.monto})" aria-label="Recordar por WhatsApp" title="Recordar por WhatsApp">${icon("wa")}</button>`:""}<button class="btn sm ghost ic" onclick="DIR.formCobro('${c.id}')" title="Más opciones" aria-label="Editar">${icon("edit")}</button></td></tr>`; }).join("")
    || `<tr><td colspan="6">${emptyMsg("Sin cobros registrados en este mes.","file")}</td></tr>`}
   </tbody></table></div>`;

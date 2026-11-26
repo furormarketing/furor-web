@@ -147,8 +147,10 @@ let channel=null;
 const PK = { lecturas:r=>r.miembro_id+"|"+r.canal, config:r=>r.clave };
 const keyOf = (t,r) => (PK[t]||(x=>x.id))(r);
 let _rf=0;
-const escribiendoNota = () => { const a=document.activeElement; return !!(a && a.classList && (a.classList.contains("ns-in")||a.classList.contains("ns-new"))); };
-document.addEventListener("focusout", e=>{ if(e.target && e.target.classList && (e.target.classList.contains("ns-in")||e.target.classList.contains("ns-new"))) setTimeout(()=>{ if(S._pendRender && !escribiendoNota()){ S._pendRender=false; render(); } },60); });
+// mientras alguien escribe en una nota o en un campo editable de una tabla, no se redibuja la pantalla (si no, se borra lo que está escribiendo)
+const _esEditable = el => !!(el && el.classList && (el.classList.contains("ns-in")||el.classList.contains("ns-new")||(el.classList.contains("inl")&&/^(INPUT|TEXTAREA)$/.test(el.tagName))));
+const escribiendoNota = () => _esEditable(document.activeElement);
+document.addEventListener("focusout", e=>{ if(_esEditable(e.target)) setTimeout(()=>{ if(S._pendRender && !escribiendoNota()){ S._pendRender=false; render(); } },60); });
 function renderSoon(){ if(escribiendoNota()){ S._pendRender=true; return; } if(_rf) return; _rf=requestAnimationFrame(()=>{ _rf=0; render(); }); }
 function applyChange(t, p){
   const arr=S[t]; if(!Array.isArray(arr)) return scheduleReload(t);
@@ -1303,7 +1305,7 @@ function vDireccion(){
   if(window.DIR) return DIR.vista();
   if(!_dirCargando){
     _dirCargando=true;
-    const sc=document.createElement("script"); sc.src="direccion.js?v=24"; sc.onload=()=>render();
+    const sc=document.createElement("script"); sc.src="direccion.js?v=25"; sc.onload=()=>render();
     sc.onerror=()=>{ _dirCargando=false; toast("No se pudo abrir Dirección. Revisá la conexión."); };
     document.body.appendChild(sc);
   }
