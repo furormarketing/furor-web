@@ -205,7 +205,7 @@ function vCuentas(seg){
   const sinFecha=D.fin_cuentas.filter(c=>!c.alta);
   const totPack=delAnio.reduce((a,c)=>a+Number(c.pack||0),0);
   const fila=c=>{ const con=c.cobro_con?cuenta(c.cobro_con):null; return `<button type="button" class="cu-row ${c.activo?"":"baja"}" onclick="DIR.formCuenta('${c.id}')" title="Editar">
-    <span class="cu-neg"><b>${esc(c.negocio)}</b>${!c.activo?`<span class="cu-baja">Baja</span>`:""}${con?`<span class="s">con ${esc(con.negocio)}</span>`:""}</span>
+    <span class="cu-neg"><b>${esc(c.negocio)}</b>${con?`<span class="s">con ${esc(con.negocio)}</span>`:""}</span>
     <span class="cu-nom">${esc(c.titular||"—")}</span>
     <span class="cu-fec">${esc(c.alta.slice(8,10)+"-"+c.alta.slice(5,7)+"-"+c.alta.slice(0,4))}</span>
     <span class="cu-resp">${esc(c.responsable||"MC")}</span>
