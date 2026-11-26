@@ -1120,7 +1120,7 @@ function vTareas(){
     <div class="etabs">${cols.map(([k,l])=>`<button class="${S.tEstM===k?"on":""}" style="--c:${k==="pendiente"?"var(--s-otra)":k==="curso"?"var(--info)":"var(--ok)"}" onclick="S.tEstM='${k}';render()"><span class="dot"></span>${l}<b>${list.filter(t=>t.estado===k).length}</b></button>`).join("")}</div>
     <div>${it.map(taskCard).join("")||`<div class="card">${emptyMsg(S.tEstM==="hecha"?"Todavía no hay tareas terminadas.":"No hay tareas acá.","check")}</div>`}${S.tEstM==="hecha"&&list.filter(t=>t.estado==="hecha").length>it.length?`<div class="s" style="padding:4px 2px">Se muestran las últimas ${it.length}.</div>`:""}</div>`;
   }
-  return `<div class="head"><div><div class="eyebrow">Operación</div><h1>Tareas</h1><p>Quién hace qué, para qué cliente y para cuándo</p></div><button class="btn pri" onclick="formTarea()">${icon("plus")}Nueva tarea</button></div>
+  return `<div class="head"><div><div class="eyebrow">Operación</div><h1>Tareas</h1><p>Quién hace qué y para qué cliente</p></div><button class="btn pri" onclick="formTarea()">${icon("plus")}Nueva tarea</button></div>
   <div class="toolbar">${tScopeSeg()}
     <select id="tArea" aria-label="Área" onchange="S.f.tArea=this.value;render()"><option value="">Todas las áreas</option>${AREAS.map(a=>`<option ${S.f.tArea===a?"selected":""}>${a}</option>`).join("")}</select></div>
   <div class="board">${[["pendiente","Por hacer"],["curso","En curso"],["hecha","Hechas"]].map(col).join("")}</div>`;
@@ -1208,11 +1208,11 @@ document.addEventListener("visibilitychange",()=>{ if(document.hidden) _flushBor
 function taskCard(t){
   const late=t.vence&&t.vence<today()&&t.estado!=="hecha";
   const nCom=S.mensajes.filter(m=>m.tarea_id===t.id).length, nImg=S.mensajes.filter(m=>m.tarea_id===t.id).reduce((a,m)=>a+(m.adjuntos||[]).length,0), un=unread("t-"+t.id);
-  return `<div class="task p-${esc(t.prioridad)} ${late?"late":""}" onclick="if(!event.target.closest('button,a'))location.hash='tarea-${t.id}'"><a class="t" href="#tarea-${t.id}" style="color:inherit;text-decoration:none;display:block">${esc(t.titulo)}</a>
+  return `<div class="task" onclick="if(!event.target.closest('button,a'))location.hash='tarea-${t.id}'"><a class="t" href="#tarea-${t.id}" style="color:inherit;text-decoration:none;display:block">${esc(t.titulo)}</a>
   ${t.detalle?`<div class="s" style="white-space:pre-wrap">${esc(t.detalle.length>140?t.detalle.slice(0,140)+"…":t.detalle)}</div>`:""}
   <div class="meta"><span>${t.asignado?esc(memName(t.asignado)):"Sin responsable"}</span>${t.cliente_id?`<span>· ${esc(cliName(t.cliente_id))}</span>`:""}${t.area?`<span>· ${esc(t.area)}</span>`:""}</div>
   ${nCom?`<div class="meta"><span class="pill ${un?"bad":""}">${icon("chat")}${nCom} mensaje${nCom>1?"s":""}${un?" · "+un+" sin leer":""}</span>${nImg?`<span class="pill">${icon("image")}${nImg}</span>`:""}</div>`:""}
-  <div class="acts">${t.vence?`<span class="pill ${late?"bad":t.vence===today()?"warn":""}">${esc(late?"Venció "+fmtDate(t.vence):"Vence "+fmtDate(t.vence))}</span>`:""}<button class="btn sm" onclick="advance('${t.id}')">${t.estado==="hecha"?"Reabrir":t.estado==="curso"?"Terminar":"Empezar"}</button><button class="btn sm ghost ic del-t" onclick="borrarTarea('${t.id}')" title="Borrar tarea" aria-label="Borrar tarea">${icon("trash")}</button></div></div>`;
+  <div class="acts"><button class="btn sm" onclick="advance('${t.id}')">${t.estado==="hecha"?"Reabrir":t.estado==="curso"?"Terminar":"Empezar"}</button><button class="btn sm ghost ic del-t" onclick="borrarTarea('${t.id}')" title="Borrar tarea" aria-label="Borrar tarea">${icon("trash")}</button></div></div>`;
 }
 async function tareaHecha(id){
   const t=S.tareas.find(x=>x.id===id); if(!t) return;
@@ -1242,9 +1242,7 @@ function vTarea(t){
     <section class="card" style="padding:0;overflow:hidden">${thread("t-"+t.id)}</section>
     <section class="card t-info"><h2 style="margin-bottom:12px">Detalle</h2><dl class="ficha">
       <div><dt>Estado</dt><dd><span class="pill ${t.estado==="hecha"?"ok":t.estado==="curso"?"info":""}">${ES[t.estado]}</span></dd></div>
-      <div><dt>Prioridad</dt><dd><span class="pill ${t.prioridad==="alta"?"bad":t.prioridad==="media"?"warn":"ok"}">${PR[t.prioridad]||"—"}</span></dd></div>
       <div><dt>Responsable</dt><dd>${t.asignado?dd(memName(t.asignado)):dd("")}</dd></div>
-      <div><dt>Vence</dt><dd>${t.vence?`<span class="pill ${late?"bad":""}">${esc(late?"Venció "+fmtDate(t.vence):fmtDate(t.vence))}</span>`:"—"}</dd></div>
       <div><dt>Creada por</dt><dd>${t.creado_por?dd(memName(t.creado_por)):dd("")}</dd></div>
       ${t.cliente_id?`<div><dt>Cliente</dt><dd><a href="#cliente-${t.cliente_id}">${esc(cliName(t.cliente_id))}</a></dd></div>`:""}</dl>
       ${t.detalle?`<h3 style="margin:16px 0 6px">Brief</h3><p style="white-space:pre-wrap;margin:0">${esc(t.detalle)}</p>`:""}
@@ -1767,16 +1765,14 @@ async function doDel(table,id){
 function pintarFotosForm(){ const el=$("#tFotos"); if(!el) return; el.innerHTML=(S.pendAtt["form-tarea"]||[]).map((p,i)=>`<div class="pthumb"><img src="${p.url}" alt=""><button type="button" onclick="S.pendAtt['form-tarea'].splice(${i},1);pintarFotosForm()" aria-label="Quitar">✕</button></div>`).join(""); }
 function formTarea(id, cliId, vence){
   S.pendAtt["form-tarea"]=[];
-  const t=id?S.tareas.find(x=>x.id===id)||{}:{asignado:S.me.id,cliente_id:cliId||"",prioridad:"media",estado:"pendiente",area:"General",vence:vence||""};
+  const t=id?S.tareas.find(x=>x.id===id)||{}:{asignado:S.me.id,cliente_id:cliId||"",area:"General"};
+  S._tVence = id ? null : (vence||null); // si se abre desde la agenda, queda en ese día
   openModal(`<h2>${id?"Editar tarea":"Nueva tarea"}</h2><form class="form" onsubmit="saveTarea(event,'${id||""}')">
     <label class="f full" for="tTit">Tarea<input type="text" id="tTit" required value="${esc(t.titulo)}" placeholder="Ej: Diseñar 3 placas de feed para TANK"></label>
     <label class="f full" for="tDet">Detalle<textarea id="tDet" onpaste="pegarAdj(event,'form-tarea')" placeholder="Brief, links, referencias">${esc(t.detalle)}</textarea></label>
     <label class="f" for="tAsig">Responsable<select id="tAsig">${memOptions(t.asignado)}</select></label>
     <label class="f" for="tCli">Cliente<select id="tCli">${cliOptions(t.cliente_id)}</select></label>
     <label class="f" for="tArea2">Área<select id="tArea2">${opts(AREAS,t.area)}</select></label>
-    <label class="f" for="tPrio">Prioridad<select id="tPrio">${[["alta","Alta"],["media","Media"],["baja","Baja"]].map(([k,l])=>`<option value="${k}" ${t.prioridad===k?"selected":""}>${l}</option>`).join("")}</select></label>
-    <label class="f" for="tVence">Vence<input type="date" id="tVence" value="${esc(t.vence)}"></label>
-    <label class="f" for="tEst">Estado<select id="tEst">${[["pendiente","Por hacer"],["curso","En curso"],["hecha","Hecha"]].map(([k,l])=>`<option value="${k}" ${t.estado===k?"selected":""}>${l}</option>`).join("")}</select></label>
     <div class="full"><div class="f" style="margin-bottom:6px">Fotos de referencia</div>
       <div class="pend" id="tFotos" style="border:0;padding:0 0 8px"></div>
       <label class="btn" style="cursor:pointer">${icon("image")}Agregar fotos<input type="file" hidden accept="image/*" multiple onchange="agregarAdj('form-tarea',this.files);pintarFotosForm();this.value=''"></label>
@@ -1787,8 +1783,8 @@ function formTarea(id, cliId, vence){
 async function saveTarea(e,id){
   e.preventDefault();
   const prev=id?S.tareas.find(x=>x.id===id)||{}:{};
-  const estado=v("tEst");
-  const data={titulo:v("tTit"),detalle:v("tDet"),asignado:nz(v("tAsig")),cliente_id:nz(v("tCli")),area:v("tArea2"),prioridad:v("tPrio"),vence:nz(v("tVence")),estado,hecha_el:estado==="hecha"?(prev.hecha_el||new Date().toISOString()):null};
+  const data={titulo:v("tTit"),detalle:v("tDet"),asignado:nz(v("tAsig")),cliente_id:nz(v("tCli")),area:v("tArea2")};
+  if(!id){ data.estado="pendiente"; data.prioridad="media"; if(S._tVence) data.vence=S._tVence; }
   const btn=e.submitter||document.querySelector("#modal .btn.pri"); if(btn){ btn.disabled=true; btn.textContent="Guardando…"; }
   let tid=id;
   if(id){ if(!await run(sb.from("tareas").update(data).eq("id",id))){ if(btn){btn.disabled=false;btn.textContent="Guardar";} return; } Object.assign(prev,data); }
