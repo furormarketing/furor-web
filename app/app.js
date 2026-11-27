@@ -148,7 +148,8 @@ const PK = { lecturas:r=>r.miembro_id+"|"+r.canal, config:r=>r.clave };
 const keyOf = (t,r) => (PK[t]||(x=>x.id))(r);
 let _rf=0;
 // mientras alguien escribe en una nota o en un campo editable de una tabla, no se redibuja la pantalla (si no, se borra lo que está escribiendo)
-const _esEditable = el => !!(el && el.classList && (el.classList.contains("ns-in")||el.classList.contains("ns-new")||(el.classList.contains("inl")&&/^(INPUT|TEXTAREA)$/.test(el.tagName))));
+// cualquier campo de texto con foco (menos el chat, que tiene que seguir mostrando mensajes nuevos)
+const _esEditable = el => !!(el && el.tagName && (el.tagName==="TEXTAREA" || (el.tagName==="INPUT" && !/^(checkbox|radio|button|submit|file|range|color)$/i.test(el.type||""))) && !String(el.id||"").startsWith("msg-"));
 const escribiendoNota = () => _esEditable(document.activeElement);
 document.addEventListener("focusout", e=>{ if(_esEditable(e.target)) setTimeout(()=>{ if(S._pendRender && !escribiendoNota()){ S._pendRender=false; render(); } },60); });
 function renderSoon(){ if(escribiendoNota()){ S._pendRender=true; return; } if(_rf) return; _rf=requestAnimationFrame(()=>{ _rf=0; render(); }); }
@@ -360,7 +361,7 @@ function render(){
   S._lastView=S.view;
   if(hsPrev.length) document.querySelectorAll("#main "+HS).forEach((e,i)=>{ if(hsPrev[i]) e.scrollLeft=hsPrev[i]; });
   document.querySelectorAll("body > .daysheet-bg").forEach(x=>x.remove());
-  const ds=$("#main .daysheet-bg"); if(ds) document.body.appendChild(ds);
+  const ds=$("#main .daysheet-bg"); if(ds){ if(S._sheetAnim){ ds.classList.add("anim"); S._sheetAnim=false; } document.body.appendChild(ds); }
   if(aid){ const el=document.getElementById(aid); if(el){ el.focus(); try{ if(sel!=null) el.setSelectionRange(sel,sel); }catch(e){} } }
   const m2=$(".msgs"); if(m2 && atBottom) m2.scrollTop=m2.scrollHeight;
   if(S.view==="chat" && (!S.mobile || S.chatOpen)) markSeen(S.chatCh);
@@ -613,7 +614,7 @@ async function toggleFeriado(fecha){
 }
 function abrirDia(k){
   if(S.f.calSel!==k){ S.qaTxt=""; S.qaHora=""; }
-  S.f.calSel=k; if(S.mobile) S.diaSheet=true; render();
+  S.f.calSel=k; if(S.mobile){ if(!S.diaSheet) S._sheetAnim=true; S.diaSheet=true; } render();
   if(!S.mobile) setTimeout(()=>{ const i=document.getElementById("qaTit"); if(i) i.focus(); });
 }
 function qaMas(fecha){
@@ -1305,7 +1306,7 @@ function vDireccion(){
   if(window.DIR) return DIR.vista();
   if(!_dirCargando){
     _dirCargando=true;
-    const sc=document.createElement("script"); sc.src="direccion.js?v=31"; sc.onload=()=>render();
+    const sc=document.createElement("script"); sc.src="direccion.js?v=32"; sc.onload=()=>render();
     sc.onerror=()=>{ _dirCargando=false; toast("No se pudo abrir Dirección. Revisá la conexión."); };
     document.body.appendChild(sc);
   }
@@ -1740,8 +1741,12 @@ async function savePublicado(e,id){
 }
 
 /* ---------- Modales y formularios ---------- */
-function openModal(html){ $("#modal").innerHTML=html; $("#modalBg").classList.add("open"); const f=$("#modal input:not([type=checkbox]):not([disabled]), #modal select, #modal textarea"); if(f) f.focus(); }
-function closeModal(){ $("#modalBg").classList.remove("open"); $("#modal").innerHTML=""; }
+function openModal(html){
+  $("#modal").innerHTML=html; const bg=$("#modalBg"); bg.classList.add("open"); bg.scrollTop=0; document.body.classList.add("modal-open");
+  // en el celular no se abre el teclado solo: eso hacía saltar la pantalla al abrir un formulario
+  if(!S.mobile){ const f=$("#modal input:not([type=checkbox]):not([disabled]), #modal select, #modal textarea"); if(f) f.focus(); }
+}
+function closeModal(){ $("#modalBg").classList.remove("open"); $("#modal").innerHTML=""; document.body.classList.remove("modal-open"); }
 $("#modalBg").addEventListener("click",e=>{ if(e.target.id==="modalBg") closeModal(); });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
 const opts=(arr,sel)=>arr.map(a=>`<option ${sel===a?"selected":""}>${esc(a)}</option>`).join("");

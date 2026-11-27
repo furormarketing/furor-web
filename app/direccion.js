@@ -155,7 +155,7 @@ function deudaAcc(id){
     <label class="f" for="dmMon">Monto que debe<input ${MONTO_IN} id="dmMon" value="${montoVal(r)}"></label>
     <div class="actions"><div><button type="button" class="btn" onclick="DIR._deuda('${id}','nocobra')">Ya no se cobra</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn">Guardar monto</button><button type="button" class="btn pri" onclick="DIR._deuda('${id}','cobrado')">${icon("ok")}Cobrado</button></div></div>
   </form>`);
-  setTimeout(()=>{ const i=document.getElementById("dmMon"); if(i){ i.focus(); i.select(); } },50);
+  if(!S.mobile) setTimeout(()=>{ const i=document.getElementById("dmMon"); if(i){ i.focus(); i.select(); } },50);
 }
 async function _deuda(id,acc){
   const x=D.fin_cobros.find(c=>c.id===id); if(!x) return;
